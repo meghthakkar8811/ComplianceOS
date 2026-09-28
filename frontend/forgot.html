@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Forgot Password — ComplianceOS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Serif:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/auth.css">
+<script src="js/theme.js"></script>
+</head>
+<body>
+<button class="theme-toggle-btn" onclick="toggleTheme()" title="Toggle Dark/Light Mode"></button>
+<div class="auth-bg"><div class="auth-bg-grid"></div><div class="auth-bg-glow"></div></div>
+
+<div class="auth-center">
+  <div class="auth-card verify-card" id="step-email">
+    <div class="verify-icon">🔑</div>
+    <h2>Reset your password</h2>
+    <p class="verify-sub">Enter your email and we'll send a 6-digit reset code.</p>
+
+    <div class="msg-box error"   id="err1" style="display:none"></div>
+    <div class="msg-box success" id="suc1" style="display:none"></div>
+
+    <form id="forgot-form">
+      <div class="form-group">
+        <label>Email Address</label>
+        <div class="input-wrap">
+          <span class="input-icon">✉</span>
+          <input type="email" id="reset-email" placeholder="you@company.com" required autocomplete="email">
+        </div>
+      </div>
+      <button type="submit" class="btn-primary full-w" id="send-btn">
+        <span id="send-text">Send Reset Code</span>
+        <span id="send-spin" class="spinner" style="display:none"></span>
+      </button>
+    </form>
+    <div class="auth-footer" style="margin-top:18px"><a href="login.html">← Back to Sign In</a></div>
+  </div>
+
+  <!-- STEP 2: Enter code + new password -->
+  <div class="auth-card verify-card" id="step-reset" style="display:none">
+    <div class="verify-icon">🔒</div>
+    <h2>Enter your reset code</h2>
+    <p class="verify-sub">Check <strong id="reset-email-display"></strong> for the 6-digit code.</p>
+
+    <div class="msg-box error"   id="err2" style="display:none"></div>
+    <div class="msg-box success" id="suc2" style="display:none"></div>
+
+    <div class="otp-wrap" id="otp-wrap2">
+      <input class="otp-input" type="text" maxlength="1" inputmode="numeric" id="r0" onkeyup="otpMove2(this,0)">
+      <input class="otp-input" type="text" maxlength="1" inputmode="numeric" id="r1" onkeyup="otpMove2(this,1)">
+      <input class="otp-input" type="text" maxlength="1" inputmode="numeric" id="r2" onkeyup="otpMove2(this,2)">
+      <div class="otp-dash">—</div>
+      <input class="otp-input" type="text" maxlength="1" inputmode="numeric" id="r3" onkeyup="otpMove2(this,3)">
+      <input class="otp-input" type="text" maxlength="1" inputmode="numeric" id="r4" onkeyup="otpMove2(this,4)">
+      <input class="otp-input" type="text" maxlength="1" inputmode="numeric" id="r5" onkeyup="otpMove2(this,5)">
+    </div>
+
+    <div class="form-group" style="margin-top:20px">
+      <label>New Password</label>
+      <div class="input-wrap">
+        <span class="input-icon">🔒</span>
+        <input type="password" id="new-pass" placeholder="At least 8 characters" required>
+        <button type="button" class="toggle-pass" onclick="togglePassword('new-pass', this)">👁</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Confirm New Password</label>
+      <div class="input-wrap">
+        <span class="input-icon">🔒</span>
+        <input type="password" id="confirm-pass" placeholder="Repeat new password" required>
+        <button type="button" class="toggle-pass" onclick="togglePassword('confirm-pass', this)">👁</button>
+      </div>
+    </div>
+
+    <button class="btn-primary full-w" id="reset-btn" onclick="submitReset()">
+      <span id="reset-text">Reset Password</span>
+      <span id="reset-spin" class="spinner" style="display:none"></span>
+    </button>
+    <div class="auth-footer" style="margin-top:18px"><a href="login.html">← Back to Sign In</a></div>
+  </div>
+</div>
+
+<script>
+const API = '../backend/auth';
+let resetEmail = '';
+
+document.getElementById('forgot-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  resetEmail = document.getElementById('reset-email').value.trim().toLowerCase();
+  document.getElementById('send-btn').disabled = true;
+  document.getElementById('send-text').style.display = 'none';
+  document.getElementById('send-spin').style.display = 'inline-block';
+  document.getElementById('err1').style.display = 'none';
+
+  try {
+    const res  = await fetch(`${API}/forgot_password.php`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ email: resetEmail }),
+    });
+    const data = await res.json();
+    document.getElementById('step-email').style.display = 'none';
+    document.getElementById('step-reset').style.display = 'block';
+    document.getElementById('reset-email-display').textContent = resetEmail;
+    document.getElementById('r0').focus();
+  } catch (err) {
+    document.getElementById('err1').textContent = 'Connection failed.';
+    document.getElementById('err1').style.display = 'flex';
+    document.getElementById('send-btn').disabled = false;
+    document.getElementById('send-text').style.display = 'inline';
+    document.getElementById('send-spin').style.display = 'none';
+  }
+});
+
+function otpMove2(inp, idx) {
+  inp.value = inp.value.replace(/\D/g,'');
+  if (inp.value && idx < 5) document.getElementById('r' + (idx+1)).focus();
+}
+
+document.getElementById('otp-wrap2').addEventListener('keydown', (e) => {
+  if (e.key === 'Backspace') {
+    const idx = parseInt(e.target.id.slice(1));
+    if (!e.target.value && idx > 0) { const p = document.getElementById('r'+(idx-1)); p.value=''; p.focus(); }
+  }
+});
+
+document.getElementById('otp-wrap2').addEventListener('paste', (e) => {
+  e.preventDefault();
+  const pasted = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g,'').slice(0,6);
+  for (let i = 0; i < 6; i++) { const el = document.getElementById('r'+i); if (el) el.value = pasted[i]||''; }
+});
+
+async function submitReset() {
+  const code    = Array.from({length:6},(_,i)=>document.getElementById('r'+i)?.value||'').join('');
+  const pass    = document.getElementById('new-pass').value;
+  const confirm = document.getElementById('confirm-pass').value;
+  document.getElementById('err2').style.display = 'none';
+
+  if (code.length !== 6)   { showErr2('Enter all 6 digits'); return; }
+  if (pass !== confirm)     { showErr2('Passwords do not match'); return; }
+  if (pass.length < 8)      { showErr2('Password must be at least 8 characters'); return; }
+
+  document.getElementById('reset-btn').disabled = true;
+  document.getElementById('reset-text').style.display = 'none';
+  document.getElementById('reset-spin').style.display = 'inline-block';
+
+  try {
+    const res  = await fetch(`${API}/reset_password.php`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email: resetEmail, code, password: pass }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      document.querySelectorAll('.otp-input').forEach(el => el.classList.add('otp-success'));
+      document.getElementById('suc2').textContent = '✓ Password reset! Redirecting to sign in…';
+      document.getElementById('suc2').style.display = 'flex';
+      setTimeout(() => window.location.href = 'login.html?reset=1', 1500);
+    } else {
+      showErr2(data.error || 'Invalid code or expired. Please try again.');
+      document.getElementById('reset-btn').disabled = false;
+      document.getElementById('reset-text').style.display = 'inline';
+      document.getElementById('reset-spin').style.display = 'none';
+    }
+  } catch (err) {
+    showErr2('Connection failed.');
+    document.getElementById('reset-btn').disabled = false;
+    document.getElementById('reset-text').style.display = 'inline';
+    document.getElementById('reset-spin').style.display = 'none';
+  }
+}
+
+function showErr2(msg) { const b = document.getElementById('err2'); b.textContent = msg; b.style.display = 'flex'; }
+function togglePassword(id, btn) {
+  const inp = document.getElementById(id); inp.type = inp.type==='password'?'text':'password';
+  btn.textContent = inp.type==='password'?'👁':'🙈';
+}
+</script>
+</body>
+</html>

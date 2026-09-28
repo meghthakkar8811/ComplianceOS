@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Create Account — ComplianceOS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Serif:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/auth.css">
+<script src="js/theme.js"></script>
+</head>
+<body>
+<button class="theme-toggle-btn" onclick="toggleTheme()" title="Toggle Dark/Light Mode"></button>
+<div class="auth-bg"><div class="auth-bg-grid"></div><div class="auth-bg-glow"></div></div>
+
+<div class="auth-wrap">
+  <!-- LEFT -->
+  <div class="auth-left">
+    <div class="auth-logo">
+      <div class="logo-hex">⬡</div>
+      <div><div class="logo-name">ComplianceOS</div><div class="logo-tag">Mining Compliance Platform</div></div>
+    </div>
+    <h1 class="auth-headline">Start your<br><span class="headline-amber">compliance journey.</span></h1>
+    <p class="auth-sub">Set up your mining company in 2 minutes. Your first mine's compliance calendar auto-generates on signup.</p>
+    <div class="auth-features">
+      <div class="af-item"><span class="af-dot green"></span>Free 14-day trial — no credit card</div>
+      <div class="af-item"><span class="af-dot amber"></span>Onboard your first mine in 5 minutes</div>
+      <div class="af-item"><span class="af-dot blue"></span>Compliance calendar auto-generated</div>
+      <div class="af-item"><span class="af-dot purple"></span>WhatsApp alerts activated immediately</div>
+    </div>
+    <div class="plan-preview">
+      <div class="pp-label">Starting on Starter Plan</div>
+      <div class="pp-price">₹9,999<span>/month</span></div>
+      <div class="pp-note">After your 14-day free trial</div>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="auth-right">
+    <div class="auth-card">
+      <div class="auth-card-header">
+        <h2>Create your account</h2>
+        <p>Set up ComplianceOS for your mining company</p>
+      </div>
+
+      <a class="btn-google" href="../backend/auth/google_login.php">
+        <svg width="18" height="18" viewBox="0 0 24 24">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+        </svg>
+        Sign up with Google
+      </a>
+
+      <div class="auth-divider"><span>or create account with email</span></div>
+
+      <div class="msg-box error"   id="error-box"   style="display:none"></div>
+      <div class="msg-box success" id="success-box" style="display:none"></div>
+
+      <form id="signup-form">
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>Full Name <span class="req">*</span></label>
+            <div class="input-wrap">
+              <span class="input-icon">👤</span>
+              <input type="text" id="full_name" placeholder="Mahesh Thakkar" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Phone Number</label>
+            <div class="input-wrap">
+              <span class="input-icon">📱</span>
+              <input type="tel" id="phone" placeholder="+91 98XXX XXXXX">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Company / Mining Firm Name <span class="req">*</span></label>
+          <div class="input-wrap">
+            <span class="input-icon">🏢</span>
+            <input type="text" id="company_name" placeholder="Thakkar Mining Private Limited" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Work Email Address <span class="req">*</span></label>
+          <div class="input-wrap">
+            <span class="input-icon">✉</span>
+            <input type="email" id="email" placeholder="mahesh@thakkarmining.com" required autocomplete="email">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Password <span class="req">*</span></label>
+          <div class="input-wrap">
+            <span class="input-icon">🔒</span>
+            <input type="password" id="password" placeholder="At least 8 characters" required autocomplete="new-password" oninput="checkPasswordStrength(this.value)">
+            <button type="button" class="toggle-pass" onclick="togglePassword('password', this)">👁</button>
+          </div>
+          <div class="password-strength" id="pw-strength" style="display:none">
+            <div class="pw-bar-wrap"><div class="pw-bar" id="pw-bar"></div></div>
+            <span id="pw-label"></span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Confirm Password <span class="req">*</span></label>
+          <div class="input-wrap">
+            <span class="input-icon">🔒</span>
+            <input type="password" id="confirm_password" placeholder="Repeat your password" required autocomplete="new-password">
+            <button type="button" class="toggle-pass" onclick="togglePassword('confirm_password', this)">👁</button>
+          </div>
+        </div>
+
+        <label class="checkbox-label" style="margin-bottom:20px">
+          <input type="checkbox" id="terms" required>
+          <span class="checkmark"></span>
+          I agree to the <a href="#" target="_blank">Terms of Service</a> and <a href="#" target="_blank">Privacy Policy</a>
+        </label>
+
+        <button type="submit" class="btn-primary" id="signup-btn">
+          <span id="signup-btn-text">Create Account</span>
+          <span id="signup-spinner" class="spinner" style="display:none"></span>
+        </button>
+      </form>
+
+      <div class="auth-footer">Already have an account? <a href="login.html">Sign in →</a></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '../backend/auth';
+
+document.getElementById('signup-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  clearMessages();
+
+  const password = document.getElementById('password').value;
+  const confirm  = document.getElementById('confirm_password').value;
+  if (password !== confirm) { showError('Passwords do not match'); return; }
+  if (password.length < 8)  { showError('Password must be at least 8 characters'); return; }
+
+  setLoading(true);
+  const body = {
+    company_name: document.getElementById('company_name').value.trim(),
+    full_name:    document.getElementById('full_name').value.trim(),
+    email:        document.getElementById('email').value.trim().toLowerCase(),
+    phone:        document.getElementById('phone').value.trim(),
+    password,
+  };
+
+  try {
+    const res  = await fetch(`${API}/register.php`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    let data;
+    try {
+      data = await res.json();
+    } catch (parseErr) {
+      throw new Error(`Server returned status ${res.status}. Check XAMPP Apache and PHP logs.`);
+    }
+
+    if (data.success) {
+      localStorage.setItem('cos_pending_email', body.email);
+      let redirUrl = 'verify.html?email=' + encodeURIComponent(body.email);
+      if (data.debug_code) {
+        localStorage.setItem('cos_pending_code', data.debug_code);
+        redirUrl += '&code=' + encodeURIComponent(data.debug_code);
+        showSuccess('Account created! (Dev mode: OTP ' + data.debug_code + ')');
+      } else {
+        showSuccess('Account created! Check your email for the verification code.');
+      }
+      setTimeout(() => window.location.href = redirUrl, 1200);
+    } else {
+      showError(data.error || 'Registration failed. Please try again.');
+      setLoading(false);
+    }
+  } catch (err) {
+    if (window.location.protocol === 'file:') {
+      showError('Please open this page via <a href="http://localhost/complianceos/frontend/signup.html" style="color:var(--amber-bright);text-decoration:underline;">http://localhost/complianceos/frontend/signup.html</a> (not file://).');
+    } else {
+      showError(err.message && !err.message.includes('fetch') ? err.message : 'Connection failed. Please ensure Apache and MySQL are running in XAMPP.');
+    }
+    setLoading(false);
+  }
+});
+
+function checkPasswordStrength(pw) {
+  const el = document.getElementById('pw-strength');
+  const bar = document.getElementById('pw-bar');
+  const lbl = document.getElementById('pw-label');
+  if (!pw) { el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  let score = 0;
+  if (pw.length >= 8)  score++;
+  if (pw.length >= 12) score++;
+  if (/[A-Z]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  const levels = [
+    { pct: '20%', color: '#e74c3c', label: 'Too weak' },
+    { pct: '40%', color: '#e74c3c', label: 'Weak' },
+    { pct: '60%', color: '#f0a500', label: 'Fair' },
+    { pct: '80%', color: '#e8a020', label: 'Good' },
+    { pct: '100%', color: '#2ecc71', label: 'Strong' },
+  ];
+  const level = levels[Math.min(score, 4)];
+  bar.style.width = level.pct; bar.style.background = level.color;
+  lbl.textContent = level.label; lbl.style.color = level.color;
+}
+
+function setLoading(on) {
+  document.getElementById('signup-btn').disabled = on;
+  document.getElementById('signup-btn-text').style.display = on ? 'none' : 'inline';
+  document.getElementById('signup-spinner').style.display  = on ? 'inline-block' : 'none';
+}
+function showError(msg)   { const b = document.getElementById('error-box');   b.innerHTML = msg; b.style.display = 'flex'; }
+function showSuccess(msg) { const b = document.getElementById('success-box'); b.innerHTML = msg; b.style.display = 'flex'; }
+function clearMessages()  { document.getElementById('error-box').style.display = 'none'; document.getElementById('success-box').style.display = 'none'; }
+function togglePassword(id, btn) {
+  const inp = document.getElementById(id);
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  btn.textContent = inp.type === 'password' ? '👁' : '🙈';
+}
+</script>
+</body>
+</html>

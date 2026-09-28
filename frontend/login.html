@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Sign In — ComplianceOS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Serif:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/auth.css">
+<script src="js/theme.js"></script>
+</head>
+<body>
+<button class="theme-toggle-btn" onclick="toggleTheme()" title="Toggle Dark/Light Mode"></button>
+
+<div class="auth-bg">
+  <div class="auth-bg-grid"></div>
+  <div class="auth-bg-glow"></div>
+</div>
+
+<div class="auth-wrap">
+
+  <!-- LEFT PANEL -->
+  <div class="auth-left">
+    <div class="auth-logo">
+      <div class="logo-hex">⬡</div>
+      <div>
+        <div class="logo-name">ComplianceOS</div>
+        <div class="logo-tag">Mining Compliance Platform</div>
+      </div>
+    </div>
+    <h1 class="auth-headline">Statutory compliance,<br><span class="headline-amber">automated.</span></h1>
+    <p class="auth-sub">IBM Form B. Royalty calculations. DGMS readiness. All in one platform built for Indian mining companies.</p>
+    <div class="auth-features">
+      <div class="af-item"><span class="af-dot green"></span>IBM Form B auto-fill in 20 minutes</div>
+      <div class="af-item"><span class="af-dot amber"></span>Live royalty calculator — 8 states</div>
+      <div class="af-item"><span class="af-dot blue"></span>DGMS inspection readiness score</div>
+      <div class="af-item"><span class="af-dot purple"></span>Document expiry alerts via WhatsApp</div>
+    </div>
+    <div class="auth-trust">
+      <div class="trust-stat"><span class="ts-num">8</span><span class="ts-label">States</span></div>
+      <div class="trust-divider"></div>
+      <div class="trust-stat"><span class="ts-num">64</span><span class="ts-label">Minerals</span></div>
+      <div class="trust-divider"></div>
+      <div class="trust-stat"><span class="ts-num">∞</span><span class="ts-label">Compliance Calendar</span></div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL — FORM -->
+  <div class="auth-right">
+    <div class="auth-card">
+
+      <div class="auth-card-header">
+        <h2>Welcome back</h2>
+        <p>Sign in to your ComplianceOS account</p>
+      </div>
+
+      <!-- GOOGLE SIGN IN -->
+      <a class="btn-google" href="../backend/auth/google_login.php">
+        <svg width="18" height="18" viewBox="0 0 24 24">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+        </svg>
+        Continue with Google
+      </a>
+
+      <div class="auth-divider"><span>or sign in with email</span></div>
+
+      <!-- ERROR/SUCCESS MESSAGES -->
+      <div class="msg-box error" id="error-box" style="display:none"></div>
+      <div class="msg-box success" id="success-box" style="display:none"></div>
+
+      <!-- LOGIN FORM -->
+      <form id="login-form">
+        <div class="form-group">
+          <label>Email Address</label>
+          <div class="input-wrap">
+            <span class="input-icon">✉</span>
+            <input type="email" id="email" placeholder="you@company.com" required autocomplete="email">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <div class="label-row">
+            <label>Password</label>
+            <a class="forgot-link" href="forgot.html">Forgot password?</a>
+          </div>
+          <div class="input-wrap">
+            <span class="input-icon">🔒</span>
+            <input type="password" id="password" placeholder="Enter your password" required autocomplete="current-password">
+            <button type="button" class="toggle-pass" onclick="togglePassword('password', this)">👁</button>
+          </div>
+        </div>
+
+        <div class="form-row-2">
+          <label class="checkbox-label">
+            <input type="checkbox" id="remember">
+            <span class="checkmark"></span>
+            Remember me for 30 days
+          </label>
+        </div>
+
+        <button type="submit" class="btn-primary" id="login-btn">
+          <span id="login-btn-text">Sign In</span>
+          <span id="login-spinner" class="spinner" style="display:none"></span>
+        </button>
+      </form>
+
+      <div class="auth-footer">
+        Don't have an account? <a href="signup.html">Create one free →</a>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '../backend/auth';
+
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  setLoading(true);
+  clearMessages();
+
+  const email    = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const remember = document.getElementById('remember').checked;
+
+  try {
+    const res  = await fetch(`${API}/login.php`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ email, password, remember }),
+    });
+
+    let data;
+    try {
+      data = await res.json();
+    } catch (parseErr) {
+      throw new Error(`Server returned status ${res.status}. Check XAMPP Apache and PHP logs.`);
+    }
+
+    if (data.success) {
+      localStorage.setItem('cos_token',    data.data.token);
+      localStorage.setItem('cos_user',     JSON.stringify(data.data));
+      localStorage.setItem('cos_mine_id',  '');
+      showSuccess('Sign in successful! Redirecting…');
+      setTimeout(() => window.location.href = 'dashboard.html', 800);
+    } else {
+      if (data.error && data.error.includes('verify your email')) {
+        showError(data.error + ' <a href="verify.html?email=' + encodeURIComponent(email) + '">Verify now →</a>');
+      } else {
+        showError(data.error || 'Invalid email or password');
+      }
+      setLoading(false);
+    }
+  } catch (err) {
+    if (window.location.protocol === 'file:') {
+      showError('Please open this page via <a href="http://localhost/complianceos/frontend/login.html" style="color:var(--amber-bright);text-decoration:underline;">http://localhost/complianceos/frontend/login.html</a> (not file://).');
+    } else {
+      showError(err.message && !err.message.includes('fetch') ? err.message : 'Connection failed. Please ensure Apache and MySQL are running in XAMPP.');
+    }
+    setLoading(false);
+  }
+});
+
+function setLoading(on) {
+  document.getElementById('login-btn').disabled = on;
+  document.getElementById('login-btn-text').style.display = on ? 'none' : 'inline';
+  document.getElementById('login-spinner').style.display  = on ? 'inline-block' : 'none';
+}
+
+function showError(msg)   { const b = document.getElementById('error-box');   b.innerHTML = msg; b.style.display = 'flex'; }
+function showSuccess(msg) { const b = document.getElementById('success-box'); b.innerHTML = msg; b.style.display = 'flex'; }
+function clearMessages()  { document.getElementById('error-box').style.display = 'none'; document.getElementById('success-box').style.display = 'none'; }
+function togglePassword(id, btn) {
+  const inp = document.getElementById(id);
+  inp.type  = inp.type === 'password' ? 'text' : 'password';
+  btn.textContent = inp.type === 'password' ? '👁' : '🙈';
+}
+
+// Auto-fill from URL params (after Google redirect or demo)
+const p = new URLSearchParams(window.location.search);
+if (window.location.protocol === 'file:') {
+  showError('⚠️ Warning: You opened this page via <code>file://</code>. Please access it via <a href="http://localhost/complianceos/frontend/login.html" style="color:var(--amber-bright);text-decoration:underline;font-weight:600;">http://localhost/complianceos/frontend/login.html</a>');
+}
+if (p.get('verified'))   showSuccess('Email verified! You can now sign in.');
+if (p.get('reset'))      showSuccess('Password reset successfully. Please sign in.');
+if (p.get('error'))      showError('Google sign-in failed. Please try again or use email.');
+</script>
+</body>
+</html>
