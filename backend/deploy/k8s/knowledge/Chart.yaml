@@ -1,0 +1,10 @@
+apiVersion: v2
+name: complianceos-knowledge
+description: Knowledge service chart for ComplianceOS — document indexing and semantic search (agent-engine's own knowledge service, hosted as ComplianceOS's own deployable)
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+dependencies:
+  - name: app-base
+    version: 0.1.0
+    repository: "file://../app-base"

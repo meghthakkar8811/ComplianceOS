@@ -1,0 +1,9 @@
+[
+  {
+    "_t": "com.agentengine.util.crypto.EncryptionKeyInfraConfig",
+    "type": "ENCRYPTION_KEY",
+    "keyId": "default",
+    "provider": "KEY",
+    "key": "${ENCRYPTION_KEY}"
+  }
+]

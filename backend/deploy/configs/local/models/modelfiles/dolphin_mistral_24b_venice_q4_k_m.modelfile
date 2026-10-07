@@ -1,0 +1,6 @@
+FROM /Users/rahul/Models/cognitivecomputations_Dolphin-Mistral-24B-Venice-Edition-Q4_K_M.gguf
+
+PARAMETER num_thread 4
+PARAMETER num_ctx 16384
+PARAMETER num_gpu 99
+PARAMETER num_batch 512

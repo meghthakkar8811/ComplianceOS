@@ -1,0 +1,20 @@
+[
+  {
+    "id": "1",
+    "name": "local",
+    "domain": "localhost",
+    "defaultModels": {
+      "fastModelId": "gemma4",
+      "compactionModelId": "gemma4",
+      "evaluatorModelId": "gemma4",
+      "embeddingModelId": "nomic-embed-text",
+      "chatModelId": "gemma4",
+      "visionModelId": "gemma4"
+    },
+    "user": {
+      "id": "1",
+      "username": "admin",
+      "password": "password"
+    }
+  }
+]

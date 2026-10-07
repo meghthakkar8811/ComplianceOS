@@ -1,0 +1,10 @@
+service:
+  name: localstack
+
+deploymentStrategy:
+  type: Recreate
+
+image:
+  repository: localstack/localstack
+  tag: "3"
+  pullPolicy: IfNotPresent

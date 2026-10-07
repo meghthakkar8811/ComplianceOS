@@ -1,0 +1,12 @@
+{{- if include "complianceos.app-base.pekkoEnabled" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "complianceos.app-base.instance" . }}-pekko-configmap
+  namespace: {{ include "complianceos.app-base.namespace" . }}
+  labels:
+    {{- include "complianceos.app-base.labels" . | nindent 4 }}
+data:
+  pekko-base.conf: |-
+    {{- required "app-base.pekko.baseConf must be set (via deployae) when pekko.cluster is set" .Values.pekko.baseConf | nindent 4 }}
+{{- end }}

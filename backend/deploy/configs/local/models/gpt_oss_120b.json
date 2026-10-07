@@ -1,0 +1,21 @@
+{
+  "id": "gpt-oss-120b",
+  "model": "openai/gpt-oss-120b",
+  "name": "GPT OSS (120B)",
+  "baseUrl": "https://api.groq.com/openai/v1",
+  "apiKey": "{{ env.GROQ_API_KEY }}",
+  "temperature": 0.35,
+  "topK": 50,
+  "topP": 0.92,
+  "repeatPenalty": 1.05,
+  "toolCallingEnabled": true,
+  "thoughtsEnabled": true,
+  "additionalParams": [
+    {
+      "key": "reasoning_format",
+      "value": "parsed"
+    }
+  ],
+  "provider": "OPEN_AI",
+  "type": "CHAT"
+}

@@ -1,0 +1,66 @@
+[
+  {
+    "title": "Accident & Dangerous Occurrence Register",
+    "recordType": "REGISTER",
+    "authority": "DGMS",
+    "registerCode": "ACCIDENT_REGISTER",
+    "maxDaysAllowed": 1,
+    "notes": "MMR 1961 Reg. 20"
+  },
+  {
+    "title": "Safety Committee Proceedings",
+    "recordType": "REGISTER",
+    "authority": "DGMS",
+    "registerCode": "SAFETY_COMMITTEE",
+    "maxDaysAllowed": 30,
+    "notes": "MMR 1961 Reg. 62"
+  },
+  {
+    "title": "Explosive Consumption Register",
+    "recordType": "REGISTER",
+    "authority": "DGMS",
+    "registerCode": "EXPLOSIVE_CONSUMPTION",
+    "maxDaysAllowed": 7,
+    "notes": "Explosives Rules"
+  },
+  {
+    "title": "Shotfirer Competency Register",
+    "recordType": "REGISTER",
+    "authority": "DGMS",
+    "registerCode": "SHOTFIRER_COMPETENCY",
+    "maxDaysAllowed": 90,
+    "notes": "MMR 1961 Reg. 173"
+  },
+  {
+    "title": "First-Aid Register",
+    "recordType": "REGISTER",
+    "authority": "DGMS",
+    "registerCode": "FIRST_AID",
+    "maxDaysAllowed": 14,
+    "notes": "MMR 1961 Reg. 55"
+  },
+  {
+    "title": "Mining Machinery Register",
+    "recordType": "REGISTER",
+    "authority": "DGMS",
+    "registerCode": "MACHINERY_REGISTER",
+    "maxDaysAllowed": 30,
+    "notes": "MMR 1961 Reg. 79"
+  },
+  {
+    "title": "Weigh Bridge Register",
+    "recordType": "REGISTER",
+    "authority": "DGMS",
+    "registerCode": "WEIGHBRIDGE_REGISTER",
+    "maxDaysAllowed": 1,
+    "notes": "MCDR 2017"
+  },
+  {
+    "title": "Employment Register",
+    "recordType": "REGISTER",
+    "authority": "DGMS",
+    "registerCode": "EMPLOYMENT_REGISTER",
+    "maxDaysAllowed": 30,
+    "notes": "MMDR 1957"
+  }
+]

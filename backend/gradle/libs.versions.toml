@@ -1,0 +1,207 @@
+[plugins]
+quarkus = { id = "io.quarkus", version.ref = "quarkus" }
+protobuf = { id = "com.google.protobuf", version.ref = "protobuf-plugin" }
+
+[versions]
+# Core frameworks
+quarkus = "3.34.0"
+langchain4j = "1.20.2"
+langchain4j-plugin = "1.20.2"
+qdrant-client = "1.17.0"
+pdfbox = "2.0.32"
+google-adk = "1.4.0"
+google-genai = "1.44.0"
+pekko = "1.2.1"
+pekko-persistence-jdbc = "1.2.0"
+pekko-projections = "1.1.1"
+pekko-management = "1.0.0"
+
+# Jackson & JSON
+jackson = "2.18.6"
+json-path = "2.10.0"
+jinjava = "2.8.3"
+networknt-json-schema-validator = "2.0.0"
+
+aws-sdk = "2.31.0"
+oci-sdk = "3.80.3"
+fabric8-kubernetes-client = "6.13.4"
+
+# gRPC & Protobuf
+protobuf = "3.25.8"
+protobuf-plugin = "0.9.5"
+grpc = "1.79.0"
+
+# Utilities
+guava = "33.5.0-jre"
+byte-buddy = "1.18.2"
+concurrency-limits = "0.5.3"
+groovy = "4.0.28"
+rxjava = "3.1.12"
+reactive-streams = "1.0.4"
+java-diff-utils = "4.16"
+stateless4j = "2.6.0"
+slf4j = "2.0.17"
+commons-text = "1.13.1"
+flexmark = "0.64.8"
+commonmark = "0.28.0"
+
+# Database & Drivers
+mongodb = "5.6.3"
+postgresql = "42.7.7"
+vertx = "4.5.25"
+
+# Jakarta & MicroProfile
+jakarta-validation = "3.0.2"
+jakarta-inject = "2.0.1"
+jakarta-cdi = "4.0.1"
+jakarta-annotation = "3.0.0"
+javax-annotation = "1.3.2"
+microprofile-openapi = "4.0.1"
+
+# Other
+ag-ui = "0.1.0"
+kotlinx-serialization = "1.8.1"
+okhttp = "4.12.0"
+spotless = "8.4.0"
+jandex = "2.3.0"
+cron-utils = "9.2.1"
+jgroups = "5.3.13.Final"
+jgroups-kubernetes = "2.0.1.Final"
+
+[libraries]
+guava = { group = "com.google.guava", name = "guava", version.ref = "guava" }
+concurrency-limits-core = { group = "com.netflix.concurrency-limits", name = "concurrency-limits-core", version.ref = "concurrency-limits" }
+cron-utils = { group = "com.cronutils", name = "cron-utils", version.ref = "cron-utils" }
+byte-buddy = { group = "net.bytebuddy", name = "byte-buddy", version.ref = "byte-buddy" }
+
+# BOMs
+langchain4j-bom = { group = "dev.langchain4j", name = "langchain4j-bom", version.ref = "langchain4j" }
+pekko-bom = { module = "org.apache.pekko:pekko-bom_2.13", version.ref = "pekko" }
+quarkus-bom = { group = "io.quarkus", name = "quarkus-bom", version.ref = "quarkus" }
+
+# Pekko
+pekko-actor-typed = { module = "org.apache.pekko:pekko-actor-typed_2.13", version.ref = "pekko" }
+pekko-cluster-sharding-typed = { module = "org.apache.pekko:pekko-cluster-sharding-typed_2.13", version.ref = "pekko" }
+pekko-cluster-typed = { module = "org.apache.pekko:pekko-cluster-typed_2.13", version.ref = "pekko" }
+pekko-persistence-jdbc = { module = "org.apache.pekko:pekko-persistence-jdbc_2.13", version.ref = "pekko-persistence-jdbc" }
+pekko-persistence-typed = { module = "org.apache.pekko:pekko-persistence-typed_2.13", version.ref = "pekko" }
+pekko-serialization-jackson = { module = "org.apache.pekko:pekko-serialization-jackson_2.13", version.ref = "pekko" }
+pekko-streams = { module = "org.apache.pekko:pekko-stream_2.13", version.ref = "pekko" }
+pekko-streams-typed = { module = "org.apache.pekko:pekko-stream-typed_2.13", version.ref = "pekko" }
+pekko-projection-core = { module = "org.apache.pekko:pekko-projection-core_2.13", version.ref = "pekko-projections" }
+pekko-projection-eventsourced = { module = "org.apache.pekko:pekko-projection-eventsourced_2.13", version.ref = "pekko-projections" }
+pekko-projection-jdbc = { module = "org.apache.pekko:pekko-projection-jdbc_2.13", version.ref = "pekko-projections" }
+pekko-management-cluster-bootstrap = { module = "org.apache.pekko:pekko-management-cluster-bootstrap_2.13", version.ref = "pekko-management" }
+pekko-management-cluster-http = { module = "org.apache.pekko:pekko-management-cluster-http_2.13", version.ref = "pekko-management" }
+pekko-discovery-kubernetes-api = { module = "org.apache.pekko:pekko-discovery-kubernetes-api_2.13", version.ref = "pekko-management" }
+postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
+
+# Google AI
+google-genai = { group = "com.google.genai", name = "google-genai", version.ref = "google-genai" }
+google-adk = { group = "com.google.adk", name = "google-adk", version.ref = "google-adk" }
+google-adk-langchain4j = { group = "com.google.adk", name = "google-adk-langchain4j", version.ref = "google-adk" }
+
+# Quarkus & LangChain4j Core
+langchain4j-core = { group = "dev.langchain4j", name = "langchain4j" }
+langchain4j-open-ai = { group = "dev.langchain4j", name = "langchain4j-open-ai", version.ref = "langchain4j-plugin" }
+langchain4j-ollama = { group = "dev.langchain4j", name = "langchain4j-ollama", version.ref = "langchain4j-plugin" }
+langchain4j-qdrant = { group = "dev.langchain4j", name = "langchain4j-community-qdrant", version.ref = "langchain4j-plugin" }
+langchain4j-http-client-jdk = { group = "dev.langchain4j", name = "langchain4j-http-client-jdk" }
+langchain4j-poi = { group = "dev.langchain4j", name = "langchain4j-document-parser-apache-poi" }
+pdfbox = { group = "org.apache.pdfbox", name = "pdfbox", version.ref = "pdfbox" }
+qdrant-client = { group = "io.qdrant", name = "client", version.ref = "qdrant-client" }
+quarkus-mongodb-client = { group = "io.quarkus", name = "quarkus-mongodb-client" }
+quarkus-logging-json = { group = "io.quarkus", name = "quarkus-logging-json" }
+quarkus-rest-jackson = { group = "io.quarkus", name = "quarkus-rest-jackson" }
+quarkus-smallrye-openapi = { group = "io.quarkus", name = "quarkus-smallrye-openapi" }
+quarkus-grpc = { group = "io.quarkus", name = "quarkus-grpc" }
+quarkus-opentelemetry = { group = "io.quarkus", name = "quarkus-opentelemetry" }
+quarkus-smallrye-fault-tolerance = { group = "io.quarkus", name = "quarkus-smallrye-fault-tolerance" }
+opentelemetry-api = { group = "io.opentelemetry", name = "opentelemetry-api" }
+quarkus-jackson = { group = "io.quarkus", name = "quarkus-jackson" }
+quarkus-smallrye-health = { group = "io.quarkus", name = "quarkus-smallrye-health" }
+quarkus-micrometer-registry-prometheus = { group = "io.quarkus", name = "quarkus-micrometer-registry-prometheus" }
+quarkus-hibernate-validator = { group = "io.quarkus", name = "quarkus-hibernate-validator" }
+quarkus-arc = { group = "io.quarkus", name = "quarkus-arc" }
+quarkus-elytron-security-common = { group = "io.quarkus", name = "quarkus-elytron-security-common" }
+quarkus-config-smallrye = { group = "io.quarkus", name = "quarkus-smallrye-context-propagation" }
+quarkus-agroal = { group = "io.quarkus", name = "quarkus-agroal" }
+quarkus-jdbc-postgresql = { group = "io.quarkus", name = "quarkus-jdbc-postgresql" }
+quarkus-kubernetes-client = { group = "io.quarkus", name = "quarkus-kubernetes-client" }
+quarkus-scheduler = { group = "io.quarkus", name = "quarkus-scheduler" }
+fabric8-kubernetes-client = { group = "io.fabric8", name = "kubernetes-client", version.ref = "fabric8-kubernetes-client" }
+
+# Jakarta APIs
+jakarta-validation-api = { group = "jakarta.validation", name = "jakarta.validation-api", version.ref = "jakarta-validation" }
+jakarta-inject-api = { group = "jakarta.inject", name = "jakarta.inject-api", version.ref = "jakarta-inject" }
+jakarta-enterprise-cdi-api = { group = "jakarta.enterprise", name = "jakarta.enterprise.cdi-api", version.ref = "jakarta-cdi" }
+jakarta-annotation-api = { group = "jakarta.annotation", name = "jakarta.annotation-api", version.ref = "jakarta-annotation" }
+javax-annotation-api = { group = "javax.annotation", name = "javax.annotation-api", version.ref = "javax-annotation" }
+microprofile-openapi-api = { group = "org.eclipse.microprofile.openapi", name = "microprofile-openapi-api", version.ref = "microprofile-openapi" }
+
+# Logging
+slf4j-api = { group = "org.slf4j", name = "slf4j-api", version.ref = "slf4j" }
+rxjava = { group = "io.reactivex.rxjava3", name = "rxjava", version.ref = "rxjava" }
+reactive-streams = { group = "org.reactivestreams", name = "reactive-streams", version.ref = "reactive-streams" }
+stateless4j = { group = "com.github.stateless4j", name = "stateless4j", version.ref = "stateless4j" }
+
+
+# AWS SDK v2
+aws-s3 = { group = "software.amazon.awssdk", name = "s3", version.ref = "aws-sdk" }
+aws-sts = { group = "software.amazon.awssdk", name = "sts", version.ref = "aws-sdk" }
+
+# OCI Java SDK
+oci-objectstorage = { group = "com.oracle.oci.sdk", name = "oci-java-sdk-objectstorage", version.ref = "oci-sdk" }
+oci-common = { group = "com.oracle.oci.sdk", name = "oci-java-sdk-common", version.ref = "oci-sdk" }
+oci-common-httpclient-jersey3 = { group = "com.oracle.oci.sdk", name = "oci-java-sdk-common-httpclient-jersey3", version.ref = "oci-sdk" }
+# Quarkus's BOM excludes commons-logging (it standardizes on JBoss Logging) without substituting
+# an API-compatible shim, so Apache HttpClient 4.x (pulled in transitively by the OCI SDK's Jersey3
+# HTTP transport via jersey-apache-connector) throws NoClassDefFoundError on first use unless this
+# shim is present. Quarkus-BOM-managed, hence no version.ref.
+commons-logging-jboss-logging = { group = "org.jboss.logging", name = "commons-logging-jboss-logging" }
+oci-keymanagement = { group = "com.oracle.oci.sdk", name = "oci-java-sdk-keymanagement", version.ref = "oci-sdk" }
+oci-core = { group = "com.oracle.oci.sdk", name = "oci-java-sdk-core", version.ref = "oci-sdk" }
+
+# AG-UI
+ag-ui-core = { group = "com.ag-ui.community", name = "java-core", version.ref = "ag-ui" }
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json-jvm", version.ref = "kotlinx-serialization" }
+
+# Commons & Utilities
+jackson-databind = { group = "com.fasterxml.jackson.core", name = "jackson-databind", version.ref = "jackson" }
+jackson-dataformat-yaml = { group = "com.fasterxml.jackson.dataformat", name = "jackson-dataformat-yaml", version.ref = "jackson" }
+jackson-datatype-jdk8 = { group = "com.fasterxml.jackson.datatype", name = "jackson-datatype-jdk8", version.ref = "jackson" }
+jackson-datatype-jsr310 = { group = "com.fasterxml.jackson.datatype", name = "jackson-datatype-jsr310", version.ref = "jackson" }
+jackson-datatype-guava = { group = "com.fasterxml.jackson.datatype", name = "jackson-datatype-guava", version.ref = "jackson" }
+jinjava = { group = "com.hubspot.jinjava", name = "jinjava", version.ref = "jinjava" }
+java-diff-utils = { group = "io.github.java-diff-utils", name = "java-diff-utils", version.ref = "java-diff-utils" }
+mongodb-bson = { group = "org.mongodb", name = "bson", version.ref = "mongodb" }
+mongodb-driver-sync = { group = "org.mongodb", name = "mongodb-driver-sync", version.ref = "mongodb" }
+vertx-json-schema = { group = "io.vertx", name = "vertx-json-schema", version.ref = "vertx" }
+networknt-json-schema-validator = { group = "com.networknt", name = "json-schema-validator", version.ref = "networknt-json-schema-validator" }
+json-path = { group = "com.jayway.jsonpath", name = "json-path", version.ref = "json-path" }
+groovy = { group = "org.apache.groovy", name = "groovy", version.ref = "groovy" }
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+commons-text = { group = "org.apache.commons", name = "commons-text", version.ref = "commons-text" }
+flexmark-all = { group = "com.vladsch.flexmark", name = "flexmark-all", version.ref = "flexmark" }
+commonmark = { group = "org.commonmark", name = "commonmark", version.ref = "commonmark" }
+jgroups = { group = "org.jgroups", name = "jgroups", version.ref = "jgroups" }
+jgroups-kubernetes = { group = "org.jgroups.kubernetes", name = "jgroups-kubernetes", version.ref = "jgroups-kubernetes" }
+
+# gRPC & Protobuf
+protobuf-java = { group = "com.google.protobuf", name = "protobuf-java", version.ref = "protobuf" }
+protobuf-protoc = { group = "com.google.protobuf", name = "protoc", version.ref = "protobuf" }
+grpc-protobuf = { group = "io.grpc", name = "grpc-protobuf", version.ref = "grpc" }
+grpc-netty-shaded = { group = "io.grpc", name = "grpc-netty-shaded", version.ref = "grpc" }
+grpc-stub = { group = "io.grpc", name = "grpc-stub", version.ref = "grpc" }
+grpc-protoc-gen-java = { group = "io.grpc", name = "protoc-gen-grpc-java", version.ref = "grpc" }
+
+# Build plugins
+spotless-gradle-plugin = { group = "com.diffplug.spotless", name = "spotless-plugin-gradle", version.ref = "spotless" }
+jandex-gradle-plugin = { group = "org.kordamp.gradle", name = "jandex-gradle-plugin", version.ref = "jandex" }
+
+[bundles]
+# The OCI SDK's Jersey3 HTTP transport pulls in Apache HttpClient 4.x transitively, which needs
+# the commons-logging shim (see commons-logging-jboss-logging above) — bundled so every module
+# that uses this transport gets the shim automatically, without modules that don't touch OCI
+# paying for it.
+oci-httpclient-jersey3 = ["oci-common-httpclient-jersey3", "commons-logging-jboss-logging"]

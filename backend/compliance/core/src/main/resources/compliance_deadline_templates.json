@@ -1,0 +1,32 @@
+[
+  {
+    "code": "IBM_MONTHLY_RETURN",
+    "title": "IBM Monthly Return (F-series, MCDR 2017)",
+    "authority": "IBM",
+    "recordType": "RETURN",
+    "status": "PENDING_SUBMISSION",
+    "monthsOfYear": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    "dayOfMonth": 1,
+    "expiry": "{{ periodStart + dayOffsetMillis }}"
+  },
+  {
+    "code": "EC_HALF_YEARLY_REPORT",
+    "title": "Environmental Clearance Half-Yearly Compliance Report",
+    "authority": "MOEFCC",
+    "recordType": "REPORT",
+    "status": "PENDING_SUBMISSION",
+    "monthsOfYear": [6, 12],
+    "dayOfMonth": 1,
+    "expiry": "{{ periodStart + dayOffsetMillis }}"
+  },
+  {
+    "code": "DGMS_QUARTERLY_REPORT",
+    "title": "DGMS Quarterly Safety Report",
+    "authority": "DGMS",
+    "recordType": "REPORT",
+    "status": "PENDING_SUBMISSION",
+    "monthsOfYear": [1, 4, 7, 10],
+    "dayOfMonth": 15,
+    "expiry": "{{ periodStart + dayOffsetMillis }}"
+  }
+]

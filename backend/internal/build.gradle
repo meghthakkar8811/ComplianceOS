@@ -1,0 +1,22 @@
+plugins {
+    id 'com.complianceos.java-application-conventions'
+}
+
+group = 'com.complianceos.internal'
+
+dependencies {
+    implementation platform(libs.quarkus.bom)
+    implementation libs.quarkus.arc
+
+    // Hosts compliance:core's repositories (their @Startup index/collection setup) and its
+    // ComplianceProvisioningService — discovered generically by agent-engine's own
+    // CustomerProvisioningService/EnvironmentProvisioningService below, so no compliance-specific
+    // provisioning code is needed in this module at all.
+    runtimeOnly project(':compliance:core')
+
+    // Agent-engine's own provisioning orchestration: CustomerProvisioningService,
+    // EnvironmentProvisioningService, and the ProvisioningIntRestAPI/InfraConfigIntRestAPI REST
+    // resources. Both orchestrators discover every ProvisioningService bean on the classpath
+    // generically (Instance<ProvisioningService>), including compliance's own.
+    implementation 'com.agentengine.internal:internal:1.0.1-SNAPSHOT'
+}

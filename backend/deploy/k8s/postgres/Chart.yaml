@@ -1,0 +1,10 @@
+apiVersion: v2
+dependencies:
+  - name: infra-base
+    version: 0.1.0
+    repository: "file://../infra-base"
+name: complianceos-postgres
+description: PostgreSQL for ComplianceOS
+type: application
+version: 0.1.0
+appVersion: "15"

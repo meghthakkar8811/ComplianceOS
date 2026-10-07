@@ -1,0 +1,15 @@
+plugins {
+    id 'com.complianceos.java-application-conventions'
+}
+
+group = 'com.complianceos.tenancy'
+
+dependencies {
+    implementation enforcedPlatform(libs.quarkus.bom)
+
+    // Hosts agent-engine's own tenancy service (customers, roles, role mappings,
+    // sharing) as ComplianceOS's own tenancy deployable.
+    implementation 'com.agentengine.tenancy:core:1.0.1-SNAPSHOT'
+
+    implementation libs.quarkus.arc
+}

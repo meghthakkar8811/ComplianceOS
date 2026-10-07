@@ -1,0 +1,10 @@
+apiVersion: v2
+name: complianceos-tenancy
+description: Tenancy service chart for ComplianceOS — customers, roles and role mappings, sharing (agent-engine's own tenancy service, hosted as ComplianceOS's own deployable)
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+dependencies:
+  - name: app-base
+    version: 0.1.0
+    repository: "file://../app-base"

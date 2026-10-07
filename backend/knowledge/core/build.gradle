@@ -1,0 +1,15 @@
+plugins {
+    id 'com.complianceos.java-application-conventions'
+}
+
+group = 'com.complianceos.knowledge'
+
+dependencies {
+    implementation enforcedPlatform(libs.quarkus.bom)
+
+    // Hosts agent-engine's own document indexing and semantic search service as
+    // ComplianceOS's own knowledge deployable.
+    implementation 'com.agentengine.knowledge:core:1.0.1-SNAPSHOT'
+
+    implementation libs.quarkus.arc
+}

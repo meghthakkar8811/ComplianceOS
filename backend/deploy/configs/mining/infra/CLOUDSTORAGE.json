@@ -1,0 +1,12 @@
+[
+  {
+    "_t": "com.agentengine.util.cloudstorage.CloudStorageServerInfraConfig",
+    "type": "CLOUDSTORAGE_SERVER",
+    "serverId": "default",
+    "provider": "ORACLE",
+    "region": "ap-mumbai-1",
+    "namespace": "bmt6upkvrhpm",
+    "useInstancePrincipal": true,
+    "compartmentId": "ocid1.tenancy.oc1..aaaaaaaasys5dibnsspt4aqhsu4rpl6vwlfsdlbxbozp6dqwirwbolncdesq"
+  }
+]

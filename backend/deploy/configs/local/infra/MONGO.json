@@ -1,0 +1,8 @@
+[
+  {
+    "_t": "com.agentengine.util.mongodb.infra.MongoServerInfraConfig",
+    "type": "MONGO_SERVER",
+    "serverId": "default",
+    "uri": "${INFRA_MONGODB_URI}"
+  }
+]

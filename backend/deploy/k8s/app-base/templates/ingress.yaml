@@ -1,0 +1,51 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "complianceos.app-base.instance" . }}
+  namespace: {{ include "complianceos.app-base.namespace" . }}
+  labels:
+    {{- include "complianceos.app-base.labels" . | nindent 4 }}
+  {{- if or .Values.ingress.clusterIssuer .Values.ingress.maxBodySize }}
+  annotations:
+    {{- /*
+    cert-manager watches for this annotation on any Ingress and automatically requests/renews a
+    certificate from the named ClusterIssuer, storing it in the Secret this Ingress's own `tls`
+    block already names below — nothing else needs wiring up. `local`'s mkcert-based TLS doesn't
+    set ingress.clusterIssuer, so it gets no annotation and is unaffected.
+    */}}
+    {{- if .Values.ingress.clusterIssuer }}
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.clusterIssuer }}
+    {{- end }}
+    {{- if .Values.ingress.maxBodySize }}
+    nginx.ingress.kubernetes.io/proxy-body-size: {{ .Values.ingress.maxBodySize | quote }}
+    {{- end }}
+  {{- end }}
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- end }}
+  rules:
+    {{- range .Values.ingress.hosts }}
+    - host: {{ .host }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ include "complianceos.app-base.instance" $ }}
+                port:
+                  number: {{ $.Values.service.httpPort }}
+          {{- end }}
+    {{- end }}
+  {{- if .Values.ingress.tlsEnabled }}
+  tls:
+    - hosts:
+        {{- range .Values.ingress.hosts }}
+        - {{ .host }}
+        {{- end }}
+      secretName: {{ include "complianceos.app-base.instance" . }}-tls
+  {{- end }}
+{{- end }}

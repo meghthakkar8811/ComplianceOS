@@ -1,0 +1,3 @@
+{{- if gt (int (.Values.replicaCount | default 1)) 1 }}
+{{- include "complianceos.infra-base.postDeploymentScriptJobs" . }}
+{{- end }}

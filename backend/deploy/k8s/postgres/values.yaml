@@ -1,0 +1,9 @@
+service:
+  name: postgres
+
+image:
+  repository: postgres
+  tag: "15"
+  pullPolicy: IfNotPresent
+
+database: complianceos_events

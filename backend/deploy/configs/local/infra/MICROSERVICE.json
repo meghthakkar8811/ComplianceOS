@@ -1,0 +1,51 @@
+[
+  {
+    "_t": "com.agentengine.util.ms.client.MicroServiceServerInfraConfig",
+    "type": "MICROSERVICE_SERVER",
+    "serverId": "compliance-default",
+    "host": "compliance-local.complianceos.svc.cluster.local",
+    "port": 8080
+  },
+  {
+    "_t": "com.agentengine.util.ms.client.MicroServiceServerInfraConfig",
+    "type": "MICROSERVICE_SERVER",
+    "serverId": "catalog-default",
+    "host": "compliance-local.complianceos.svc.cluster.local",
+    "port": 8080
+  },
+  {
+    "_t": "com.agentengine.util.ms.client.MicroServiceServerInfraConfig",
+    "type": "MICROSERVICE_SERVER",
+    "serverId": "agent-default",
+    "host": "agent-local.complianceos.svc.cluster.local",
+    "port": 8080
+  },
+  {
+    "_t": "com.agentengine.util.ms.client.MicroServiceServerInfraConfig",
+    "type": "MICROSERVICE_SERVER",
+    "serverId": "knowledge-default",
+    "host": "knowledge-local.complianceos.svc.cluster.local",
+    "port": 8080
+  },
+  {
+    "_t": "com.agentengine.util.ms.client.MicroServiceServerInfraConfig",
+    "type": "MICROSERVICE_SERVER",
+    "serverId": "connectors-default",
+    "host": "connectors-local.complianceos.svc.cluster.local",
+    "port": 8080
+  },
+  {
+    "_t": "com.agentengine.util.ms.client.MicroServiceServerInfraConfig",
+    "type": "MICROSERVICE_SERVER",
+    "serverId": "scheduler-default",
+    "host": "scheduler-local.complianceos.svc.cluster.local",
+    "port": 8080
+  },
+  {
+    "_t": "com.agentengine.util.ms.client.MicroServiceServerInfraConfig",
+    "type": "MICROSERVICE_SERVER",
+    "serverId": "tenancy-default",
+    "host": "tenancy-local.complianceos.svc.cluster.local",
+    "port": 8080
+  }
+]

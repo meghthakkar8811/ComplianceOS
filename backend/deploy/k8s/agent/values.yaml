@@ -1,0 +1,5 @@
+app-base:
+  service:
+    name: agent
+  pekko:
+    cluster: agent

@@ -1,0 +1,69 @@
+{{- $probes := include "complianceos.infra-base.probes" . | fromYaml -}}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "complianceos.infra-base.instance" . }}
+  namespace: {{ include "complianceos.infra-base.namespace" . }}
+  labels:
+    {{- include "complianceos.infra-base.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "complianceos.infra-base.instance" . }}-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "complianceos.infra-base.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "complianceos.infra-base.selectorLabels" . | nindent 8 }}
+    spec:
+      securityContext:
+        {{- include "complianceos.infra-base.podSecurityContext" . | nindent 8 }}
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: postgres
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- include "complianceos.infra-base.containerSecurityContext" . | nindent 12 }}
+          env:
+            - name: POSTGRES_DB
+              value: {{ .Values.database | quote }}
+            - name: POSTGRES_HOST_AUTH_METHOD
+              value: "trust"
+          ports:
+            - name: postgres
+              containerPort: 5432
+          startupProbe:
+            exec:
+              command: ["pg_isready", "-h", "127.0.0.1", "-p", "5432", "-U", "postgres"]
+            periodSeconds: {{ $probes.startup.periodSeconds }}
+            failureThreshold: {{ $probes.startup.failureThreshold }}
+            timeoutSeconds: {{ $probes.startup.timeoutSeconds }}
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-h", "127.0.0.1", "-p", "5432", "-U", "postgres"]
+            periodSeconds: {{ $probes.readiness.periodSeconds }}
+            failureThreshold: {{ $probes.readiness.failureThreshold }}
+            timeoutSeconds: {{ $probes.readiness.timeoutSeconds }}
+          livenessProbe:
+            tcpSocket:
+              port: postgres
+            periodSeconds: {{ $probes.liveness.periodSeconds }}
+            failureThreshold: {{ $probes.liveness.failureThreshold }}
+            timeoutSeconds: {{ $probes.liveness.timeoutSeconds }}
+          resources:
+            {{- toYaml (required "resources must be set" .Values.resources) | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+              subPath: pgdata
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ required "persistence.size must be set" .Values.persistence.size }}

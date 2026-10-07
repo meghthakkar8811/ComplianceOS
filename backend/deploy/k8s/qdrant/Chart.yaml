@@ -1,0 +1,10 @@
+apiVersion: v2
+name: complianceos-qdrant
+description: Qdrant vector database for ComplianceOS
+type: application
+version: 0.1.0
+appVersion: "v1.17.1"
+dependencies:
+  - name: infra-base
+    version: 0.1.0
+    repository: "file://../infra-base"

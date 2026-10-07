@@ -1,0 +1,50 @@
+[
+  {
+    "state": "ODISHA",
+    "mineral": "IRON_ORE",
+    "year": 2026,
+    "month": "JULY",
+    "ratePerTonne": 58200,
+    "sourceCitation": "MMDR Act 1957 Second Schedule (15% of IBM-published average sale price for iron ore, July 2026)"
+  },
+  {
+    "state": "ODISHA",
+    "mineral": "IRON_ORE",
+    "year": 2026,
+    "month": "AUGUST",
+    "ratePerTonne": 59500,
+    "sourceCitation": "MMDR Act 1957 Second Schedule (15% of IBM-published average sale price for iron ore, August 2026)"
+  },
+  {
+    "state": "ODISHA",
+    "mineral": "IRON_ORE",
+    "year": 2026,
+    "month": "SEPTEMBER",
+    "ratePerTonne": 61000,
+    "sourceCitation": "MMDR Act 1957 Second Schedule (15% of IBM-published average sale price for iron ore, September 2026)"
+  },
+  {
+    "state": "ODISHA",
+    "mineral": "IRON_ORE",
+    "year": 2026,
+    "month": "OCTOBER",
+    "ratePerTonne": 62800,
+    "sourceCitation": "MMDR Act 1957 Second Schedule (15% of IBM-published average sale price for iron ore, October 2026)"
+  },
+  {
+    "state": "ODISHA",
+    "mineral": "IRON_ORE",
+    "year": 2026,
+    "month": "NOVEMBER",
+    "ratePerTonne": 60900,
+    "sourceCitation": "MMDR Act 1957 Second Schedule (15% of IBM-published average sale price for iron ore, November 2026)"
+  },
+  {
+    "state": "ODISHA",
+    "mineral": "IRON_ORE",
+    "year": 2026,
+    "month": "DECEMBER",
+    "ratePerTonne": 63400,
+    "sourceCitation": "MMDR Act 1957 Second Schedule (15% of IBM-published average sale price for iron ore, December 2026)"
+  }
+]

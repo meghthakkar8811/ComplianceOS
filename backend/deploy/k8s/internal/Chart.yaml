@@ -1,0 +1,10 @@
+apiVersion: v2
+name: complianceos-internal
+description: Internal provisioning service chart for ComplianceOS — environment and customer compliance provisioning (royalty rate seeding, mongo/microservice registration for the compliance service)
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+dependencies:
+  - name: app-base
+    version: 0.1.0
+    repository: "file://../app-base"

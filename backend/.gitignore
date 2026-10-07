@@ -1,0 +1,47 @@
+# Gradle
+.gradle
+**/build/
+!src/**/build/
+deploy/docker/.deps-base-context/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+
+# Eclipse
+.project
+.classpath
+.settings/
+bin/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+
+# Quarkus
+.quarkus/
+quarkus-app/
+
+# Environment Variables
+.env
+.env.local
+
+# Temp files
+*~
+*.swp
+*.bak
+
+# Helm
+Chart.lock
+
+# Locally generated dev TLS certs (mkcert), machine-specific — never committed
+deploy/local-certs/

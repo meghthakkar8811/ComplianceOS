@@ -1,0 +1,14 @@
+[
+  {
+    "tier": "RegisteredBefore12Jan2015",
+    "effectiveFrom": 0,
+    "rate": 0.3,
+    "sourceCitation": "Mines and Minerals (Contribution to District Mineral Foundation) Rules, 2015 (G.S.R. 715(E), 17 Sep 2015) s.9 \u2014 30% of royalty for leases granted before 12 Jan 2015"
+  },
+  {
+    "tier": "RegisteredAfter12Jan2015",
+    "effectiveFrom": 1421020800000,
+    "rate": 0.1,
+    "sourceCitation": "Mines and Minerals (Contribution to District Mineral Foundation) Rules, 2015 (G.S.R. 715(E), 17 Sep 2015) s.9 \u2014 10% of royalty for leases granted on or after 12 Jan 2015"
+  }
+]

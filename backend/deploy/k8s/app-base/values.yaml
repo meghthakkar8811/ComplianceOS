@@ -1,0 +1,81 @@
+namespace: complianceos
+revisionHistoryLimit: 3
+minReadySeconds: 20
+preStopSleepSeconds: 15
+terminationGracePeriodSeconds: 90
+pdb:
+  enabled: false
+
+tmpVolume:
+  sizeLimit: 256Mi
+
+# A tier can override this with the name of a docker-registry Secret (created out of band,
+# e.g. `kubectl create secret docker-registry ...`) when its images live in a private registry.
+imagePullSecrets: []
+
+service:
+  httpPort: 8080
+  grpcPort: 9000
+
+# Setting pekko.cluster turns on Pekko clustering for this service: the runtime property,
+# pod-discovery RBAC, the service account token, the two ports above, and the pod label peers
+# use to find each other. Nothing else needs setting. Leave unset (cluster empty) to disable.
+pekko: {}
+
+# Same for every service today; an app chart can override app-base.java.* if it ever differs.
+java:
+  opts: "--enable-preview -Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager -Dfile.encoding=UTF-8"
+  args: "-XX:InitialRAMPercentage=40.0 -XX:MaxRAMPercentage=40.0 -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -Xss256k -XX:+ExitOnOutOfMemoryError"
+
+ingress:
+  enabled: false
+  # Max request body size ingress-nginx will accept (its own default is 1m), e.g. "50m". Empty
+  # leaves ingress-nginx's default in place.
+  maxBodySize: ""
+
+# One namespace-wide Secret (created by deployae as `complianceos-secrets`) injected into
+# every app pod via envFrom. Keys become container environment variables as-is, so
+# `INFRA_MONGODB_URI` in the Secret is `System.getenv("INFRA_MONGODB_URI")` in the JVM.
+secrets:
+  envSecretName: complianceos-secrets
+
+serviceAccount:
+  automountToken: false
+
+rbac:
+  rules: []
+
+deploymentStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+podSecurityContext:
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+
+probes:
+  readiness:
+    path: /q/health/ready
+    periodSeconds: 10
+    failureThreshold: 3
+    timeoutSeconds: 3
+  liveness:
+    path: /q/health/live
+    periodSeconds: 20
+    failureThreshold: 3
+    timeoutSeconds: 3
+  startup:
+    enabled: true
+    path: /q/health
+    periodSeconds: 10
+    failureThreshold: 45
+    timeoutSeconds: 3

@@ -1,0 +1,63 @@
+{{- $probes := include "complianceos.infra-base.httpProbes" . | fromYaml -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "complianceos.infra-base.instance" . }}
+  namespace: {{ include "complianceos.infra-base.namespace" . }}
+  labels:
+    {{- include "complianceos.infra-base.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    {{- toYaml .Values.deploymentStrategy | nindent 4 }}
+  selector:
+    matchLabels:
+      {{- include "complianceos.infra-base.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "complianceos.infra-base.selectorLabels" . | nindent 8 }}
+    spec:
+      securityContext:
+        {{- include "complianceos.infra-base.podSecurityContext" . | nindent 8 }}
+      containers:
+        - name: qdrant
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- include "complianceos.infra-base.containerSecurityContext" . | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 6333
+            - name: grpc
+              containerPort: 6334
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: {{ $probes.startup.periodSeconds }}
+            failureThreshold: {{ $probes.startup.failureThreshold }}
+            timeoutSeconds: {{ $probes.startup.timeoutSeconds }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: {{ $probes.readiness.periodSeconds }}
+            failureThreshold: {{ $probes.readiness.failureThreshold }}
+            timeoutSeconds: {{ $probes.readiness.timeoutSeconds }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: {{ $probes.liveness.periodSeconds }}
+            failureThreshold: {{ $probes.liveness.failureThreshold }}
+            timeoutSeconds: {{ $probes.liveness.timeoutSeconds }}
+          resources:
+            {{- toYaml (required "resources must be set" .Values.resources) | nindent 12 }}
+          volumeMounts:
+            - name: qdrant-storage
+              mountPath: /qdrant/storage
+      volumes:
+        - name: qdrant-storage
+          persistentVolumeClaim:
+            claimName: {{ include "complianceos.infra-base.instance" . }}-pvc

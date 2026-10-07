@@ -1,0 +1,17 @@
+# Headless service required by the Postgres StatefulSet for pod DNS identity.
+# Application pods connect to Postgres via the regular ClusterIP service (postgres).
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "complianceos.infra-base.instance" . }}-headless
+  namespace: {{ include "complianceos.infra-base.namespace" . }}
+  labels:
+    {{- include "complianceos.infra-base.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  selector:
+    {{- include "complianceos.infra-base.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres

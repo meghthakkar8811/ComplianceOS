@@ -1,0 +1,16 @@
+plugins {
+    id 'com.complianceos.java-library-conventions'
+}
+
+group = 'com.complianceos.compliance'
+
+dependencies {
+    implementation 'com.agentengine.scheduler:api:1.0.1-SNAPSHOT'
+    implementation 'com.agentengine.util:common:1.0.1-SNAPSHOT'
+    implementation 'com.agentengine.util:scripts:1.0.1-SNAPSHOT'
+    implementation project(':compliance:api')
+
+    implementation platform(libs.quarkus.bom)
+    implementation libs.quarkus.arc
+    implementation libs.jakarta.inject.api
+}

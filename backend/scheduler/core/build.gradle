@@ -1,0 +1,21 @@
+plugins {
+    id 'com.complianceos.java-application-conventions'
+}
+
+group = 'com.complianceos.scheduler'
+
+dependencies {
+    implementation enforcedPlatform(libs.quarkus.bom)
+
+    // Hosts agent-engine's own cron-style job scheduler as ComplianceOS's own
+    // scheduler deployable — fires jobs such as agent:jobs' InvokeAgentJob.
+    implementation 'com.agentengine.scheduler:core:1.0.1-SNAPSHOT'
+    // compliance:jobs' own EnsureComplianceCalendarJob, loaded by the scheduler by reflection —
+    // never referenced directly, same as agent-engine's own *:jobs modules.
+    runtimeOnly project(':compliance:jobs')
+    // For ClientProducer, below.
+    implementation 'com.agentengine.catalog:api:1.0.1-SNAPSHOT'
+    implementation 'com.agentengine.util.ms:client:1.0.1-SNAPSHOT'
+
+    implementation libs.quarkus.arc
+}

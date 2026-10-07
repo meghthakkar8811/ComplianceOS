@@ -1,0 +1,17 @@
+{{- if include "complianceos.app-base.needsRbac" . -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "complianceos.app-base.instance" . }}-rolebinding
+  namespace: {{ include "complianceos.app-base.namespace" . }}
+  labels:
+    {{- include "complianceos.app-base.labels" . | nindent 4 }}
+subjects:
+- kind: ServiceAccount
+  name: {{ include "complianceos.app-base.instance" . }}
+  namespace: {{ include "complianceos.app-base.namespace" . }}
+roleRef:
+  kind: Role
+  name: {{ include "complianceos.app-base.instance" . }}
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}

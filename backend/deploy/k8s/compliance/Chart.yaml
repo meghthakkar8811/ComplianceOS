@@ -1,0 +1,10 @@
+apiVersion: v2
+name: complianceos-compliance
+description: Compliance service chart for ComplianceOS — mines, production, royalty, compliance filings, DGMS registers
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+dependencies:
+  - name: app-base
+    version: 0.1.0
+    repository: "file://../app-base"

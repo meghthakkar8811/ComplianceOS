@@ -1,0 +1,212 @@
+[
+  {
+    "id": "reader",
+    "name": "Reader",
+    "standard": true,
+    "assetClassVsPermissions": {
+      "Agent": [
+        "READ"
+      ],
+      "AgentSession": [
+        "READ"
+      ],
+      "Connection": [
+        "READ"
+      ],
+      "Knowledge": [
+        "READ"
+      ],
+      "Model": [
+        "READ"
+      ],
+      "User": [
+        "READ"
+      ],
+      "AgentSchedule": [
+        "READ"
+      ],
+      "Mine": [
+        "READ"
+      ]
+    }
+  },
+  {
+    "id": "editor",
+    "name": "Editor",
+    "standard": true,
+    "assetClassVsPermissions": {
+      "Agent": [
+        "READ",
+        "EDIT"
+      ],
+      "AgentSession": [
+        "READ",
+        "EDIT"
+      ],
+      "Connection": [
+        "READ",
+        "EDIT"
+      ],
+      "Knowledge": [
+        "READ",
+        "EDIT"
+      ],
+      "Model": [
+        "READ",
+        "EDIT"
+      ],
+      "User": [
+        "READ",
+        "EDIT"
+      ],
+      "AgentSchedule": [
+        "READ",
+        "EDIT"
+      ],
+      "Mine": [
+        "READ",
+        "EDIT"
+      ]
+    }
+  },
+  {
+    "id": "manager",
+    "name": "Manager",
+    "standard": true,
+    "assetClassVsPermissions": {
+      "Agent": [
+        "READ",
+        "EDIT",
+        "DELETE",
+        "SHARE",
+        "CREATE"
+      ],
+      "AgentSession": [
+        "READ",
+        "EDIT",
+        "DELETE",
+        "SHARE",
+        "CREATE"
+      ],
+      "Connection": [
+        "READ",
+        "EDIT",
+        "DELETE",
+        "SHARE",
+        "CREATE"
+      ],
+      "Knowledge": [
+        "READ",
+        "EDIT",
+        "DELETE",
+        "SHARE",
+        "CREATE"
+      ],
+      "Model": [
+        "READ",
+        "EDIT",
+        "DELETE",
+        "SHARE",
+        "CREATE"
+      ],
+      "User": [
+        "READ",
+        "EDIT",
+        "DELETE",
+        "SHARE",
+        "CREATE"
+      ],
+      "AgentSchedule": [
+        "READ",
+        "EDIT",
+        "DELETE",
+        "SHARE",
+        "CREATE"
+      ],
+      "Mine": [
+        "READ",
+        "EDIT",
+        "DELETE",
+        "SHARE",
+        "CREATE"
+      ]
+    }
+  },
+  {
+    "id": "owner",
+    "name": "Owner",
+    "standard": false,
+    "assetClassVsPermissions": {
+      "Agent": [
+        "READ",
+        "EDIT",
+        "DELETE",
+        "SHARE",
+        "CREATE"
+      ],
+      "AgentSession": [
+        "READ",
+        "EDIT",
+        "DELETE",
+        "SHARE",
+        "CREATE"
+      ],
+      "Connection": [
+        "READ",
+        "EDIT",
+        "DELETE",
+        "SHARE",
+        "CREATE"
+      ],
+      "Knowledge": [
+        "READ",
+        "EDIT",
+        "DELETE",
+        "SHARE",
+        "CREATE"
+      ],
+      "Memory": [
+        "READ",
+        "EDIT",
+        "DELETE",
+        "SHARE",
+        "CREATE"
+      ],
+      "Model": [
+        "READ",
+        "EDIT",
+        "DELETE",
+        "SHARE",
+        "CREATE"
+      ],
+      "Notebook": [
+        "READ",
+        "EDIT",
+        "DELETE",
+        "SHARE",
+        "CREATE"
+      ],
+      "User": [
+        "READ",
+        "EDIT",
+        "DELETE",
+        "SHARE",
+        "CREATE"
+      ],
+      "AgentSchedule": [
+        "READ",
+        "EDIT",
+        "DELETE",
+        "SHARE",
+        "CREATE"
+      ],
+      "Mine": [
+        "READ",
+        "EDIT",
+        "DELETE",
+        "SHARE",
+        "CREATE"
+      ]
+    }
+  }
+]

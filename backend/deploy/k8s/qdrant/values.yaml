@@ -1,0 +1,10 @@
+service:
+  name: qdrant
+
+deploymentStrategy:
+  type: Recreate
+
+image:
+  repository: qdrant/qdrant
+  tag: "v1.17.1"
+  pullPolicy: IfNotPresent

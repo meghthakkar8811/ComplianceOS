@@ -1,0 +1,13 @@
+[
+  {
+    "_t": "com.agentengine.util.sql.SQLServerInfraConfig",
+    "type": "SQL_SERVER",
+    "serverId": "default",
+    "engine": "POSTGRES",
+    "host": "postgres-local.infra.svc.cluster.local",
+    "port": 5432,
+    "database": "complianceos",
+    "username": "postgres",
+    "password": ""
+  }
+]

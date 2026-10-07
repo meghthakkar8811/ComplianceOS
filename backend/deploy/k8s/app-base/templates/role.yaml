@@ -1,0 +1,11 @@
+{{- if include "complianceos.app-base.needsRbac" . -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "complianceos.app-base.instance" . }}
+  namespace: {{ include "complianceos.app-base.namespace" . }}
+  labels:
+    {{- include "complianceos.app-base.labels" . | nindent 4 }}
+rules:
+{{- include "complianceos.app-base.rbacRules" . | nindent 2 }}
+{{- end }}

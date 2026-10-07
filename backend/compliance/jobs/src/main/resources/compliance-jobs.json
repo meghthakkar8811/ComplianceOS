@@ -1,0 +1,7 @@
+[
+  {
+    "id": "{{ customerId }}:EnsureComplianceCalendar",
+    "jobClassName": "com.complianceos.compliance.jobs.EnsureComplianceCalendarJob",
+    "cronSchedule": "0 0 2 ? * SUN"
+  }
+]

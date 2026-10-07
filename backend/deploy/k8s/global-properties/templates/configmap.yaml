@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: global-properties-{{ required "env must be set (-e/--environment)" .Values.env }}-configmap
+  namespace: {{ include "complianceos-global-properties.namespace" . }}
+  labels:
+    {{- include "complianceos-global-properties.labels" . | nindent 4 }}
+data:
+  global.properties: |-
+    {{- range $key, $value := .Values.globalProperties }}
+    {{ $key }}={{ $value }}
+    {{- end }}

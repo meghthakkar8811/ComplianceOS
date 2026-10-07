@@ -1,0 +1,11 @@
+plugins {
+    id 'com.complianceos.java-library-conventions'
+}
+
+group = 'com.complianceos.agent'
+
+dependencies {
+    implementation enforcedPlatform(libs.quarkus.bom)
+
+    api 'com.agentengine.agent:api:1.0.1-SNAPSHOT'
+}

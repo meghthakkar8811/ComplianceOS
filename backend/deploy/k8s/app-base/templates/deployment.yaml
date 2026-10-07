@@ -1,0 +1,148 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "complianceos.app-base.instance" . }}
+  namespace: {{ include "complianceos.app-base.namespace" . }}
+  labels:
+    {{- include "complianceos.app-base.labels" . | nindent 4 }}
+spec:
+  replicas: {{ required "replicas must be set" .Values.replicas }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  minReadySeconds: {{ .Values.minReadySeconds }}
+  strategy:
+    {{- include "complianceos.app-base.deploymentStrategy" . | nindent 4 }}
+  selector:
+    matchLabels:
+      {{- include "complianceos.app-base.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "complianceos.app-base.podLabels" . | nindent 8 }}
+        {{- include "complianceos.app-base.pekkoClusterLabel" . | nindent 8 }}
+      annotations:
+        checksum/application-properties: {{ (.Values.config | default dict).applicationProperties | toYaml | sha256sum }}
+        {{- with (.Values.global | default dict).rolloutRevision }}
+        rolloutRevision: {{ . | quote }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "complianceos.app-base.instance" . }}
+      automountServiceAccountToken: {{ include "complianceos.app-base.automountToken" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Values.service.name }}
+          image: {{ include "complianceos.app-base.image" . | quote }}
+          {{- /*
+          A registry-backed tier (global.imageRegistry set) reuses a fixed tag ("latest") across
+          deploys, so a node must re-check the registry every time rather than trusting a
+          previously-pulled image with the same tag — the standard "latest never updates" gotcha
+          otherwise. local's shared-daemon path never pulls from anywhere at all, so IfNotPresent
+          (skip the no-op pull entirely) stays correct and unchanged for it.
+          */}}
+          imagePullPolicy: {{ if (.Values.global | default dict).imageRegistry }}Always{{ else }}IfNotPresent{{ end }}
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sh", "-c", "sleep {{ .Values.preStopSleepSeconds }}"]
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          env:
+            - name: QUARKUS_HTTP_PORT
+              value: {{ .Values.service.httpPort | quote }}
+            - name: QUARKUS_GRPC_SERVER_PORT
+              value: {{ .Values.service.grpcPort | quote }}
+            # Quarkus's own management interface (health checks) — isolated from main traffic on
+            # its own HTTP server/event-loop, so heavy request load can't starve a probe and get
+            # Kubernetes to kill a pod that's actually fine, just busy. Never needs overriding per
+            # environment, so it's a plain literal here rather than a values.yaml knob.
+            - name: QUARKUS_MANAGEMENT_PORT
+              value: "9001"
+            - name: QUARKUS_CONFIG_LOCATIONS
+              value: file:/config/application.properties
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: KUBERNETES_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: ENVIRONMENT
+              value: {{ (.Values.global | default dict).env | quote }}
+            - name: TIER
+              value: {{ .Values.tier | quote }}
+            {{- if include "complianceos.app-base.pekkoEnabled" . }}
+            - name: PEKKO_CLUSTER
+              value: {{ .Values.pekko.cluster | quote }}
+            - name: PEKKO_CLUSTER_LABEL_KEY
+              value: {{ include "complianceos.app-base.pekkoClusterLabelKey" . | trim | quote }}
+            {{- end }}
+            {{- $java := .Values.java | default dict }}
+            {{- if $java.opts }}
+            - name: JAVA_OPTS
+              value: {{ $java.opts | quote }}
+            {{- end }}
+            {{- if $java.args }}
+            - name: JAVA_ARGS
+              value: {{ $java.args | quote }}
+            {{- end }}
+          {{- $secrets := .Values.secrets | default dict }}
+          {{- if $secrets.envSecretName }}
+          envFrom:
+            - secretRef:
+                name: {{ $secrets.envSecretName }}
+                optional: true
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.httpPort }}
+            - name: grpc
+              containerPort: {{ .Values.service.grpcPort }}
+            {{- if include "complianceos.app-base.pekkoEnabled" . }}
+            - name: pekko
+              containerPort: 2552
+            - name: pekko-mgmt
+              containerPort: 8558
+            {{- end }}
+            - name: quarkus-mgmt
+              containerPort: 9001
+          {{- include "complianceos.app-base.probes" . | nindent 10 }}
+          resources:
+            {{- toYaml (required "resources must be set" .Values.resources) | nindent 12 }}
+          volumeMounts:
+            - name: application-properties
+              mountPath: /config/application.properties
+              subPath: application.properties
+              readOnly: true
+            - name: global-properties
+              mountPath: /config/global.properties
+              subPath: global.properties
+              readOnly: true
+            {{- if include "complianceos.app-base.pekkoEnabled" . }}
+            - name: pekko-base
+              mountPath: /config/pekko-base.conf
+              subPath: pekko-base.conf
+              readOnly: true
+            {{- end }}
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: application-properties
+          configMap:
+            name: {{ include "complianceos.app-base.applicationPropertiesConfigMapName" . }}
+        - name: global-properties
+          configMap:
+            name: {{ include "complianceos.app-base.globalPropertiesConfigMapName" . }}
+        {{- if include "complianceos.app-base.pekkoEnabled" . }}
+        - name: pekko-base
+          configMap:
+            name: {{ include "complianceos.app-base.instance" . }}-pekko-configmap
+        {{- end }}
+        - name: tmp
+          emptyDir:
+            sizeLimit: {{ .Values.tmpVolume.sizeLimit }}

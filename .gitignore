@@ -1,0 +1,23 @@
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+
+# System
+.DS_Store
+.DS_Store?
+._*
+
+# Temp files
+*~
+*.swp
+
+# Helm Charts
+charts/
+tmpcharts-*/
+*.tgz
+
+# Python
+__pycache__/
+*.pyc
+uv.lock

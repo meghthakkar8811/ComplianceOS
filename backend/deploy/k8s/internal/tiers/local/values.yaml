@@ -1,0 +1,25 @@
+app-base:
+  tier: local
+  minReadySeconds: 0
+  preStopSleepSeconds: 0
+  terminationGracePeriodSeconds: 10
+  # No zero-downtime need locally — Recreate avoids the base default's surge pod, which
+  # doubles CPU/memory demand during rollout on this resource-constrained node.
+  deploymentStrategy:
+    type: Recreate
+  replicas: 1
+  # Idle except during a deploy, so CPU is minimal — this service only runs provisioning.
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "350Mi"
+    limits:
+      cpu: "100m"
+      memory: "350Mi"
+  config:
+    applicationProperties:
+      quarkus.otel.service.name: complianceos-internal
+      # Disabled: no OTel collector deployed. Remove and set quarkus.otel.exporter.otlp.endpoint when one is available.
+      quarkus.otel.sdk.disabled: "true"
+      quarkus.grpc.server.use-separate-server: "false"
+      quarkus.shutdown.timeout: 5S

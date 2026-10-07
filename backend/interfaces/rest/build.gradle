@@ -1,0 +1,22 @@
+plugins {
+    id 'com.complianceos.java-application-conventions'
+}
+
+dependencies {
+    implementation enforcedPlatform(libs.quarkus.bom)
+    implementation project(':compliance:api')
+
+    implementation 'io.quarkus:quarkus-rest'
+    implementation 'io.quarkus:quarkus-rest-jackson'
+    implementation 'io.quarkus:quarkus-smallrye-openapi'
+
+    // Pulls in agent-engine's own REST surface (chat, sessions, governance, the resource
+    // catalog, etc.) as part of this service, so compliance's own resources extend it in one
+    // running process rather than standing up a second gateway.
+    implementation 'com.agentengine.interfaces:rest:1.0.1-SNAPSHOT'
+
+    implementation 'com.agentengine.tenancy:api:1.0.1-SNAPSHOT'
+    implementation 'com.agentengine.util:common:1.0.1-SNAPSHOT'
+    implementation 'com.agentengine.util:context:1.0.1-SNAPSHOT'
+    implementation 'com.agentengine.util.ms:client:1.0.1-SNAPSHOT'
+}

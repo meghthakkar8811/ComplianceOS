@@ -1,0 +1,14 @@
+app-base:
+  service:
+    name: rest
+
+  ingress:
+    enabled: true
+    className: nginx
+    tlsEnabled: true
+    maxBodySize: "50m"
+    hosts:
+      - host: agents.com
+        paths:
+          - path: /
+            pathType: Prefix

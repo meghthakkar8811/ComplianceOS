@@ -1,0 +1,32 @@
+app-base:
+  tier: local
+  minReadySeconds: 0
+  preStopSleepSeconds: 0
+  terminationGracePeriodSeconds: 10
+  # No zero-downtime need locally — Recreate avoids the base default's surge pod, which
+  # doubles CPU/memory demand during rollout on this resource-constrained node.
+  deploymentStrategy:
+    type: Recreate
+  replicas: 2
+  resources:
+    requests:
+      # keep 2:3 ratio for cpu:memory i.e. 2cpu then 3GB memory with at least 512MB in any case because otherwise pods are OOMKilled
+      cpu: "300m"
+      memory: "512Mi"
+    limits:
+      cpu: "300m"
+      memory: "512Mi"
+  config:
+    applicationProperties:
+      # quarkus.log.category."org.jgroups".level: DEBUG
+      quarkus.otel.service.name: complianceos-agent
+      # Disabled: no OTel collector deployed. Remove and set quarkus.otel.exporter.otlp.endpoint when one is available.
+      quarkus.otel.sdk.disabled: "true"
+      quarkus.grpc.server.use-separate-server: "false"
+      agent-engine.session-actor.passivation.idle-timeout-seconds: "3600"
+      # gRPC server configuration - increase message size limit to 100MB
+      quarkus.grpc.server.max-inbound-message-size: "104857600"
+      quarkus.shutdown.timeout: 5S
+      pekko.coordinated-shutdown.phases.cluster-sharding-shutdown-region.timeout: 5s
+      pekko.coordinated-shutdown.phases.cluster-leave.timeout: 5s
+      pekko.coordinated-shutdown.phases.actor-system-terminate.timeout: 5s

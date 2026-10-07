@@ -1,0 +1,15 @@
+plugins {
+    id 'com.complianceos.java-application-conventions'
+}
+
+group = 'com.complianceos.connectors'
+
+dependencies {
+    implementation enforcedPlatform(libs.quarkus.bom)
+
+    // Hosts agent-engine's own config-driven HTTP connector framework as
+    // ComplianceOS's own connectors deployable, backing tools such as web_research.
+    implementation 'com.agentengine.connectors:core:1.0.1-SNAPSHOT'
+
+    implementation libs.quarkus.arc
+}

@@ -1,0 +1,32 @@
+plugins {
+    id 'com.complianceos.java-application-conventions'
+}
+
+group = 'com.complianceos.compliance'
+
+dependencies {
+    implementation project(':compliance:api')
+
+    // compliance took over catalog's slot in the deploy graph (APP_CHART_NAMES), so it also
+    // hosts catalog's own agent/model/session services in-process — ComplianceOS is an agentic
+    // platform in its own right, not just the mining/compliance domain.
+    implementation 'com.agentengine.catalog:core:1.0.1-SNAPSHOT'
+
+    implementation 'com.agentengine.util:common:1.0.1-SNAPSHOT'
+    implementation 'com.agentengine.util:tenancy:1.0.1-SNAPSHOT'
+    implementation 'com.agentengine.tenancy:api:1.0.1-SNAPSHOT'
+    implementation 'com.agentengine.util.ms:client:1.0.1-SNAPSHOT'
+    implementation 'com.agentengine.util:context:1.0.1-SNAPSHOT'
+    implementation 'com.agentengine.util:mongodb:1.0.1-SNAPSHOT'
+    implementation 'com.agentengine.util:scripts:1.0.1-SNAPSHOT'
+    runtimeOnly 'com.agentengine.util.ms:server:1.0.1-SNAPSHOT'
+
+    implementation platform(libs.quarkus.bom)
+    implementation libs.quarkus.arc
+    implementation libs.quarkus.grpc
+    implementation libs.quarkus.hibernate.validator
+    implementation libs.quarkus.opentelemetry
+
+    implementation 'com.fasterxml.jackson.core:jackson-annotations'
+    implementation 'org.mongodb:bson'
+}

@@ -1,0 +1,16 @@
+plugins {
+    id 'com.complianceos.java-application-conventions'
+}
+
+group = 'com.complianceos.agent'
+
+dependencies {
+    implementation enforcedPlatform(libs.quarkus.bom)
+    implementation project(':agent:api')
+
+    // Hosts agent-engine's own agent runtime (model providers, tools, guardrails,
+    // orchestration, sessions, memory) — compliance-specific Tools extend it here.
+    implementation 'com.agentengine.agent:core:1.0.1-SNAPSHOT'
+
+    implementation libs.quarkus.arc
+}
