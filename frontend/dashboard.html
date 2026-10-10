@@ -131,10 +131,8 @@
           <div class="hb-label">COMPLIANCE HEALTH SCORE</div>
           <div class="hb-status" id="hb-status">Loading…</div>
           <div class="hb-bars">
-            <div class="hb-row"><span class="hb-cat">IBM Returns</span><div class="hb-track"><div class="hb-fill green" id="hb-ibm" style="width:0%"></div></div><span class="hb-val green" id="hb-ibm-val">–</span></div>
-            <div class="hb-row"><span class="hb-cat">Royalty Filing</span><div class="hb-track"><div class="hb-fill amber" id="hb-royalty" style="width:0%"></div></div><span class="hb-val amber" id="hb-royalty-val">–</span></div>
+            <div class="hb-row"><span class="hb-cat">Filing Compliance</span><div class="hb-track"><div class="hb-fill green" id="hb-ibm" style="width:0%"></div></div><span class="hb-val green" id="hb-ibm-val">–</span></div>
             <div class="hb-row"><span class="hb-cat">DGMS Registers</span><div class="hb-track"><div class="hb-fill amber" id="hb-dgms" style="width:0%"></div></div><span class="hb-val amber" id="hb-dgms-val">–</span></div>
-            <div class="hb-row"><span class="hb-cat">Environment</span><div class="hb-track"><div class="hb-fill red" id="hb-env" style="width:0%"></div></div><span class="hb-val red" id="hb-env-val">–</span></div>
           </div>
         </div>
       </div>
@@ -149,7 +147,7 @@
     <!-- KPI STRIP -->
     <div class="kpi-grid" id="kpi-grid">
       <div class="kpi-card"><div class="kpi-icon-wrap blue"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></div><div class="kpi-content"><div class="kpi-label">Month Production</div><div class="kpi-value" id="kpi-produced">– MT</div><div class="kpi-change neutral" id="kpi-produced-sub">This month</div></div></div>
-      <div class="kpi-card"><div class="kpi-icon-wrap amber"><span style="font-size:16px;font-weight:700">₹</span></div><div class="kpi-content"><div class="kpi-label">Royalty Due</div><div class="kpi-value" id="kpi-royalty">₹–</div><div class="kpi-change neutral" id="kpi-royalty-sub">Current period</div></div></div>
+      <div class="kpi-card"><div class="kpi-icon-wrap amber"><span style="font-size:16px;font-weight:700">₹</span></div><div class="kpi-content"><div class="kpi-label">Royalty (Gross)</div><div class="kpi-value" id="kpi-royalty">₹–</div><div class="kpi-change neutral" id="kpi-royalty-sub">Current period</div></div></div>
       <div class="kpi-card"><div class="kpi-icon-wrap red"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><div class="kpi-content"><div class="kpi-label">Pending Filings</div><div class="kpi-value" id="kpi-filings">–</div><div class="kpi-change neutral" id="kpi-filings-sub">Deadlines</div></div></div>
       <div class="kpi-card"><div class="kpi-icon-wrap green"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div><div class="kpi-content"><div class="kpi-label">Today's Production</div><div class="kpi-value" id="kpi-today">– MT</div><div class="kpi-change neutral">Today</div></div></div>
       <div class="kpi-card"><div class="kpi-icon-wrap purple"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div><div class="kpi-content"><div class="kpi-label">Docs Expiring</div><div class="kpi-value" id="kpi-docs">–</div><div class="kpi-change neutral">Next 90 days</div></div></div>
@@ -175,7 +173,7 @@
       <div class="dash-card">
         <div class="card-head"><h3>Royalty — Current Month</h3></div>
         <div id="royalty-snap"></div>
-        <button class="btn-primary full-w mt-12" onclick="navigate('royalty')">Open Calculator</button>
+        <button class="btn-primary full-w mt-12" onclick="navigate('royalty')">View Royalty →</button>
       </div>
     </div>
   </section>
@@ -183,15 +181,15 @@
   <!-- ═══ COMPLIANCE CALENDAR ═══ -->
   <section class="page" id="page-calendar">
     <div class="page-header">
-      <div class="page-title-block"><h1>Compliance Calendar</h1><p class="page-sub">All statutory deadlines · IBM · DGMS · State DME · SPCB · Forest</p></div>
+      <div class="page-title-block"><h1>Compliance Calendar</h1><p class="page-sub">All statutory deadlines · IBM · DGMS · MoEFCC · SPCB</p></div>
       <div class="page-actions">
         <select class="filter-select" id="cal-filter" onchange="loadCalendar()">
           <option value="">All Authorities</option>
           <option value="IBM">IBM</option>
           <option value="DGMS">DGMS</option>
-          <option value="STATE_DME">State DME</option>
+          <option value="MOEFCC">MoEFCC</option>
           <option value="SPCB">SPCB</option>
-          <option value="FOREST">Forest</option>
+          <option value="STATE_GOVT">State Govt</option>
         </select>
       </div>
     </div>
@@ -206,10 +204,10 @@
     <div class="forms-grid">
       <div class="form-tile ready" onclick="openFormB()">
         <div class="ft-badge ready">READY TO FILE</div>
-        <div class="ft-letter">B</div>
-        <div class="ft-name">IBM Form B</div>
-        <div class="ft-desc">Monthly Production Return — Metalliferous Mines. 94% auto-filled from your production data.</div>
-        <div class="ft-meta"><span id="formb-due">Due: Loading…</span><span class="ft-autofill">94% auto-filled ✓</span></div>
+        <div class="ft-letter">F</div>
+        <div class="ft-name">IBM Monthly Return</div>
+        <div class="ft-desc">F-series return under MCDR 2017. Auto-filled from your production data.</div>
+        <div class="ft-meta"><span id="formb-due">Due: Loading…</span><span class="ft-autofill">Auto-filled ✓</span></div>
         <button class="btn-primary full-w">Auto-Fill & Preview →</button>
       </div>
       <div class="form-tile"><div class="ft-badge">QUARTERLY</div><div class="ft-letter">C</div><div class="ft-name">IBM Form C</div><div class="ft-desc">Quarterly Return of Labour Employed</div><div class="ft-meta"><span>V2</span></div><button class="btn-ghost full-w" disabled>Coming in V2</button></div>
@@ -221,72 +219,26 @@
   <!-- ═══ ROYALTY CALCULATOR ═══ -->
   <section class="page" id="page-royalty">
     <div class="page-header">
-      <div class="page-title-block"><h1>Royalty Calculator</h1><p class="page-sub">Live royalty, DMF & NMET computation · MMDR Schedule II rates · 8 states</p></div>
+      <div class="page-title-block"><h1>Royalty</h1><p class="page-sub">Auto-calculated from production entries and the applicable DMF/NMET rates — recalculated whenever production changes</p></div>
     </div>
     <div class="royalty-layout">
-      <div class="royalty-inputs">
-        <div class="input-card">
-          <div class="ic-title">Mine & Mineral</div>
-          <div class="form-row-2">
-            <div class="fg"><label>State</label>
-              <select id="rc-state" onchange="liveRoyalty()">
-                <option value="RAJASTHAN">Rajasthan</option>
-                <option value="GUJARAT">Gujarat</option>
-                <option value="ODISHA">Odisha</option>
-                <option value="JHARKHAND">Jharkhand</option>
-                <option value="CHHATTISGARH">Chhattisgarh</option>
-                <option value="MADHYA_PRADESH">Madhya Pradesh</option>
-                <option value="GOA">Goa</option>
-                <option value="KARNATAKA">Karnataka</option>
-              </select>
-            </div>
-            <div class="fg"><label>Mineral</label>
-              <select id="rc-mineral" onchange="liveRoyalty()">
-                <option value="LIMESTONE">Limestone</option>
-                <option value="IRON_ORE">Iron Ore</option>
-                <option value="COAL">Coal</option>
-                <option value="BAUXITE">Bauxite</option>
-                <option value="MANGANESE">Manganese Ore</option>
-                <option value="CHROMITE">Chromite</option>
-                <option value="DOLOMITE">Dolomite</option>
-                <option value="GRANITE">Granite</option>
-              </select>
-            </div>
-          </div>
-          <div class="live-rate-card" id="live-rate-card">
-            <div class="lrc-label">CURRENT RATE</div>
-            <div class="lrc-rate" id="lrc-rate">Loading…</div>
-            <div class="lrc-source" id="lrc-source"></div>
-          </div>
-          <div class="fg" style="margin-top:16px"><label>Quantity Dispatched (MT)</label>
-            <div class="range-input-wrap">
-              <input type="range" id="rc-qty-range" min="0" max="200000" value="42810" oninput="syncQty(this.value)">
-              <input type="number" id="rc-qty" value="42810" oninput="syncRange(this.value)">
-            </div>
-          </div>
-          <div class="fg"><label>Advance Paid (₹)</label><input type="number" id="rc-advance" value="0" oninput="liveRoyalty()"></div>
-          <button class="btn-primary full-w" onclick="saveRoyaltyCalc()" style="margin-top:8px">Save Calculation</button>
-        </div>
-      </div>
-      <div class="royalty-output">
+      <div class="royalty-output" style="grid-column:1/-1">
         <div class="computation-card">
-          <div class="cc-header"><h3>Live Computation</h3><span class="cc-period" id="cc-period"></span></div>
+          <div class="cc-header"><h3>Current Period</h3><span class="cc-period" id="cc-period"></span></div>
           <div class="comp-rows" id="comp-rows">
-            <div class="cr"><span>Quantity</span><span class="mono" id="co-qty">–</span></div>
-            <div class="cr"><span>Rate</span><span class="mono" id="co-rate">–</span></div>
             <div class="cr subtotal"><span>Base Royalty</span><span class="mono" id="co-base">–</span></div>
-            <div class="cr"><span>DMF (30%)</span><span class="mono" id="co-dmf">–</span></div>
-            <div class="cr"><span>NMET (2%)</span><span class="mono" id="co-nmet">–</span></div>
+            <div class="cr"><span id="co-dmf-label">DMF</span><span class="mono" id="co-dmf">–</span></div>
+            <div class="cr"><span id="co-nmet-label">NMET</span><span class="mono" id="co-nmet">–</span></div>
             <div class="cr-divider"></div>
             <div class="cr gross"><span>Gross Liability</span><span class="mono" id="co-gross">–</span></div>
-            <div class="cr"><span>Advance Paid</span><span class="mono green" id="co-adv">–</span></div>
-            <div class="cr-divider amber"></div>
-            <div class="cr net-due"><span>NET DUE</span><span class="mono amber-text" id="co-net">–</span></div>
           </div>
         </div>
         <div class="history-card">
-          <h3>State Rate Comparison — <span id="compare-mineral">Limestone</span></h3>
-          <div id="compare-list"></div>
+          <h3>Royalty History</h3>
+          <div class="table-wrap"><table class="data-table">
+            <thead><tr><th>Period</th><th class="num-col">Base</th><th class="num-col">DMF</th><th class="num-col">NMET</th><th class="num-col">Gross</th></tr></thead>
+            <tbody id="royalty-history-tbody"></tbody>
+          </table></div>
         </div>
       </div>
     </div>
@@ -305,7 +257,7 @@
       <div class="pfc-header"><h3>New Production Entry</h3><button class="icon-close" onclick="toggleProdForm()">✕</button></div>
       <div class="pfc-grid">
         <div class="fg"><label>Date</label><input type="date" id="pf-date"></div>
-        <div class="fg"><label>Shift</label><select id="pf-shift"><option value="MORNING">Morning (6AM–2PM)</option><option value="AFTERNOON">Afternoon (2PM–10PM)</option><option value="NIGHT">Night (10PM–6AM)</option></select></div>
+        <div class="fg"><label>Shift</label><select id="pf-shift"><option value="DAY">Day (6AM–6PM)</option><option value="NIGHT">Night (6PM–6AM)</option><option value="GENERAL">General</option></select></div>
         <div class="fg"><label>Pit / Section</label><input id="pf-pit" placeholder="e.g. Pit A (North)"></div>
         <div class="fg"><label>Grade</label><input id="pf-grade" placeholder="e.g. Grade A"></div>
         <div class="fg"><label>Produced (MT)</label><input type="number" id="pf-prod" placeholder="1850"></div>
@@ -333,10 +285,11 @@
     </div>
     <div class="doc-filter-row">
       <button class="filter-btn active" onclick="filterDocs(this,'')">All</button>
-      <button class="filter-btn" onclick="filterDocs(this,'LEASE')">Mining Lease</button>
-      <button class="filter-btn" onclick="filterDocs(this,'ENVIRONMENTAL')">Environmental</button>
-      <button class="filter-btn" onclick="filterDocs(this,'DGMS_CERT')">DGMS</button>
-      <button class="filter-btn" onclick="filterDocs(this,'OTHER')">Other</button>
+      <button class="filter-btn" onclick="filterDocs(this,'STATE_GOVT')">Mining Lease</button>
+      <button class="filter-btn" onclick="filterDocs(this,'MOEFCC')">Environmental</button>
+      <button class="filter-btn" onclick="filterDocs(this,'DGMS')">DGMS</button>
+      <button class="filter-btn" onclick="filterDocs(this,'IBM')">IBM</button>
+      <button class="filter-btn" onclick="filterDocs(this,'SPCB')">SPCB</button>
     </div>
     <div class="doc-grid" id="doc-grid"></div>
   </section>
@@ -411,6 +364,7 @@
         <div class="fg"><label>Mine Type</label>
           <select id="am-type"><option value="METALLIFEROUS">Metalliferous</option><option value="COAL">Coal</option></select>
         </div>
+        <div class="fg"><label>Lease Start Date *</label><input type="date" id="am-lease-start"></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -423,7 +377,7 @@
 <!-- FORM B MODAL -->
 <div class="modal-overlay" id="modal-formb" onclick="closeModalOutside(event,'modal-formb')">
   <div class="modal-box large">
-    <div class="modal-header"><div><h2>IBM Form B — Monthly Production Return</h2><p class="modal-sub" id="formb-period">Loading…</p></div><button class="modal-close" onclick="closeModal('modal-formb')">✕</button></div>
+    <div class="modal-header"><div><h2>IBM Monthly Return — F-Series</h2><p class="modal-sub" id="formb-period">Loading…</p></div><button class="modal-close" onclick="closeModal('modal-formb')">✕</button></div>
     <div class="modal-body" id="formb-body">
       <div class="autofill-banner"><span class="afb-icon">✓</span><span>94% of fields auto-filled from your production data</span><span class="afb-pct">94% complete</span></div>
       <div id="formb-content"></div>
@@ -440,11 +394,15 @@
   <div class="modal-box medium">
     <div class="modal-header"><div><h2>Upload Document</h2></div><button class="modal-close" onclick="closeModal('modal-add-doc')">✕</button></div>
     <div class="modal-body">
-      <div class="fg"><label>Document Name *</label><input id="doc-name" placeholder="Environmental Clearance"></div>
-      <div class="fg"><label>Category *</label>
-        <select id="doc-cat"><option value="LEASE">Mining Lease</option><option value="ENVIRONMENTAL">Environmental</option><option value="DGMS_CERT">DGMS Certificate</option><option value="OTHER">Other</option></select>
+      <div class="fg"><label>Document Title *</label><input id="doc-name" placeholder="e.g. Consent to Operate (CTO)"></div>
+      <div class="form-row-2">
+        <div class="fg"><label>Authority *</label>
+          <select id="doc-authority"><option value="STATE_GOVT">State Govt (Lease)</option><option value="MOEFCC">MoEFCC (Environmental)</option><option value="DGMS">DGMS</option><option value="IBM">IBM</option><option value="SPCB">SPCB</option></select>
+        </div>
+        <div class="fg"><label>Record Type *</label>
+          <select id="doc-record-type"><option value="CLEARANCE">Clearance / Certificate</option><option value="STATUTORY_PLAN">Statutory Plan</option><option value="NOTICE">Notice</option></select>
+        </div>
       </div>
-      <div class="fg"><label>Document Type *</label><input id="doc-type" placeholder="e.g. Consent to Operate (CTO)"></div>
       <div class="form-row-2">
         <div class="fg"><label>Issued Date</label><input type="date" id="doc-issued"></div>
         <div class="fg"><label>Expiry Date</label><input type="date" id="doc-expiry"></div>
@@ -465,6 +423,7 @@
   </div>
 </div>
 
+<script src="js/api.js"></script>
 <script src="js/dashboard.js"></script>
 </body>
 </html>

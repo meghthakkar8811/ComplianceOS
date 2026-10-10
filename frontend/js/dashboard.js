@@ -3,12 +3,9 @@
 // ═══════════════════════════════════════════════════════════
 // CONFIG & STATE
 // ═══════════════════════════════════════════════════════════
-const API = '../backend/api';
-const AUTH = '../backend/auth';
-
 let STATE = {
-  token:    localStorage.getItem('cos_token') || '',
-  user:     JSON.parse(localStorage.getItem('cos_user') || 'null'),
+  user:     null,
+  roleIds:  [],
   mineId:   localStorage.getItem('cos_mine_id') || '',
   mines:    [],
   dashData: null,
@@ -21,20 +18,10 @@ let STATE = {
 // BOOTSTRAP — runs on page load
 // ═══════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', async () => {
-  // Pick up token from URL (Google OAuth redirect)
-  const p = new URLSearchParams(window.location.search);
-  if (p.get('token')) {
-    STATE.token = p.get('token');
-    localStorage.setItem('cos_token', STATE.token);
-    window.history.replaceState({}, '', 'dashboard.html');
-  }
-
-  if (!STATE.token) {
-    window.location.href = 'login.html';
-    return;
-  }
-
   try {
+    const me = await apiFetch('/auth/me');
+    STATE.user = me.user;
+    STATE.roleIds = me.roleIds || [];
     await loadMines();
     populateUserUI();
     setInterval(refreshAlertBadge, 5 * 60 * 1000); // refresh every 5 min
@@ -48,30 +35,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ═══════════════════════════════════════════════════════════
 // AUTH HELPERS
 // ═══════════════════════════════════════════════════════════
-function headers() {
-  return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + STATE.token };
-}
-
-async function apiFetch(url, opts = {}) {
-  const res = await fetch(url, { ...opts, headers: headers(), credentials: 'include' });
-  if (res.status === 401) { logout(); return null; }
-  return res.json();
-}
-
-async function apiFetchForm(url, formData) {
-  const res = await fetch(url, { 
-    method: 'POST',
-    body: formData,
-    headers: { 'Authorization': 'Bearer ' + STATE.token },
-    credentials: 'include'
-  });
-  if (res.status === 401) { logout(); return null; }
-  return res.json();
-}
-
 async function logout() {
-  try { await fetch(`${AUTH}/logout.php`, { method: 'POST', headers: headers(), credentials: 'include' }); } catch {}
-  localStorage.clear();
+  try { await apiFetch('/auth/logout', { method: 'POST' }); } catch {}
+  localStorage.removeItem('cos_mine_id');
   window.location.href = 'login.html';
 }
 
@@ -109,7 +75,7 @@ function navigate(page) {
   if (page === 'dashboard')  loadDashboard();
   if (page === 'calendar')   loadCalendar();
   if (page === 'production') initProduction();
-  if (page === 'royalty')    { liveRoyalty(); loadRateCompare(); }
+  if (page === 'royalty')    loadRoyalty();
   if (page === 'dgms')       loadDgms();
   if (page === 'alerts')     loadAlerts();
   if (page === 'documents')  loadDocuments('');
@@ -125,18 +91,23 @@ function toggleSidebar() {
 // ═══════════════════════════════════════════════════════════
 function populateUserUI() {
   if (!STATE.user) return;
-  const initials = (STATE.user.full_name || 'U').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+  const name = STATE.user.username || 'User';
+  const initials = name.split(/[@._\s]/).filter(Boolean).slice(0,2).map(w => w[0]).join('').toUpperCase();
   document.getElementById('user-avatar').textContent = initials;
   document.getElementById('topbar-av').textContent   = initials;
-  document.getElementById('user-name').textContent   = STATE.user.full_name || '';
-  document.getElementById('user-role').textContent   = (STATE.user.role || '').replace('_', ' ');
-  if (STATE.user.avatar_url) {
-    ['user-avatar','topbar-av'].forEach(id => {
-      const el = document.getElementById(id);
-      el.style.backgroundImage = `url(${STATE.user.avatar_url})`;
-      el.style.backgroundSize = 'cover';
-      el.textContent = '';
-    });
+  document.getElementById('user-name').textContent   = name;
+  document.getElementById('user-role').textContent   = '';
+  loadUserRoleNames();
+}
+
+async function loadUserRoleNames() {
+  if (!STATE.roleIds.length) return;
+  try {
+    const result = await catalogSearch('Role', { filter: { field: 'id', op: 'IN', values: STATE.roleIds } });
+    const names = (result.items || []).map(r => r.name).filter(Boolean);
+    document.getElementById('user-role').textContent = names.join(', ');
+  } catch (err) {
+    console.error('Failed to load role names', err);
   }
 }
 
@@ -145,12 +116,15 @@ function populateUserUI() {
 // ═══════════════════════════════════════════════════════════
 async function loadMines() {
   showLoader(true);
-  const data = await apiFetch(`${API}/mines.php`);
-  showLoader(false);
-  if (!data || !data.success) return;
-  STATE.mines = data.data || [];
+  let result;
+  try {
+    result = await catalogSearch('Mine', { filter: { field: 'isActive', op: 'EQ', values: [true] } });
+  } finally {
+    showLoader(false);
+  }
+  STATE.mines = result.items || [];
 
-  if (STATE.mines.length && !STATE.mineId) {
+  if (STATE.mines.length && !STATE.mines.some(m => m.id === STATE.mineId)) {
     STATE.mineId = STATE.mines[0].id;
     localStorage.setItem('cos_mine_id', STATE.mineId);
   }
@@ -177,7 +151,7 @@ function updateActiveMineUI() {
   const mine = STATE.mines.find(m => m.id === STATE.mineId);
   if (!mine) return;
   document.getElementById('active-mine-name').textContent = mine.name;
-  document.getElementById('active-mine-id').textContent   = 'Lease #' + mine.lease_number;
+  document.getElementById('active-mine-id').textContent   = 'Lease #' + mine.leaseNumber;
 }
 
 function switchMine(id) {
@@ -212,52 +186,139 @@ function openAddMineModal() {
 }
 
 async function addMine() {
-  const name  = document.getElementById('am-name').value.trim();
-  const lease = document.getElementById('am-lease').value.trim();
-  const state = document.getElementById('am-state').value;
-  const min   = document.getElementById('am-mineral').value;
-  const dist  = document.getElementById('am-district').value.trim();
-  const type  = document.getElementById('am-type').value;
+  const name       = document.getElementById('am-name').value.trim();
+  const leaseNumber= document.getElementById('am-lease').value.trim();
+  const state      = document.getElementById('am-state').value;
+  const mineral    = document.getElementById('am-mineral').value;
+  const district   = document.getElementById('am-district').value.trim();
+  const mineType   = document.getElementById('am-type').value;
+  const leaseStart = document.getElementById('am-lease-start').value;
 
-  if (!name || !lease || !state || !min) { toast('Please fill all required fields', 'error'); return; }
+  if (!name || !leaseNumber || !state || !mineral || !leaseStart) { toast('Please fill all required fields', 'error'); return; }
 
-  const data = await apiFetch(`${API}/mines.php`, {
-    method: 'POST',
-    body: JSON.stringify({ name, lease_number: lease, state, mineral: min, district: dist, mine_type: type }),
-  });
-
-  if (data?.success) {
-    STATE.mines.push(data.data);
-    STATE.mineId = data.data.id;
+  try {
+    const mine = await apiFetch('/mines/', {
+      method: 'POST',
+      body: JSON.stringify({
+        name, leaseNumber, state, mineral, district, mineType,
+        leaseStartOn: Date.parse(leaseStart + 'T00:00:00Z'),
+      }),
+    });
+    STATE.mines.push(mine);
+    STATE.mineId = mine.id;
     localStorage.setItem('cos_mine_id', STATE.mineId);
     renderMineList();
     updateActiveMineUI();
     closeModal('modal-add-mine');
     toast('Mine added! Compliance calendar auto-generated.', 'success');
     loadDashboard();
-  } else {
-    toast(data?.error || 'Failed to add mine', 'error');
+  } catch (err) {
+    toast(err.message || 'Failed to add mine', 'error');
   }
 }
 
 // ═══════════════════════════════════════════════════════════
 // DASHBOARD
 // ═══════════════════════════════════════════════════════════
+const MONTH_INDEX = {
+  JANUARY:0, FEBRUARY:1, MARCH:2, APRIL:3, MAY:4, JUNE:5,
+  JULY:6, AUGUST:7, SEPTEMBER:8, OCTOBER:9, NOVEMBER:10, DECEMBER:11,
+};
+
+/**
+ * Composes the dashboard view from the generic catalog + mine endpoints — there is no single
+ * aggregate endpoint. The health score only has two real inputs: filing compliance (the ratio of
+ * non-overdue PENDING_SUBMISSION records to all of them, across every authority) and DGMS
+ * readiness (already computed server-side); royalty and environment sub-scores were never real
+ * (PHP hardcoded environment to 55 and keyed royalty off a payment-status field that no longer
+ * exists), so they're dropped rather than ported.
+ */
 async function loadDashboard() {
   if (!STATE.mineId) { showEmptyState(); return; }
   showLoader(true);
 
-  const data = await apiFetch(`${API}/core.php?ep=dashboard&mine_id=${STATE.mineId}`);
-  showLoader(false);
-  if (!data?.success) { toast('Failed to load dashboard', 'error'); return; }
+  let d;
+  try {
+    const mine = STATE.mines.find(m => m.id === STATE.mineId);
+    const now = Date.now();
+    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+    const todayStart = new Date().setHours(0,0,0,0);
+    const sixMonthsAgoStart = new Date(new Date().getFullYear(), new Date().getMonth()-5, 1).getTime();
 
-  STATE.dashData = data.data;
-  const d = data.data;
+    const [recordsResult, entriesResult, dgms, royalties] = await Promise.all([
+      catalogSearch('ComplianceRecord', { filter: { field:'mineId', op:'EQ', values:[STATE.mineId] } }),
+      catalogSearch('ProductionEntry', { filter: { op:'AND', values: [
+        { field:'mineId', op:'EQ', values:[STATE.mineId] },
+        { field:'entryTime', op:'GTE', values:[sixMonthsAgoStart] },
+      ] } }),
+      apiFetch(`/mines/${STATE.mineId}/dgms-readiness`),
+      apiFetch(`/mines/${STATE.mineId}/royalty`),
+    ]);
+
+    const records = recordsResult.items || [];
+    const entries = entriesResult.items || [];
+
+    const filings = records.filter(r => r.recordType !== 'REGISTER');
+    const pendingFilings = filings.filter(r => r.status === 'PENDING_SUBMISSION');
+    const overdueFilings = pendingFilings.filter(r => r.expiry < now);
+    const expiringDocs = records.filter(r =>
+      (r.recordType === 'CLEARANCE' || r.recordType === 'STATUTORY_PLAN') &&
+      r.status === 'VALID' && r.expiry >= now && r.expiry - now < 90*86400000);
+
+    const monthProduced = entries.filter(e => e.entryTime >= monthStart).reduce((s,e)=>s+(e.quantityProduced||0),0);
+    const todayProduced  = entries.filter(e => e.entryTime >= todayStart).reduce((s,e)=>s+(e.quantityProduced||0),0);
+
+    const chart = [];
+    for (let i = 5; i >= 0; i--) {
+      const monthDate = new Date(new Date().getFullYear(), new Date().getMonth()-i, 1);
+      const start = monthDate.getTime();
+      const end   = new Date(monthDate.getFullYear(), monthDate.getMonth()+1, 1).getTime();
+      const inMonth = entries.filter(e => e.entryTime >= start && e.entryTime < end);
+      chart.push({
+        month: monthDate.toLocaleString('default',{month:'short'}),
+        produced:   inMonth.reduce((s,e)=>s+(e.quantityProduced||0),0),
+        dispatched: inMonth.reduce((s,e)=>s+(e.quantityDispatched||0),0),
+      });
+    }
+
+    const ibmScore  = pendingFilings.length === 0 ? 100 : Math.max(0, Math.round((1 - overdueFilings.length / pendingFilings.length) * 100));
+    const dgmsScore = dgms.overallScore;
+    const overall   = Math.round(ibmScore*0.5 + dgmsScore*0.5);
+
+    const royaltyCurrent = (royalties.items || []).slice()
+      .sort((a,b) => (b.year*12+MONTH_INDEX[b.month]) - (a.year*12+MONTH_INDEX[a.month]))[0] || null;
+
+    const deadlines = pendingFilings.slice().sort((a,b) => a.expiry - b.expiry).map(r => ({
+      title: r.title, authority: r.authority, due_date: new Date(r.expiry).toISOString(),
+      days_until: Math.floor((r.expiry - now) / 86400000),
+    }));
+
+    d = {
+      mine,
+      health: { overall, ibm: ibmScore, dgms: dgmsScore },
+      kpis: {
+        month_produced_mt: monthProduced, today_produced_mt: todayProduced,
+        pending_filings: pendingFilings.length, overdue_filings: overdueFilings.length,
+        expiring_documents: expiringDocs.length,
+      },
+      dgms: { overall_score: dgmsScore },
+      deadlines,
+      production_chart: chart,
+      royalty_current: royaltyCurrent,
+    };
+  } catch (err) {
+    showLoader(false);
+    toast('Failed to load dashboard', 'error');
+    console.error(err);
+    return;
+  }
+  showLoader(false);
+  STATE.dashData = d;
 
   // Greeting
   const hour = new Date().getHours();
   const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-  document.getElementById('dash-greeting').textContent = `${greet}, ${STATE.user?.full_name?.split(' ')[0] || 'there'}`;
+  document.getElementById('dash-greeting').textContent = `${greet}, ${STATE.user?.username || 'there'}`;
   document.getElementById('dash-sub').textContent = `${d.mine.name} · ${formatState(d.mine.state)} · ${new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})}`;
 
   // Health score
@@ -275,10 +336,8 @@ async function loadDashboard() {
                   '✕ Critical — Immediate action required';
   document.getElementById('hb-status').style.color = score >= 80 ? 'var(--green)' : score >= 60 ? 'var(--warn)' : 'var(--red)';
 
-  animateBar('hb-ibm',    d.health.ibm,         'hb-ibm-val');
-  animateBar('hb-royalty',d.health.royalty,      'hb-royalty-val');
-  animateBar('hb-dgms',   d.health.dgms,         'hb-dgms-val');
-  animateBar('hb-env',    d.health.environment,  'hb-env-val');
+  animateBar('hb-ibm',  d.health.ibm,  'hb-ibm-val');
+  animateBar('hb-dgms', d.health.dgms, 'hb-dgms-val');
 
   // DGMS nav pill
   document.getElementById('dgms-nav-pill').textContent = d.dgms.overall_score;
@@ -307,8 +366,8 @@ async function loadDashboard() {
   // KPIs
   animateCounter('kpi-produced',  d.kpis.month_produced_mt, '', ' MT');
   animateCounter('kpi-today',     d.kpis.today_produced_mt, '', ' MT');
-  document.getElementById('kpi-royalty').textContent    = d.royalty_current ? '₹' + fmtINR(d.royalty_current.net_due_paise/100) : '₹—';
-  document.getElementById('kpi-royalty-sub').textContent= d.royalty_current ? d.royalty_current.challan_status : 'No calculation yet';
+  document.getElementById('kpi-royalty').textContent    = d.royalty_current ? '₹' + fmtINR(d.royalty_current.grossLiability/100) : '₹—';
+  document.getElementById('kpi-royalty-sub').textContent= d.royalty_current ? `${d.royalty_current.month} ${d.royalty_current.year}` : 'No production yet';
   document.getElementById('kpi-filings').textContent    = d.kpis.pending_filings;
   document.getElementById('kpi-filings-sub').textContent= `${d.kpis.overdue_filings} overdue`;
   document.getElementById('kpi-filings-sub').className  = 'kpi-change ' + (d.kpis.overdue_filings > 0 ? 'down' : 'neutral');
@@ -340,13 +399,14 @@ async function loadDashboard() {
   const snap = document.getElementById('royalty-snap');
   if (d.royalty_current) {
     const r = d.royalty_current;
+    const pct = (part) => r.baseAmount ? ' (' + Math.round(part / r.baseAmount * 100) + '%)' : '';
     snap.innerHTML = `
-      <div class="rb-row"><span class="rb-label">Base Royalty</span><span class="rb-val">₹${fmtINR(r.base_royalty_paise/100)}</span></div>
-      <div class="rb-row"><span class="rb-label">DMF (30%)</span><span class="rb-val">₹${fmtINR(r.dmf_paise/100)}</span></div>
-      <div class="rb-row"><span class="rb-label">NMET (2%)</span><span class="rb-val">₹${fmtINR(r.nmet_paise/100)}</span></div>
-      <div class="rb-row" style="border-bottom:none"><span class="rb-label" style="font-weight:600;color:var(--amber)">Net Due</span><span class="rb-val" style="color:var(--amber);font-size:15px">₹${fmtINR(r.net_due_paise/100)}</span></div>`;
+      <div class="rb-row"><span class="rb-label">Base Royalty</span><span class="rb-val">₹${fmtINR(r.baseAmount/100)}</span></div>
+      <div class="rb-row"><span class="rb-label">DMF${pct(r.dmfAmount)}</span><span class="rb-val">₹${fmtINR(r.dmfAmount/100)}</span></div>
+      <div class="rb-row"><span class="rb-label">NMET${pct(r.nmetAmount)}</span><span class="rb-val">₹${fmtINR(r.nmetAmount/100)}</span></div>
+      <div class="rb-row" style="border-bottom:none"><span class="rb-label" style="font-weight:600;color:var(--amber)">Gross Liability</span><span class="rb-val" style="color:var(--amber);font-size:15px">₹${fmtINR(r.grossLiability/100)}</span></div>`;
   } else {
-    snap.innerHTML = '<p style="color:var(--text2);font-size:12px">No royalty calculated yet. <a style="color:var(--amber);cursor:pointer" onclick="navigate(\'royalty\')">Calculate now →</a></p>';
+    snap.innerHTML = '<p style="color:var(--text2);font-size:12px">No royalty calculated yet — add a production entry to generate one. <a style="color:var(--amber);cursor:pointer" onclick="navigate(\'production\')">Log production →</a></p>';
   }
 }
 
@@ -473,17 +533,31 @@ function drawProductionChart() {
 async function loadCalendar() {
   if (!STATE.mineId) return;
   const auth = document.getElementById('cal-filter')?.value || '';
-  const url  = `${API}/core.php?ep=deadlines&mine_id=${STATE.mineId}${auth ? '&authority='+auth : ''}`;
-  const data = await apiFetch(url);
-  if (!data?.success) return;
+  const filters = [
+    { field:'mineId', op:'EQ', values:[STATE.mineId] },
+    { field:'recordType', op:'NE', values:['REGISTER'] },
+  ];
+  if (auth) filters.push({ field:'authority', op:'EQ', values:[auth] });
 
-  const items = data.data || [];
+  let result;
+  try {
+    result = await catalogSearch('ComplianceRecord', { filter: { op:'AND', values: filters } });
+  } catch (err) {
+    toast('Failed to load calendar', 'error');
+    return;
+  }
+
+  const now = Date.now();
+  const items = (result.items || []).map(r => ({
+    ...r, days_until: Math.floor((r.expiry - now) / 86400000),
+  })).sort((a,b) => a.expiry - b.expiry);
+
   const content = document.getElementById('calendar-content');
   if (!items.length) { content.innerHTML = '<p style="color:var(--text2);font-family:var(--mono);padding:24px">No deadlines found.</p>'; return; }
 
   const months = {};
   items.forEach(d => {
-    const dt  = new Date(d.due_date);
+    const dt  = new Date(d.expiry);
     const key = dt.toLocaleString('default', { month:'long', year:'numeric' });
     if (!months[key]) months[key] = [];
     months[key].push({ ...d, dt });
@@ -497,9 +571,8 @@ async function loadCalendar() {
         const cls  = ev.status === 'SUBMITTED' ? 'done' : days < 0 ? 'overdue' : days <= 7 ? 'due-soon' : 'upcoming';
         const chipCls = ev.status === 'SUBMITTED' ? 'green' : days <= 0 ? 'red' : days <= 7 ? 'red' : days <= 14 ? 'amber' : 'green';
         const chip = ev.status === 'SUBMITTED' ? 'Filed ✓' : days < 0 ? 'OVERDUE' : days+'d away';
-        const dt = new Date(ev.due_date);
-        return `<div class="cal-item ${cls}">
-          <div><span class="cal-day-num">${dt.getDate()}</span><span class="cal-day-mon">${dt.toLocaleString('default',{month:'short'}).toUpperCase()}</span></div>
+        return `<div class="cal-item ${cls}" onclick="openMarkSubmitted('${ev.id}')">
+          <div><span class="cal-day-num">${ev.dt.getDate()}</span><span class="cal-day-mon">${ev.dt.toLocaleString('default',{month:'short'}).toUpperCase()}</span></div>
           <div><div class="cal-item-title">${ev.title}</div><div class="cal-item-sub">${ev.authority.replace('_',' ')}</div></div>
           <span class="auth-chip auth-${ev.authority}">${ev.authority.replace('_',' ')}</span>
           <span class="days-chip ${chipCls}">${chip}</span>
@@ -508,67 +581,65 @@ async function loadCalendar() {
     </div>`).join('');
 }
 
-// ═══════════════════════════════════════════════════════════
-// ROYALTY CALCULATOR
-// ═══════════════════════════════════════════════════════════
-function syncQty(v)   { document.getElementById('rc-qty').value = v;       liveRoyalty(); }
-function syncRange(v) { document.getElementById('rc-qty-range').value = v; liveRoyalty(); }
-
-async function liveRoyalty() {
-  const state   = document.getElementById('rc-state')?.value;
-  const mineral = document.getElementById('rc-mineral')?.value;
-  const qty     = parseFloat(document.getElementById('rc-qty')?.value) || 0;
-  const advance = Math.round((parseFloat(document.getElementById('rc-advance')?.value) || 0) * 100);
-
-  if (!state || !mineral || qty <= 0) return;
-
-  const data = await apiFetch(`${API}/core.php?ep=royalty_preview&mine_id=${STATE.mineId||''}&state=${state}&mineral=${mineral}&quantity_mt=${qty}&advance_paise=${advance}`);
-  if (!data?.success) return;
-  const r = data.data;
-
-  document.getElementById('lrc-rate').textContent   = '₹' + r.rate_rupees + ' / MT';
-  document.getElementById('lrc-source').textContent = r.source + ' · Effective ' + r.effective_from;
-  document.getElementById('co-qty').textContent     = qty.toLocaleString('en-IN') + ' MT';
-  document.getElementById('co-rate').textContent    = '₹' + r.rate_rupees + '/MT';
-  document.getElementById('co-base').textContent    = '₹' + fmtINR(r.base_royalty_rupees);
-  document.getElementById('co-dmf').textContent     = '₹' + fmtINR(r.dmf_rupees);
-  document.getElementById('co-nmet').textContent    = '₹' + fmtINR(r.nmet_rupees);
-  document.getElementById('co-gross').textContent   = '₹' + fmtINR(r.gross_rupees);
-  document.getElementById('co-adv').textContent     = '−₹' + fmtINR(r.advance_rupees);
-  document.getElementById('co-net').textContent     = '₹' + fmtINR(r.net_due_rupees);
-  document.getElementById('cc-period').textContent  = new Date().toLocaleString('default',{month:'long',year:'numeric'});
-  document.getElementById('compare-mineral').textContent = document.getElementById('rc-mineral').options[document.getElementById('rc-mineral').selectedIndex]?.text || mineral;
-
-  loadRateCompare();
+/** Marks a deadline SUBMITTED with a reference number the user enters. */
+async function openMarkSubmitted(recordId) {
+  const record = (await catalogSearch('ComplianceRecord', { filter: { field:'id', op:'EQ', values:[recordId] } })).items?.[0];
+  if (!record || record.status === 'SUBMITTED') return;
+  const referenceNumber = prompt(`Mark "${record.title}" as submitted.\nEnter the authority's reference/acknowledgement number:`);
+  if (!referenceNumber) return;
+  try {
+    await apiFetch(`/mines/${STATE.mineId}/compliance-records`, {
+      method: 'POST',
+      body: JSON.stringify({ ...record, status: 'SUBMITTED', submittedOn: Date.now(), referenceNumber }),
+    });
+    toast('Marked as submitted', 'success');
+    loadCalendar();
+  } catch (err) {
+    toast(err.message || 'Failed to mark as submitted', 'error');
+  }
 }
 
-async function loadRateCompare() {
-  const mineral = document.getElementById('rc-mineral')?.value;
-  const state   = document.getElementById('rc-state')?.value;
-  if (!mineral) return;
-  const data = await apiFetch(`${API}/core.php?ep=royalty_compare&mine_id=${STATE.mineId||''}&mineral=${mineral}`);
-  if (!data?.success) return;
-  const rows = data.data || [];
-  const lowest = rows[0]?.rate_paise_per_mt;
-  document.getElementById('compare-list').innerHTML = rows.map(r => `
-    <div class="compare-row ${r.state === state ? 'current' : ''}">
-      <span class="compare-state">${formatState(r.state)}${r.state === state ? ' (selected)' : ''}</span>
-      <span class="compare-rate">₹${r.rate_rupees}/MT</span>
-      ${r.rate_paise_per_mt === lowest ? '<span class="compare-badge">Lowest</span>' : ''}
-    </div>`).join('');
-}
+// ═══════════════════════════════════════════════════════════
+// ROYALTY — read-only; derived from production entries, recalculated server-side
+// whenever production changes. There is no manual input or save action any more.
+// ═══════════════════════════════════════════════════════════
+async function loadRoyalty() {
+  if (!STATE.mineId) return;
+  let result;
+  try {
+    result = await apiFetch(`/mines/${STATE.mineId}/royalty`);
+  } catch (err) {
+    toast('Failed to load royalty', 'error');
+    return;
+  }
+  const periods = (result.items || []).slice()
+    .sort((a,b) => (b.year*12+MONTH_INDEX[b.month]) - (a.year*12+MONTH_INDEX[a.month]));
+  const current = periods[0];
 
-async function saveRoyaltyCalc() {
-  if (!STATE.mineId) { toast('Select a mine first', 'error'); return; }
-  const qty     = parseFloat(document.getElementById('rc-qty')?.value) || 0;
-  const advance = Math.round((parseFloat(document.getElementById('rc-advance')?.value) || 0) * 100);
-  const month   = new Date().toISOString().slice(0, 7);
-  const data = await apiFetch(`${API}/core.php?ep=royalty_calculate&mine_id=${STATE.mineId}`, {
-    method: 'POST',
-    body: JSON.stringify({ period_month: month, quantity_mt: qty, advance_paise: advance }),
-  });
-  if (data?.success) toast('Royalty calculation saved successfully!', 'success');
-  else toast(data?.error || 'Failed to save calculation', 'error');
+  if (current) {
+    const pct = (part) => current.baseAmount ? ' (' + Math.round(part / current.baseAmount * 100) + '%)' : '';
+    document.getElementById('cc-period').textContent   = `${current.month} ${current.year}`;
+    document.getElementById('co-dmf-label').textContent = 'DMF' + pct(current.dmfAmount);
+    document.getElementById('co-nmet-label').textContent= 'NMET' + pct(current.nmetAmount);
+    document.getElementById('co-base').textContent     = '₹' + fmtINR(current.baseAmount/100);
+    document.getElementById('co-dmf').textContent      = '₹' + fmtINR(current.dmfAmount/100);
+    document.getElementById('co-nmet').textContent     = '₹' + fmtINR(current.nmetAmount/100);
+    document.getElementById('co-gross').textContent    = '₹' + fmtINR(current.grossLiability/100);
+  } else {
+    document.getElementById('cc-period').textContent = '—';
+    ['co-base','co-dmf','co-nmet','co-gross'].forEach(id => document.getElementById(id).textContent = '₹—');
+  }
+
+  document.getElementById('royalty-history-tbody').innerHTML = periods.length
+    ? periods.map(r => `
+        <tr>
+          <td>${r.month} ${r.year}</td>
+          <td class="num-col">₹${fmtINR(r.baseAmount/100)}</td>
+          <td class="num-col">₹${fmtINR(r.dmfAmount/100)}</td>
+          <td class="num-col">₹${fmtINR(r.nmetAmount/100)}</td>
+          <td class="num-col">₹${fmtINR(r.grossLiability/100)}</td>
+        </tr>`).join('')
+    : '<tr><td colspan="5" style="color:var(--text2)">No royalty calculated yet — add a production entry to generate one.</td></tr>';
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -585,31 +656,44 @@ function initProduction() {
 async function loadProduction() {
   if (!STATE.mineId) return;
   const month = document.getElementById('prod-month')?.value || new Date().toISOString().slice(0,7);
-  const data  = await apiFetch(`${API}/core.php?ep=production&mine_id=${STATE.mineId}&month=${month}`);
-  if (!data?.success) return;
-  STATE.prodData = data.data || [];
+  const [year, mon] = month.split('-').map(Number);
+  const start = new Date(year, mon-1, 1).getTime();
+  const end   = new Date(year, mon, 1).getTime();
+
+  let result;
+  try {
+    result = await catalogSearch('ProductionEntry', { filter: { op:'AND', values: [
+      { field:'mineId', op:'EQ', values:[STATE.mineId] },
+      { field:'entryTime', op:'GTE', values:[start] },
+      { field:'entryTime', op:'LT', values:[end] },
+    ] } });
+  } catch (err) {
+    toast('Failed to load production entries', 'error');
+    return;
+  }
+  STATE.prodData = (result.items || []).sort((a,b) => b.entryTime - a.entryTime);
   renderProdTable(STATE.prodData);
   renderProdSummary();
 }
 
 function renderProdTable(rows) {
-  document.getElementById('prod-tbody').innerHTML = rows.map((r,i) => `
+  document.getElementById('prod-tbody').innerHTML = rows.map(r => `
     <tr>
-      <td>${r.entry_date}</td>
+      <td>${new Date(r.entryTime).toLocaleDateString('en-IN')}</td>
       <td>${r.shift}</td>
-      <td>${r.pit_section}</td>
-      <td>${r.mineral_grade}</td>
-      <td class="num-col">${parseFloat(r.quantity_produced_mt).toLocaleString('en-IN')}</td>
-      <td class="num-col">${parseFloat(r.quantity_dispatched_mt).toLocaleString('en-IN')}</td>
-      <td>${r.supervisor_name || '—'}</td>
+      <td>${r.pitSection}</td>
+      <td>${r.mineralGrade}</td>
+      <td class="num-col">${r.quantityProduced.toLocaleString('en-IN')}</td>
+      <td class="num-col">${r.quantityDispatched.toLocaleString('en-IN')}</td>
+      <td>${r.supervisorName || '—'}</td>
       <td><span class="status-pill ${r.status}">${r.status}</span></td>
       <td>${r.status === 'PENDING' ? `<button class="action-link" onclick="verifyEntry('${r.id}')">Verify</button>` : '—'}</td>
     </tr>`).join('');
 }
 
 function renderProdSummary() {
-  const totalP = STATE.prodData.reduce((s,r) => s + parseFloat(r.quantity_produced_mt||0), 0);
-  const totalD = STATE.prodData.reduce((s,r) => s + parseFloat(r.quantity_dispatched_mt||0), 0);
+  const totalP = STATE.prodData.reduce((s,r) => s + (r.quantityProduced||0), 0);
+  const totalD = STATE.prodData.reduce((s,r) => s + (r.quantityDispatched||0), 0);
   document.getElementById('prod-summary').innerHTML = `
     <div class="psr-card"><span class="psr-label">Total Produced</span><span class="psr-val">${totalP.toLocaleString('en-IN',{maximumFractionDigits:1})} MT</span></div>
     <div class="psr-card"><span class="psr-label">Total Dispatched</span><span class="psr-val">${totalD.toLocaleString('en-IN',{maximumFractionDigits:1})} MT</span></div>
@@ -619,8 +703,8 @@ function renderProdSummary() {
 function filterProd() {
   const q = document.getElementById('prod-search').value.toLowerCase();
   const filtered = q ? STATE.prodData.filter(r =>
-    r.entry_date.includes(q) || (r.pit_section||'').toLowerCase().includes(q) ||
-    (r.supervisor_name||'').toLowerCase().includes(q) || r.shift.toLowerCase().includes(q)
+    (r.pitSection||'').toLowerCase().includes(q) ||
+    (r.supervisorName||'').toLowerCase().includes(q) || r.shift.toLowerCase().includes(q)
   ) : STATE.prodData;
   renderProdTable(filtered);
 }
@@ -634,36 +718,44 @@ function toggleProdForm() {
 async function saveProdEntry() {
   if (!STATE.mineId) { toast('Select a mine first','error'); return; }
   const body = {
-    entry_date:            document.getElementById('pf-date').value,
-    shift:                 document.getElementById('pf-shift').value,
-    pit_section:           document.getElementById('pf-pit').value.trim(),
-    mineral_grade:         document.getElementById('pf-grade').value.trim(),
-    quantity_produced_mt:  parseFloat(document.getElementById('pf-prod').value)||0,
-    quantity_dispatched_mt:parseFloat(document.getElementById('pf-disp').value)||0,
-    supervisor_name:       document.getElementById('pf-sup').value.trim(),
-    remarks:               document.getElementById('pf-rem').value.trim(),
+    entryTime:          Date.parse(document.getElementById('pf-date').value + 'T00:00:00Z'),
+    shift:               document.getElementById('pf-shift').value,
+    pitSection:          document.getElementById('pf-pit').value.trim(),
+    mineralGrade:        document.getElementById('pf-grade').value.trim(),
+    quantityProduced:    parseFloat(document.getElementById('pf-prod').value)||0,
+    quantityDispatched:  parseFloat(document.getElementById('pf-disp').value)||0,
+    supervisorName:      document.getElementById('pf-sup').value.trim(),
+    remarks:             document.getElementById('pf-rem').value.trim(),
   };
-  if (!body.pit_section || !body.mineral_grade) { toast('Pit/section and grade are required','error'); return; }
-  const data = await apiFetch(`${API}/core.php?ep=production&mine_id=${STATE.mineId}`, {
-    method:'POST', body:JSON.stringify(body),
-  });
-  if (data?.success) {
+  if (!body.pitSection || !body.mineralGrade) { toast('Pit/section and grade are required','error'); return; }
+  try {
+    await apiFetch(`/mines/${STATE.mineId}/production`, { method:'POST', body:JSON.stringify(body) });
     toast('Production entry saved','success');
     toggleProdForm();
     loadProduction();
-  } else toast(data?.error||'Failed to save entry','error');
+  } catch (err) {
+    toast(err.message || 'Failed to save entry', 'error');
+  }
 }
 
 async function verifyEntry(id) {
-  const data = await apiFetch(`${API}/core.php?ep=production&mine_id=${STATE.mineId}&entry_id=${id}`, { method:'PATCH' });
-  if (data?.success) { toast('Entry verified','success'); loadProduction(); }
-  else toast('Failed to verify','error');
+  const entry = (await catalogSearch('ProductionEntry', { filter: { field:'id', op:'EQ', values:[id] } })).items?.[0];
+  if (!entry) { toast('Entry not found', 'error'); return; }
+  try {
+    await apiFetch(`/mines/${STATE.mineId}/production`, {
+      method:'POST', body:JSON.stringify({ ...entry, status:'VERIFIED' }),
+    });
+    toast('Entry verified','success');
+    loadProduction();
+  } catch (err) {
+    toast(err.message || 'Failed to verify', 'error');
+  }
 }
 
 function exportProdCSV() {
   const month = document.getElementById('prod-month')?.value || new Date().toISOString().slice(0,7);
   const rows  = [['Date','Shift','Pit','Grade','Produced (MT)','Dispatched (MT)','Supervisor','Status'],
-    ...STATE.prodData.map(r=>[r.entry_date,r.shift,r.pit_section,r.mineral_grade,r.quantity_produced_mt,r.quantity_dispatched_mt,r.supervisor_name||'',r.status])];
+    ...STATE.prodData.map(r=>[new Date(r.entryTime).toLocaleDateString('en-IN'),r.shift,r.pitSection,r.mineralGrade,r.quantityProduced,r.quantityDispatched,r.supervisorName||'',r.status])];
   const csv  = rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
   const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
   const url  = URL.createObjectURL(blob);
@@ -676,85 +768,109 @@ function exportProdCSV() {
 // ═══════════════════════════════════════════════════════════
 // DOCUMENTS
 // ═══════════════════════════════════════════════════════════
-async function loadDocuments(cat) {
+const DOCUMENT_RECORD_TYPES = ['CLEARANCE', 'STATUTORY_PLAN', 'NOTICE'];
+const AUTHORITY_ICONS = { IBM:'📄', DGMS:'🏅', MOEFCC:'🌿', SPCB:'🏭', STATE_GOVT:'📜' };
+
+async function loadDocuments(authority) {
   if (!STATE.mineId) return;
-  const url  = `${API}/core.php?ep=documents&mine_id=${STATE.mineId}${cat?'&category='+cat:''}`;
-  const data = await apiFetch(url);
-  if (!data?.success) return;
-  const docs = data.data || [];
-  const icons = { LEASE:'📜', ENVIRONMENTAL:'🌿', DGMS_CERT:'🏅', OTHER:'📄' };
+  const filters = [
+    { field:'mineId', op:'EQ', values:[STATE.mineId] },
+    { field:'recordType', op:'IN', values:DOCUMENT_RECORD_TYPES },
+  ];
+  if (authority) filters.push({ field:'authority', op:'EQ', values:[authority] });
+
+  let result;
+  try {
+    result = await catalogSearch('ComplianceRecord', { filter: { op:'AND', values: filters } });
+  } catch (err) {
+    toast('Failed to load documents', 'error');
+    return;
+  }
+  const docs = (result.items || []).sort((a,b) => (b.issuedOn||0) - (a.issuedOn||0));
   document.getElementById('doc-grid').innerHTML = docs.length
     ? docs.map(d => `
-        <div class="doc-card" onclick="toast('Document viewer opens in Beta','info')">
-          <div class="doc-card-icon">${icons[d.category]||'📄'}</div>
-          <div class="doc-card-name">${d.name}</div>
-          <div class="doc-card-type">${d.document_type}</div>
-          <div class="doc-card-date">Uploaded: ${d.created_at?.slice(0,10)||'—'}</div>
-          <span class="doc-expiry-tag ${getExpiryStatus(d.expiry_date)}">
-            ${getExpiryLabel(d.expiry_date)} ${d.expiry_date?'· '+d.expiry_date:''}
+        <div class="doc-card" onclick="${d.attachment ? `openDocument('${encodeURIComponent(JSON.stringify(d.attachment))}')` : `toast('No file attached','info')`}">
+          <div class="doc-card-icon">${AUTHORITY_ICONS[d.authority]||'📄'}</div>
+          <div class="doc-card-name">${d.title}</div>
+          <div class="doc-card-type">${d.authority.replace('_',' ')} · ${d.recordType.replace('_',' ')}</div>
+          <div class="doc-card-date">Issued: ${d.issuedOn ? new Date(d.issuedOn).toLocaleDateString('en-IN') : '—'}</div>
+          <span class="doc-expiry-tag ${getExpiryStatus(d.expiry)}">
+            ${getExpiryLabel(d.expiry)} ${d.expiry ? '· '+new Date(d.expiry).toLocaleDateString('en-IN') : ''}
           </span>
         </div>`).join('')
     : '<p style="color:var(--text2);font-family:var(--mono);grid-column:1/-1">No documents uploaded yet.</p>';
 }
 
-function getExpiryStatus(date) {
-  if (!date) return 'none';
-  const d = new Date(date), now = new Date();
-  if (d < now) return 'expired';
-  if ((d - now) < 90*86400000) return 'expiring';
+async function openDocument(attachmentJson) {
+  const attachment = JSON.parse(decodeURIComponent(attachmentJson));
+  try {
+    const res = await fetch(`${API}/storage/download`, {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(attachment),
+    });
+    if (!res.ok) throw new Error('Download failed');
+    const blob = await res.blob();
+    window.open(URL.createObjectURL(blob), '_blank');
+  } catch (err) {
+    toast('Failed to open document', 'error');
+  }
+}
+
+function getExpiryStatus(expiryMillis) {
+  if (!expiryMillis) return 'none';
+  const now = Date.now();
+  if (expiryMillis < now) return 'expired';
+  if (expiryMillis - now < 90*86400000) return 'expiring';
   return 'valid';
 }
-function getExpiryLabel(date) {
-  const s = getExpiryStatus(date);
+function getExpiryLabel(expiryMillis) {
+  const s = getExpiryStatus(expiryMillis);
   return s==='none'?'No Expiry':s==='expired'?'✕ Expired':s==='expiring'?'⚠ Expiring Soon':'✓ Valid';
 }
 
-function filterDocs(btn, cat) {
+function filterDocs(btn, authority) {
   document.querySelectorAll('.doc-filter-row .filter-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  loadDocuments(cat);
+  loadDocuments(authority);
 }
 
 function openAddDocModal() { openModal('modal-add-doc'); }
 
 async function addDocument() {
   if (!STATE.mineId) { toast('Select a mine first','error'); return; }
-  
+
   const fileInput = document.getElementById('doc-file');
   const file = fileInput.files[0];
-  
-  const name = document.getElementById('doc-name').value.trim();
-  const category = document.getElementById('doc-cat').value;
-  const document_type = document.getElementById('doc-type').value.trim();
-  const issued_date = document.getElementById('doc-issued').value || '';
-  const expiry_date = document.getElementById('doc-expiry').value || '';
 
-  if (!name || !document_type) { toast('Name and document type required','error'); return; }
+  const title      = document.getElementById('doc-name').value.trim();
+  const authority  = document.getElementById('doc-authority').value;
+  const recordType = document.getElementById('doc-record-type').value;
+  const issuedOn   = document.getElementById('doc-issued').value;
+  const expiryVal  = document.getElementById('doc-expiry').value;
+
+  if (!title) { toast('Document title is required','error'); return; }
   if (!file) { toast('Please select a file to upload','error'); return; }
 
-  const formData = new FormData();
-  formData.append('mine_id', STATE.mineId);
-  formData.append('name', name);
-  formData.append('category', category);
-  formData.append('document_type', document_type);
-  formData.append('issued_date', issued_date);
-  formData.append('expiry_date', expiry_date);
-  formData.append('file', file);
-
   try {
-    const data = await apiFetchForm(`${API}/core.php?ep=documents&mine_id=${STATE.mineId}`, formData);
-    
-    if (data?.success) { 
-      toast('Document saved','success'); 
-      closeModal('modal-add-doc'); 
-      loadDocuments(''); 
-      fileInput.value = '';
-      document.getElementById('file-name-display').innerText = '';
-    }
-    else toast(data?.error||'Failed to save document','error');
+    const attachment = await apiUpload(file, `${STATE.mineId}/${Date.now()}_${file.name}`);
+    const expiry = expiryVal ? Date.parse(expiryVal + 'T00:00:00Z') : null;
+    await apiFetch(`/mines/${STATE.mineId}/compliance-records`, {
+      method: 'POST',
+      body: JSON.stringify({
+        title, authority, recordType, attachment,
+        issuedOn: issuedOn ? Date.parse(issuedOn + 'T00:00:00Z') : null,
+        expiry,
+        status: expiry && expiry < Date.now() ? 'EXPIRED' : 'VALID',
+      }),
+    });
+    toast('Document saved','success');
+    closeModal('modal-add-doc');
+    loadDocuments('');
+    fileInput.value = '';
+    document.getElementById('file-name-display').innerText = '';
   } catch (err) {
-    toast('An error occurred while uploading.','error');
-    console.error(err);
+    toast(err.message || 'Failed to save document','error');
   }
 }
 
@@ -763,11 +879,15 @@ async function addDocument() {
 // ═══════════════════════════════════════════════════════════
 async function loadDgms() {
   if (!STATE.mineId) return;
-  const data = await apiFetch(`${API}/core.php?ep=dgms&mine_id=${STATE.mineId}`);
-  if (!data?.success) return;
-  const d = data.data;
+  let d;
+  try {
+    d = await apiFetch(`/mines/${STATE.mineId}/dgms-readiness`);
+  } catch (err) {
+    toast('Failed to load DGMS readiness', 'error');
+    return;
+  }
 
-  const score = d.overall_score;
+  const score = d.overallScore;
   document.getElementById('dgms-score-num').textContent = score;
   document.getElementById('dsp-verdict').textContent = d.verdict.replace('_',' ');
   document.getElementById('dsp-verdict').style.color = score>=80?'var(--green)':score>=50?'var(--warn)':'var(--red)';
@@ -780,39 +900,46 @@ async function loadDgms() {
   const circ = 427.08;
   setTimeout(() => { ring.style.strokeDashoffset = circ - (score/100)*circ; ring.style.transition='stroke-dashoffset 1s ease'; }, 100);
 
+  const colorFor = status => status==='GREEN'?'var(--green)':status==='AMBER'?'var(--amber)':'var(--red)';
+
   // Category bars
   const cats = {ACCIDENT_REGISTER:'Accident Register',SAFETY_COMMITTEE:'Safety Meetings',EXPLOSIVE_CONSUMPTION:'Explosives',SHOTFIRER_COMPETENCY:'Certifications',FIRST_AID:'First Aid',MACHINERY_REGISTER:'Machinery',WEIGHBRIDGE_REGISTER:'Weighbridge',EMPLOYMENT_REGISTER:'Employment'};
-  document.getElementById('dsp-cats').innerHTML = (d.registers||[]).map(r => {
-    const col = r.status==='green'?'var(--green)':r.status==='amber'?'var(--amber)':'var(--red)';
+  document.getElementById('dsp-cats').innerHTML = (d.scores||[]).map(r => {
+    const col = colorFor(r.status);
     return `<div class="dsp-cat">
-      <span>${cats[r.register_code]||r.register_code}</span>
+      <span>${cats[r.register.registerCode]||r.register.registerCode}</span>
       <div class="dsp-bar-wrap"><div class="dsp-bar" style="width:${r.score}%;background:${col}"></div></div>
       <span class="dsp-score" style="color:${col}">${r.score}</span>
     </div>`;
   }).join('');
 
-  document.getElementById('registers-list').innerHTML = (d.registers||[]).map(r => {
-    const dotColor = r.status==='green'?'var(--green)':r.status==='amber'?'var(--amber)':'var(--red)';
-    const noteColor = dotColor;
+  document.getElementById('registers-list').innerHTML = (d.scores||[]).map(r => {
+    const dotColor = colorFor(r.status);
     return `<div class="reg-item">
       <div>
-        <div class="reg-name">${r.register_name}</div>
-        <div class="reg-reg">${r.regulation_ref||'DGMS'}</div>
-        <div class="reg-note" style="color:${noteColor}">${r.status==='green'?'Up to date':r.days_since_update+' days since last update'}</div>
+        <div class="reg-name">${r.register.title}</div>
+        <div class="reg-reg">${r.register.notes||'DGMS'}</div>
+        <div class="reg-note" style="color:${dotColor}">${r.status==='GREEN'?'Up to date':r.daysSinceUpdate+' days since last update'}</div>
       </div>
-      <div class="reg-last">Last: ${r.last_updated_at?.slice(0,10)||'—'}</div>
-      <button class="reg-btn" onclick="markRegister('${r.register_code}')">Mark Updated</button>
+      <div class="reg-last">Last: ${r.register.lastUpdatedAt ? new Date(r.register.lastUpdatedAt).toLocaleDateString('en-IN') : '—'}</div>
+      <button class="reg-btn" onclick="markRegister('${r.register.id}')">Mark Updated</button>
       <div class="reg-dot" style="background:${dotColor};box-shadow:0 0 6px ${dotColor}"></div>
     </div>`;
   }).join('');
 }
 
-async function markRegister(code) {
-  const data = await apiFetch(`${API}/core.php?ep=dgms&mine_id=${STATE.mineId}`, {
-    method:'POST', body:JSON.stringify({register_code:code, notes:'Updated via ComplianceOS'}),
-  });
-  if (data?.success) { toast('Register marked as updated. Score: '+data.data.new_score.overall_score,'success'); loadDgms(); }
-  else toast('Failed to update register','error');
+async function markRegister(recordId) {
+  const record = (await catalogSearch('ComplianceRecord', { filter: { field:'id', op:'EQ', values:[recordId] } })).items?.[0];
+  if (!record) { toast('Register not found', 'error'); return; }
+  try {
+    await apiFetch(`/mines/${STATE.mineId}/compliance-records`, {
+      method:'POST', body:JSON.stringify({ ...record, lastUpdatedAt: Date.now(), notes:'Updated via ComplianceOS' }),
+    });
+    toast('Register marked as updated','success');
+    loadDgms();
+  } catch (err) {
+    toast(err.message || 'Failed to update register', 'error');
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -839,9 +966,6 @@ function buildAlerts() {
 
   if (d.kpis.expiring_documents > 0)
     alerts.push({ type:'warning', icon:'📄', title:`${d.kpis.expiring_documents} Document(s) Expiring Soon`, desc:'Check your document repository. Expiring CTO, EC or DGMS certificates need renewal.', time:'Within 90 days', action:'View Documents', nav:'documents' });
-
-  if (d.royalty_current?.challan_status === 'DRAFT')
-    alerts.push({ type:'info', icon:'₹', title:'Royalty Calculation Pending Payment', desc:`Net amount due: ₹${fmtINR(d.royalty_current.net_due_paise/100)}. Generate e-Challan and pay before due date.`, time:'Current period', action:'Calculate', nav:'royalty' });
 
   if (!alerts.length)
     alerts.push({ type:'success', icon:'✓', title:'All compliance checks passing!', desc:'Your mine has no critical alerts at this time. Keep updating your registers and filing returns on schedule.', time:'Now', action:null });
@@ -876,22 +1000,59 @@ function markAllRead() {
 // ═══════════════════════════════════════════════════════════
 // IBM FORMS
 // ═══════════════════════════════════════════════════════════
-function setFormBDueDate() {
-  const d = new Date();
-  d.setMonth(d.getMonth() + 1, 5);
-  document.getElementById('formb-due').textContent = 'Due: ' + d.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+/**
+ * The IBM monthly return is modeled as a ComplianceRecord (authority IBM, recordType RETURN),
+ * seeded due on the 1st of the month following the production it reports — so the record whose
+ * expiry is soonest (including already-overdue ones) is the one still outstanding to file.
+ */
+async function findIbmMonthlyReturn() {
+  if (!STATE.mineId) return null;
+  const result = await catalogSearch('ComplianceRecord', { filter: { op:'AND', values: [
+    { field:'mineId', op:'EQ', values:[STATE.mineId] },
+    { field:'authority', op:'EQ', values:['IBM'] },
+    { field:'recordType', op:'EQ', values:['RETURN'] },
+    { field:'status', op:'EQ', values:['PENDING_SUBMISSION'] },
+  ] } });
+  return (result.items || []).sort((a,b) => a.expiry - b.expiry)[0] || null;
+}
+
+let formBRecord = null;
+
+async function setFormBDueDate() {
+  const badge = document.querySelector('#page-forms .form-tile.ready .ft-badge');
+  formBRecord = await findIbmMonthlyReturn();
+  if (!formBRecord) {
+    document.getElementById('formb-due').textContent = 'No return currently outstanding';
+    if (badge) badge.textContent = 'FILED';
+    return;
+  }
+  document.getElementById('formb-due').textContent = 'Due: ' + new Date(formBRecord.expiry).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+  if (badge) badge.textContent = formBRecord.expiry < Date.now() ? 'OVERDUE' : 'READY TO FILE';
 }
 
 async function openFormB() {
   if (!STATE.mineId) { toast('Select a mine first','error'); return; }
+  if (!formBRecord) { toast('No return currently outstanding for this mine','info'); return; }
   const mine = STATE.mines.find(m => m.id === STATE.mineId);
-  const month = new Date().toISOString().slice(0,7);
-  const data  = await apiFetch(`${API}/core.php?ep=production&mine_id=${STATE.mineId}&month=${month}`);
-  const entries = data?.success ? data.data : [];
 
-  const totalProduced   = entries.reduce((s,r)=>s+parseFloat(r.quantity_produced_mt||0),0);
-  const totalDispatched = entries.reduce((s,r)=>s+parseFloat(r.quantity_dispatched_mt||0),0);
-  const d = new Date(); const per = d.toLocaleString('default',{month:'long',year:'numeric'});
+  // The return due on the 1st of month M reports production from month M-1.
+  const dueDate = new Date(formBRecord.expiry);
+  const reportStart = new Date(dueDate.getFullYear(), dueDate.getMonth()-1, 1);
+  const reportEnd   = new Date(dueDate.getFullYear(), dueDate.getMonth(), 1);
+  const per = reportStart.toLocaleString('default',{month:'long',year:'numeric'});
+
+  let entries = [];
+  try {
+    const result = await catalogSearch('ProductionEntry', { filter: { op:'AND', values: [
+      { field:'mineId', op:'EQ', values:[STATE.mineId] },
+      { field:'entryTime', op:'GTE', values:[reportStart.getTime()] },
+      { field:'entryTime', op:'LT', values:[reportEnd.getTime()] },
+    ] } });
+    entries = result.items || [];
+  } catch (err) { /* leave entries empty; the form still opens with zeros */ }
+
+  const totalProduced   = entries.reduce((s,r)=>s+(r.quantityProduced||0),0);
+  const totalDispatched = entries.reduce((s,r)=>s+(r.quantityDispatched||0),0);
 
   document.getElementById('formb-period').textContent = `${per} · Auto-filled from ComplianceOS`;
   document.getElementById('formb-content').innerHTML = `
@@ -899,7 +1060,7 @@ async function openFormB() {
       <div class="fs-title">PART A — Mine Identification</div>
       <div class="fs-grid">
         <div class="fg"><label>Name of Mine</label><input value="${mine?.name||''}"></div>
-        <div class="fg"><label>Lease Number</label><input value="${mine?.lease_number||''}"></div>
+        <div class="fg"><label>Lease Number</label><input value="${mine?.leaseNumber||''}"></div>
         <div class="fg"><label>State</label><input value="${formatState(mine?.state||'')}"></div>
         <div class="fg"><label>Mineral</label><input value="${formatMineral(mine?.mineral||'')}"></div>
         <div class="fg"><label>Return Period</label><input value="${per}"></div>
@@ -924,19 +1085,30 @@ async function openFormB() {
     <div class="form-section">
       <div class="fs-title">PART D — Declaration</div>
       <div class="fs-grid">
-        <div class="fg"><label>Agent / Manager Name</label><input value="${STATE.user?.full_name||''}" id="fb-agent"></div>
+        <div class="fg"><label>Agent / Manager Name</label><input value="${STATE.user?.username||''}" id="fb-agent"></div>
         <div class="fg"><label>Submission Date</label><input type="date" value="${new Date().toISOString().slice(0,10)}"></div>
+        <div class="fg"><label>IBM Reference Number *</label><input placeholder="e.g. IBM/MPR/2026/1042" id="fb-reference"></div>
       </div>
     </div>`;
   openModal('modal-formb');
 }
 
 async function submitFormB() {
-  const data = await apiFetch(`${API}/core.php?ep=deadlines&mine_id=${STATE.mineId}`, {
-    method:'POST', body:JSON.stringify({ deadline_id: '', reference_number: 'IBM/MPR/' + new Date().getFullYear() + '/' + Math.floor(Math.random()*9000+1000) }),
-  });
-  closeModal('modal-formb');
-  toast('IBM Form B submitted and filed! Reference saved.','success');
+  if (!formBRecord) return;
+  const referenceNumber = document.getElementById('fb-reference').value.trim();
+  if (!referenceNumber) { toast('Enter the IBM reference/acknowledgement number', 'error'); return; }
+  try {
+    await apiFetch(`/mines/${STATE.mineId}/compliance-records`, {
+      method: 'POST',
+      body: JSON.stringify({ ...formBRecord, status: 'SUBMITTED', submittedOn: Date.now(), referenceNumber }),
+    });
+    closeModal('modal-formb');
+    toast('IBM return submitted and filed! Reference saved.','success');
+    formBRecord = null;
+    setFormBDueDate();
+  } catch (err) {
+    toast(err.message || 'Failed to submit return', 'error');
+  }
 }
 
 // ═══════════════════════════════════════════════════════════

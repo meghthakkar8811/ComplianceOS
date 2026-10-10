@@ -54,8 +54,8 @@
         <p>Sign in to your ComplianceOS account</p>
       </div>
 
-      <!-- GOOGLE SIGN IN -->
-      <a class="btn-google" href="../backend/auth/google_login.php">
+      <!-- GOOGLE SIGN IN — not yet supported by the backend; kept as a no-op for when it is -->
+      <a class="btn-google" href="javascript:void(0)" onclick="showError('Google sign-in is coming soon.')">
         <svg width="18" height="18" viewBox="0 0 24 24">
           <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
           <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -115,9 +115,8 @@
   </div>
 </div>
 
+<script src="js/api.js"></script>
 <script>
-const API = '../backend/auth';
-
 document.getElementById('login-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   setLoading(true);
@@ -125,43 +124,16 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
 
   const email    = document.getElementById('email').value.trim();
   const password = document.getElementById('password').value;
-  const remember = document.getElementById('remember').checked;
 
   try {
-    const res  = await fetch(`${API}/login.php`, {
+    await apiFetch('/auth/login', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ email, password, remember }),
+      body: JSON.stringify({ type: 'password', username: email, password }),
     });
-
-    let data;
-    try {
-      data = await res.json();
-    } catch (parseErr) {
-      throw new Error(`Server returned status ${res.status}. Check XAMPP Apache and PHP logs.`);
-    }
-
-    if (data.success) {
-      localStorage.setItem('cos_token',    data.data.token);
-      localStorage.setItem('cos_user',     JSON.stringify(data.data));
-      localStorage.setItem('cos_mine_id',  '');
-      showSuccess('Sign in successful! Redirecting…');
-      setTimeout(() => window.location.href = 'dashboard.html', 800);
-    } else {
-      if (data.error && data.error.includes('verify your email')) {
-        showError(data.error + ' <a href="verify.html?email=' + encodeURIComponent(email) + '">Verify now →</a>');
-      } else {
-        showError(data.error || 'Invalid email or password');
-      }
-      setLoading(false);
-    }
+    showSuccess('Sign in successful! Redirecting…');
+    setTimeout(() => window.location.href = 'dashboard.html', 500);
   } catch (err) {
-    if (window.location.protocol === 'file:') {
-      showError('Please open this page via <a href="http://localhost/complianceos/frontend/login.html" style="color:var(--amber-bright);text-decoration:underline;">http://localhost/complianceos/frontend/login.html</a> (not file://).');
-    } else {
-      showError(err.message && !err.message.includes('fetch') ? err.message : 'Connection failed. Please ensure Apache and MySQL are running in XAMPP.');
-    }
+    showError(err.status === 401 ? 'Invalid email or password' : 'Connection failed. Please ensure the backend is running.');
     setLoading(false);
   }
 });
@@ -183,9 +155,6 @@ function togglePassword(id, btn) {
 
 // Auto-fill from URL params (after Google redirect or demo)
 const p = new URLSearchParams(window.location.search);
-if (window.location.protocol === 'file:') {
-  showError('⚠️ Warning: You opened this page via <code>file://</code>. Please access it via <a href="http://localhost/complianceos/frontend/login.html" style="color:var(--amber-bright);text-decoration:underline;font-weight:600;">http://localhost/complianceos/frontend/login.html</a>');
-}
 if (p.get('verified'))   showSuccess('Email verified! You can now sign in.');
 if (p.get('reset'))      showSuccess('Password reset successfully. Please sign in.');
 if (p.get('error'))      showError('Google sign-in failed. Please try again or use email.');
