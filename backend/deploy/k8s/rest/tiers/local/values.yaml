@@ -25,9 +25,10 @@ app-base:
       # terminationGracePeriodSeconds (base default: 90) must exceed preStopSleepSeconds + this value.
       quarkus.shutdown.timeout: 5S
 
-      # CORS configuration for React frontend
+      # CORS configuration for the local frontend dev server. A regex (Quarkus' /.../ syntax)
+      # rather than a fixed port, so dev.sh can bind whichever localhost port is free.
       quarkus.http.cors.enabled: "true"
-      quarkus.http.cors.origins: "http://localhost:3000"
+      quarkus.http.cors.origins: "/http://localhost:[0-9]+/"
       quarkus.http.cors.methods: "GET,POST,PUT,DELETE,OPTIONS,PATCH"
       quarkus.http.cors.headers: "accept,authorization,content-type,x-requested-with"
       quarkus.http.cors.exposed-headers: "Content-Disposition"
