@@ -24,7 +24,7 @@ public final class EnsureComplianceCalendarJob extends Job {
   public JobResult run() {
     final MiningService miningService = service(MiningService.class);
     miningService
-        .findMines(new Query().withFilter(Filters.eq("isActive", true)).withPage(Page.UNBOUNDED))
+        .findMines(new Query().withFilter(Filters.eq("active", true)).withPage(Page.UNBOUNDED))
         .getItems()
         .forEach(mine -> miningService.ensureComplianceRecords(mine.getId()));
     return JobResult.empty();

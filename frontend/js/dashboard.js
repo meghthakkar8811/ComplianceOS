@@ -118,7 +118,7 @@ async function loadMines() {
   showLoader(true);
   let result;
   try {
-    result = await catalogSearch('Mine', { filter: { field: 'isActive', op: 'EQ', values: [true] } });
+    result = await catalogSearch('Mine', { filter: { field: 'active', op: 'EQ', values: [true] } });
   } finally {
     showLoader(false);
   }
@@ -1128,7 +1128,6 @@ function showLoader(on) {
 
 function showEmptyState() {
   showLoader(false);
-  navigate('dashboard');
   document.getElementById('dash-greeting').textContent = 'Welcome to ComplianceOS';
   document.getElementById('dash-sub').textContent = 'Add your first mine lease to get started';
   document.getElementById('priority-actions').innerHTML = `<div class="action-card ok" onclick="openAddMineModal()"><div class="ac-severity">GET STARTED</div><div class="ac-text">Add your first mine lease to auto-generate your compliance calendar</div><div class="ac-cta">Add Mine →</div></div>`;

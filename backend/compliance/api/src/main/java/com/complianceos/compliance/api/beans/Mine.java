@@ -6,7 +6,7 @@ import com.agentengine.util.common.beans.BaseEntity;
 
 @Index(name = "mine_name_idx", def = "{'name': 1}")
 @Index(name = "mine_state_idx", def = "{'state': 1}")
-@Index(name = "mine_is_active_idx", def = "{'isActive': 1}")
+@Index(name = "mine_is_active_idx", def = "{'active': 1}")
 @Permissioned(assetClass = AssetClass.MINE)
 public class Mine extends BaseEntity {
 
@@ -16,7 +16,7 @@ public class Mine extends BaseEntity {
   private String district;
   private String mineral;
   private String mineType;
-  private boolean isActive = true;
+  private boolean active = true;
 
   // When this mine's lease was granted — determines, among other things, which royalty rate
   // tier applies (see MiningConstants.LEASE_TIER_PRE_2015/LEASE_TIER_POST_2015).
@@ -73,11 +73,11 @@ public class Mine extends BaseEntity {
   }
 
   public boolean isActive() {
-    return isActive;
+    return active;
   }
 
-  public void setActive(boolean isActive) {
-    this.isActive = isActive;
+  public void setActive(boolean active) {
+    this.active = active;
   }
 
   public long getLeaseStartOn() {
