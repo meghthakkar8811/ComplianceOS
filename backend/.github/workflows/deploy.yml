@@ -1,0 +1,106 @@
+name: Deploy tier
+
+# tier/environment are free-text, not a dropdown: GitHub Actions can't populate workflow_dispatch
+# choices from repo folder contents at trigger time. The validation step below checks the real
+# folders instead of trusting a stale list — a tier/environment is defined purely by which
+# folders exist under deploy/k8s/*/tiers and deploy/k8s/global-properties/envs, no central
+# registration.
+on:
+  workflow_dispatch:
+    inputs:
+      tier:
+        description: "Tier name — a folder under deploy/k8s/<chart>/tiers/"
+        required: true
+        default: "mining"
+      environment:
+        description: "Environment name — a folder under deploy/k8s/global-properties/envs/"
+        required: true
+        default: "mining"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate tier and environment exist
+        run: |
+          set -e
+          if [ ! -d "deploy/k8s/global-properties/envs/${{ inputs.environment }}" ]; then
+            echo "::error::No such environment — deploy/k8s/global-properties/envs/${{ inputs.environment }} does not exist"
+            exit 1
+          fi
+          if ! ls deploy/k8s/*/tiers/"${{ inputs.tier }}"/values.yaml >/dev/null 2>&1; then
+            echo "::error::No such tier — no deploy/k8s/*/tiers/${{ inputs.tier }} directory found in any chart"
+            exit 1
+          fi
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          java-version: "21"
+          distribution: "corretto"
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Set up Python (for deploycos)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deploycos
+        run: pip install ./deploy/scripts
+
+      - name: Log in to OCIR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.OCIR_REGISTRY }}
+          username: ${{ secrets.OCIR_USERNAME }}
+          password: ${{ secrets.OCIR_AUTH_TOKEN }}
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Set up kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Ensure image pull secret in Kubernetes
+        run: |
+          kubectl create secret docker-registry ocir-pull \
+            --namespace complianceos \
+            --docker-server="${{ secrets.OCIR_REGISTRY }}" \
+            --docker-username="${{ secrets.OCIR_USERNAME }}" \
+            --docker-password="${{ secrets.OCIR_AUTH_TOKEN }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      # Builds only the app charts enabled for this tier (per Chart.is_enabled_for_tier),
+      # builds+pushes their images, and helm-upgrades every enabled chart.
+      # Also runs Kubernetes Jobs to seed Infra and App configs via deploycos.
+      - name: Deploy
+        env:
+          DOCKER_DEFAULT_PLATFORM: linux/arm64
+          SECRETS_CONTEXT: ${{ toJson(secrets) }}
+        run: |
+          eval "$(echo "$SECRETS_CONTEXT" | jq -r 'to_entries | .[] | "export \(.key)=\(.value|@sh)"')"
+          python3 -m deploycos deploy \
+            -t "${{ inputs.tier }}" \
+            -e "${{ inputs.environment }}" \
+            --image-tag latest \
+            --image-registry "${{ secrets.OCIR_IMAGE_REGISTRY }}" \
+            --no-clean-docker-cache

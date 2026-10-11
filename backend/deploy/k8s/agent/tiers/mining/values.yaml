@@ -7,7 +7,7 @@ app-base:
   terminationGracePeriodSeconds: 10
   deploymentStrategy:
     type: Recreate
-  replicas: 2
+  replicas: 1
   resources:
     requests:
       cpu: "250m"
