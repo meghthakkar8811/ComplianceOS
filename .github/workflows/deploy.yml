@@ -101,9 +101,9 @@ jobs:
         env:
           DOCKER_DEFAULT_PLATFORM: linux/arm64
           SECRETS_CONTEXT: ${{ toJson(secrets) }}
+          INFRA_MONGODB_URI: ${{ secrets.INFRA_MONGODB_URI }}
           GITHUB_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
-          eval "$(echo "$SECRETS_CONTEXT" | jq -r 'to_entries | .[] | "export \(.key)=\(.value|@sh)"')"
           python3 -m deploycos deploy \
             -t "${{ inputs.tier }}" \
             -e "${{ inputs.environment }}" \
