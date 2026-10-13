@@ -50,7 +50,11 @@ class BuildGradleStage(Stage):
         prerequisite the Dockerfile depends on, and cheaper than one gradle process per
         component since `--parallel` already parallelizes across modules internally."""
         tasks = [GRADLE_TASKS[component] for component in self.components]
-        subprocess.run(["./gradlew", *tasks, "-x", "test", "--parallel"], cwd=REPO_ROOT, check=True)
+        subprocess.run(
+            ["./gradlew", *tasks, "-x", "test", "--parallel", "--refresh-dependencies"],
+            cwd=REPO_ROOT,
+            check=True,
+        )
 
 
 @dataclass(eq=False, kw_only=True)
