@@ -9,19 +9,23 @@ on:
   workflow_dispatch:
     inputs:
       tier:
-        description: "Tier name — a folder under deploy/k8s/<chart>/tiers/"
+        description: "Tier name — a folder under backend/deploy/k8s/<chart>/tiers/"
         required: true
         default: "mining"
       environment:
-        description: "Environment name — a folder under deploy/k8s/global-properties/envs/"
+        description: "Environment name — a folder under backend/deploy/k8s/global-properties/envs/"
         required: true
         default: "mining"
 
 jobs:
   deploy:
     runs-on: ubuntu-24.04-arm
+    defaults:
+      run:
+        working-directory: backend
     permissions:
       contents: read
+      packages: read
     steps:
       - uses: actions/checkout@v4
 
@@ -49,7 +53,7 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          key: ${{ runner.os }}-gradle-${{ hashFiles('backend/**/*.gradle*', 'backend/**/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
 
@@ -80,8 +84,9 @@ jobs:
           echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
           chmod 600 ~/.kube/config
 
-      - name: Ensure image pull secret in Kubernetes
+      - name: Ensure namespace and image pull secret in Kubernetes
         run: |
+          kubectl create namespace complianceos --dry-run=client -o yaml | kubectl apply -f -
           kubectl create secret docker-registry ocir-pull \
             --namespace complianceos \
             --docker-server="${{ secrets.OCIR_REGISTRY }}" \
@@ -96,11 +101,12 @@ jobs:
         env:
           DOCKER_DEFAULT_PLATFORM: linux/arm64
           SECRETS_CONTEXT: ${{ toJson(secrets) }}
+          GITHUB_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           eval "$(echo "$SECRETS_CONTEXT" | jq -r 'to_entries | .[] | "export \(.key)=\(.value|@sh)"')"
           python3 -m deploycos deploy \
             -t "${{ inputs.tier }}" \
             -e "${{ inputs.environment }}" \
             --image-tag latest \
-            --image-registry "${{ secrets.OCIR_IMAGE_REGISTRY }}" \
+            --image-registry "${{ secrets.OCIR_IMAGE_REGISTRY || format('{0}/bmt6upkvrhpm', secrets.OCIR_REGISTRY) }}" \
             --no-clean-docker-cache

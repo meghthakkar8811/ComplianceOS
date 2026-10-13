@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from deployae.stages.base import Stage, run_graph
+from deploycos.stages.base import Stage, run_graph
 
 
 @dataclass(eq=False, kw_only=True)

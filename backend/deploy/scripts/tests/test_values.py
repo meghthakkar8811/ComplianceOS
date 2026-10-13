@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from deployae.values import load_yaml, parent_chart_name
+from deploycos.values import load_yaml, parent_chart_name
 
 
 def test_load_yaml_missing_file_returns_empty(tmp_path: Path) -> None:
