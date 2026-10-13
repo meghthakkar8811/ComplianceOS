@@ -25,7 +25,7 @@ jobs:
         working-directory: backend
     permissions:
       contents: read
-      packages: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
 
@@ -65,12 +65,12 @@ jobs:
       - name: Install deploycos
         run: pip install ./deploy/scripts
 
-      - name: Log in to OCIR
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ secrets.OCIR_REGISTRY }}
-          username: ${{ secrets.OCIR_USERNAME }}
-          password: ${{ secrets.OCIR_AUTH_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Helm
         uses: azure/setup-helm@v4
@@ -89,9 +89,15 @@ jobs:
           kubectl create namespace complianceos --dry-run=client -o yaml | kubectl apply -f -
           kubectl create secret docker-registry ocir-pull \
             --namespace complianceos \
-            --docker-server="${{ secrets.OCIR_REGISTRY }}" \
-            --docker-username="${{ secrets.OCIR_USERNAME }}" \
-            --docker-password="${{ secrets.OCIR_AUTH_TOKEN }}" \
+            --docker-server="ghcr.io" \
+            --docker-username="${{ github.actor }}" \
+            --docker-password="${{ secrets.GH_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create secret docker-registry ghcr-pull \
+            --namespace complianceos \
+            --docker-server="ghcr.io" \
+            --docker-username="${{ github.actor }}" \
+            --docker-password="${{ secrets.GH_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}" \
             --dry-run=client -o yaml | kubectl apply -f -
 
       # Builds only the app charts enabled for this tier (per Chart.is_enabled_for_tier),
@@ -104,9 +110,10 @@ jobs:
           INFRA_MONGODB_URI: ${{ secrets.INFRA_MONGODB_URI }}
           GITHUB_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
+          OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           python3 -m deploycos deploy \
             -t "${{ inputs.tier }}" \
             -e "${{ inputs.environment }}" \
             --image-tag latest \
-            --image-registry "${{ secrets.OCIR_IMAGE_REGISTRY || format('{0}/bmt6upkvrhpm', secrets.OCIR_REGISTRY) }}" \
+            --image-registry "ghcr.io/${OWNER_LOWER}" \
             --no-clean-docker-cache
