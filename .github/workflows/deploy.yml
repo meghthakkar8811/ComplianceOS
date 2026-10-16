@@ -106,8 +106,13 @@ jobs:
       - name: Deploy
         env:
           DOCKER_DEFAULT_PLATFORM: linux/arm64
-          SECRETS_CONTEXT: ${{ toJson(secrets) }}
           INFRA_MONGODB_URI: ${{ secrets.INFRA_MONGODB_URI }}
+          NEON_JDBC_PASSWORD: ${{ secrets.NEON_JDBC_PASSWORD }}
+          QDRANT_TOKEN: ${{ secrets.QDRANT_TOKEN }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+          BRAVE_TOKEN: ${{ secrets.BRAVE_TOKEN }}
+          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+          REDDIT_PASSWORD: ${{ secrets.REDDIT_PASSWORD }}
           GITHUB_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
