@@ -1,7 +1,5 @@
 package com.complianceos.compliance.core.service;
 
-import com.agentengine.agent.api.model.UserMessage;
-import com.agentengine.agent.api.services.RuntimeService;
 import com.agentengine.catalog.api.services.AgentService;
 import com.agentengine.util.agents.beans.config.BaseAgentConfig;
 import com.agentengine.util.common.codec.JsonUtils;
@@ -39,8 +37,6 @@ public class ComplianceProvisioningServiceImpl implements ComplianceProvisioning
   private static final String NMET_RATES_KEY = "nmetRates";
   private static final String ROYALTY_RATE_RESEARCH_AGENT_RESOURCE =
       "royalty_rate_research_agent.json";
-  private static final String ROYALTY_RATE_RESEARCH_KICKOFF =
-      "Research Gujarat's current mineral royalty rates and report your findings.";
 
   private final MongoClientProvisioner mongoClientProvisioner;
   private final MicroServiceProvisioner microServiceProvisioner;
@@ -72,33 +68,28 @@ public class ComplianceProvisioningServiceImpl implements ComplianceProvisioning
     run.step("royalty-rates", () -> saveRoyaltyRates(request));
     run.step("dmf-rates", () -> saveDmfRates(request));
     run.step("nmet-rates", () -> saveNmetRates(request));
-    run.step("royalty-rate-research-agent", this::triggerRoyaltyRateResearchAgent);
+    run.step("royalty-rate-research-agent", this::seedRoyaltyRateResearchAgent);
     return run.result();
   }
 
   /**
    * Seeds the royalty rate research agent under the system customer — royalty rates are
-   * environment-wide, not any one customer's data, so the agent researching them is too — and
-   * starts it once. It only researches and reports; nothing it finds is applied automatically.
+   * environment-wide, not any one customer's data, so the agent researching them is too. It only
+   * researches and reports; nothing it finds is applied automatically.
    *
-   * <p>Best-effort: starting the agent can race the agent service's own cluster formation this
-   * early in a fresh deploy, and a run.step failure here would otherwise abort the whole
-   * environment provisioning — including royalty-rates/dmf-rates/nmet-rates, which matter far
-   * more than this kickoff succeeding on the first try. A failure here is logged, not thrown.
+   * <p>When it runs is declared separately, by {@link ComplianceCustomerJobsProvider}: a one-time
+   * kickoff shortly after this step, then a recurring refresh. A failure here is logged, not
+   * thrown, since nothing else depends on this succeeding.
    */
-  private void triggerRoyaltyRateResearchAgent() {
+  private void seedRoyaltyRateResearchAgent() {
     try {
       final BaseAgentConfig agentConfig =
           JsonUtils.fromJson(
               ResourceUtils.loadResourceAsString(ROYALTY_RATE_RESEARCH_AGENT_RESOURCE),
               BaseAgentConfig.class);
-      final AgentService agentService = microServiceClientProvider.getRaw(AgentService.class);
-      agentService.saveAgent(agentConfig, true);
-      microServiceClientProvider
-          .getRaw(RuntimeService.class)
-          .invoke(agentConfig.getId(), null, UserMessage.ofText(ROYALTY_RATE_RESEARCH_KICKOFF));
+      microServiceClientProvider.getRaw(AgentService.class).saveAgent(agentConfig, true);
     } catch (final Exception exception) {
-      LOG.warn("Failed to start the royalty rate research agent", exception);
+      LOG.warn("Failed to seed the royalty rate research agent", exception);
     }
   }
 

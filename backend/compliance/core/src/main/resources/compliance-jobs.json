@@ -1,0 +1,11 @@
+[
+  {
+    "id": "RoyaltyRateResearchAgentRefresh",
+    "jobClassName": "com.agentengine.agent.jobs.InvokeAgentJob",
+    "cronSchedule": "0 0 2 1 * ?",
+    "payload": {
+      "agentId": "royalty_rate_research_agent",
+      "message": "Research Gujarat's current mineral royalty rates and report your findings."
+    }
+  }
+]

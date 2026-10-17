@@ -1,0 +1,11 @@
+[
+  {
+    "id": "default_brave_connection",
+    "name": "Default Brave Connection",
+    "appName": "brave",
+    "authType": "TOKEN",
+    "inputs": {
+      "token": "${BRAVE_TOKEN}"
+    }
+  }
+]
