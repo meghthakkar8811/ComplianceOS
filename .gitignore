@@ -21,3 +21,6 @@ tmpcharts-*/
 __pycache__/
 *.pyc
 uv.lock
+
+# Local dev overrides
+frontend/js/env.local.js

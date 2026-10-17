@@ -7,11 +7,15 @@
 // status code — there is no {success, data|error} envelope to unwrap.
 // ═══════════════════════════════════════════════════════════
 
-// Points at the mining tier's public ingress. Its CORS config and the mining customer's
-// registered domain both already allow http://localhost:3000, so this frontend can be served
-// locally (e.g. via dev.sh) against the real remote backend. For local tier instead, use
-// 'http://localhost:8080' and run dev.sh, which port-forwards rest-local to that port.
-const API_ORIGIN = 'https://agentengine.duckdns.org';
+// Served from localhost (dev.sh) talks to the local tier by default; served from anywhere
+// else (a real deployment) talks to the mining tier's public ingress — mirroring how
+// agent-console picks its backend per environment. dev.sh's remote mode overrides this via
+// js/env.local.js (gitignored, loaded before this file) to test this frontend, still served
+// locally, against the remote backend instead.
+const LOCAL_ORIGIN = 'http://localhost:8080';
+const REMOTE_ORIGIN = 'https://agentengine.duckdns.org';
+const isLocalhost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+const API_ORIGIN = window.API_ORIGIN_OVERRIDE || (isLocalhost ? LOCAL_ORIGIN : REMOTE_ORIGIN);
 const API = API_ORIGIN + '/v1';
 
 class ApiError extends Error {
