@@ -11,11 +11,11 @@ dependencies {
     // scheduler deployable — fires jobs such as agent:jobs' InvokeAgentJob.
     implementation 'com.agentengine.scheduler:core:1.0.1-SNAPSHOT'
     // compliance:jobs' own EnsureComplianceCalendarJob, loaded by the scheduler by reflection —
-    // never referenced directly, same as agent-engine's own *:jobs modules.
+    // never referenced directly, same as agent-engine's own *:jobs modules. Also the path by
+    // which catalog:api reaches this deployable's runtime classpath, supplying the
+    // AgentService/SessionService client beans compliance:jobs' own CatalogCaches needs, via
+    // catalog:api's own ClientProducer — no explicit dependency needed here for that.
     runtimeOnly project(':compliance:jobs')
-    // For ClientProducer, below.
-    implementation 'com.agentengine.catalog:api:1.0.1-SNAPSHOT'
-    implementation 'com.agentengine.util.ms:client:1.0.1-SNAPSHOT'
 
     implementation libs.quarkus.arc
 }
