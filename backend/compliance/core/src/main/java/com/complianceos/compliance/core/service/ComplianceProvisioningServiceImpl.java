@@ -81,10 +81,11 @@ public class ComplianceProvisioningServiceImpl implements ComplianceProvisioning
    * environment-wide, not any one customer's data, so the agent researching them is too — and
    * starts it once. It only researches and reports; nothing it finds is applied automatically.
    *
-   * <p>Best-effort: starting the agent can race the agent service's own cluster formation this
-   * early in a fresh deploy, and a run.step failure here would otherwise abort the whole
-   * environment provisioning — including royalty-rates/dmf-rates/nmet-rates, which matter far
-   * more than this kickoff succeeding on the first try. A failure here is logged, not thrown.
+   * <p>Relies on the agent service's own environment provisioning (event-store, microservice
+   * registration) having already run — guaranteed by {@link
+   * com.agentengine.agent.core.services.AgentProvisioningServiceImpl#order} running ahead of
+   * every other service's. A failure here is logged, not thrown, since nothing else depends on
+   * this succeeding.
    */
   private void triggerRoyaltyRateResearchAgent() {
     try {
