@@ -7,10 +7,11 @@
 // status code — there is no {success, data|error} envelope to unwrap.
 // ═══════════════════════════════════════════════════════════
 
-// Matches dev.sh, which port-forwards the backend to localhost:8080 and serves this
-// frontend on localhost:3000 — the origin the backend's local CORS tier already allows.
-// Change this if you're pointing at a different backend (e.g. same-origin in production: '').
-const API_ORIGIN = 'http://localhost:8080';
+// Points at the mining tier's public ingress. Its CORS config and the mining customer's
+// registered domain both already allow http://localhost:3000, so this frontend can be served
+// locally (e.g. via dev.sh) against the real remote backend. For local tier instead, use
+// 'http://localhost:8080' and run dev.sh, which port-forwards rest-local to that port.
+const API_ORIGIN = 'https://agentengine.duckdns.org';
 const API = API_ORIGIN + '/v1';
 
 class ApiError extends Error {

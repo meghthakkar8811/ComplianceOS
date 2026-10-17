@@ -2,7 +2,7 @@
   {
     "id": "1",
     "name": "mining",
-    "domain": "agent-console-iota.vercel.app",
+    "domain": "localhost",
     "defaultModels": {
       "fastModelId": "gemma4",
       "compactionModelId": "gemma4",
