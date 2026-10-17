@@ -74,15 +74,17 @@ def seed():
                 # A freshly-rolled-out pod can report Ready before its own egress networking
                 # (needed for e.g. the Mongo driver's external DNS lookup) is fully programmed,
                 # so its first real request can 500 even though the service is otherwise healthy
-                # and the identical request succeeds moments later. Retry 5xx same as a dropped
-                # connection; a 4xx means the request itself is wrong and retrying won't help.
+                # and the identical request succeeds moments later. The JVM's own default DNS
+                # negative-cache TTL is 10s, so a sub-10s retry window can still land entirely
+                # inside the cached failure; 10s between attempts clears it with margin. A 4xx
+                # means the request itself is wrong and retrying won't help.
                 if e.code < 500 or attempt == retries - 1:
                     raise RuntimeError(f"Failed to post to {url}: HTTP {e.code} {body}")
-                time.sleep(2)
+                time.sleep(10)
             except Exception:
                 if attempt == retries - 1:
                     raise
-                time.sleep(2)
+                time.sleep(10)
 
     # Models
     for path in sorted(glob.glob("/config/models/*.json")):
