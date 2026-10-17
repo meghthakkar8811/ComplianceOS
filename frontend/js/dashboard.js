@@ -261,8 +261,9 @@ async function loadDashboard() {
     const filings = records.filter(r => r.recordType !== 'REGISTER');
     const pendingFilings = filings.filter(r => r.status === 'PENDING_SUBMISSION');
     const overdueFilings = pendingFilings.filter(r => r.expiry < now);
-    const expiringDocs = records.filter(r =>
-      (r.recordType === 'CLEARANCE' || r.recordType === 'STATUTORY_PLAN') &&
+    const docRecords = records.filter(r => r.recordType === 'CLEARANCE' || r.recordType === 'STATUTORY_PLAN');
+    const expiredDocs = docRecords.filter(r => r.expiry && r.expiry < now);
+    const expiringDocs = docRecords.filter(r =>
       r.status === 'VALID' && r.expiry >= now && r.expiry - now < 90*86400000);
 
     const monthProduced = entries.filter(e => e.entryTime >= monthStart).reduce((s,e)=>s+(e.quantityProduced||0),0);
@@ -283,7 +284,8 @@ async function loadDashboard() {
 
     const ibmScore  = pendingFilings.length === 0 ? 100 : Math.max(0, Math.round((1 - overdueFilings.length / pendingFilings.length) * 100));
     const dgmsScore = dgms.overallScore;
-    const overall   = Math.round(ibmScore*0.5 + dgmsScore*0.5);
+    const docsScore = docRecords.length === 0 ? 100 : Math.max(0, Math.round((1 - expiredDocs.length / docRecords.length) * 100));
+    const overall   = Math.round((ibmScore + dgmsScore + docsScore) / 3);
 
     const royaltyCurrent = (royalties.items || []).slice()
       .sort((a,b) => (b.year*12+MONTH_INDEX[b.month]) - (a.year*12+MONTH_INDEX[a.month]))[0] || null;
@@ -295,11 +297,11 @@ async function loadDashboard() {
 
     d = {
       mine,
-      health: { overall, ibm: ibmScore, dgms: dgmsScore },
+      health: { overall, ibm: ibmScore, dgms: dgmsScore, docs: docsScore },
       kpis: {
         month_produced_mt: monthProduced, today_produced_mt: todayProduced,
         pending_filings: pendingFilings.length, overdue_filings: overdueFilings.length,
-        expiring_documents: expiringDocs.length,
+        expiring_documents: expiringDocs.length, expired_documents: expiredDocs.length,
       },
       dgms: { overall_score: dgmsScore },
       deadlines,
@@ -338,6 +340,7 @@ async function loadDashboard() {
 
   animateBar('hb-ibm',  d.health.ibm,  'hb-ibm-val');
   animateBar('hb-dgms', d.health.dgms, 'hb-dgms-val');
+  animateBar('hb-docs', d.health.docs, 'hb-docs-val');
 
   // DGMS nav pill
   document.getElementById('dgms-nav-pill').textContent = d.dgms.overall_score;
@@ -346,6 +349,8 @@ async function loadDashboard() {
   const actions = [];
   if (d.kpis.overdue_filings > 0)
     actions.push({ sev:'critical', text:`${d.kpis.overdue_filings} filing(s) are OVERDUE`, nav:'calendar', cta:'Fix Now' });
+  if (d.kpis.expired_documents > 0)
+    actions.push({ sev:'critical', text:`${d.kpis.expired_documents} document(s) have EXPIRED`, nav:'documents', cta:'Fix Now' });
   if (d.dgms.overall_score < 60)
     actions.push({ sev:'critical', text:'DGMS Readiness is CRITICAL — registers overdue', nav:'dgms', cta:'Fix Now' });
   if (d.kpis.pending_filings > 0)
@@ -374,7 +379,7 @@ async function loadDashboard() {
   document.getElementById('kpi-docs').textContent       = d.kpis.expiring_documents;
 
   // Alert badge
-  refreshAlertBadge(d.kpis.overdue_filings + (d.dgms.overall_score < 60 ? 1 : 0));
+  refreshAlertBadge(d.kpis.overdue_filings + d.kpis.expired_documents + (d.dgms.overall_score < 60 ? 1 : 0));
 
   // Production chart
   STATE.chartData = d.production_chart;
@@ -942,6 +947,63 @@ async function markRegister(recordId) {
   }
 }
 
+/** A printable DGMS inspection pack, opened in a new tab for the browser's own print-to-PDF. */
+async function generateInspectionPack() {
+  if (!STATE.mineId) { toast('Select a mine first', 'error'); return; }
+  const mine = STATE.mines.find(m => m.id === STATE.mineId);
+  let d;
+  try {
+    d = await apiFetch(`/mines/${STATE.mineId}/dgms-readiness`);
+  } catch (err) {
+    toast('Failed to generate inspection pack', 'error');
+    return;
+  }
+  const win = window.open('', '_blank');
+  if (!win) { toast('Allow pop-ups to generate the inspection pack', 'error'); return; }
+
+  const rows = (d.scores || []).map(r => `
+    <tr>
+      <td>${r.register.title}</td>
+      <td>${r.status}</td>
+      <td>${r.score}</td>
+      <td>${r.register.lastUpdatedAt ? new Date(r.register.lastUpdatedAt).toLocaleDateString('en-IN') : '—'}</td>
+      <td>${r.status === 'GREEN' ? 'Up to date' : r.daysSinceUpdate + ' days since last update'}</td>
+    </tr>`).join('');
+
+  win.document.write(`<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>DGMS Inspection Pack — ${mine?.name || ''}</title>
+<style>
+  body{font-family:Arial,sans-serif;max-width:800px;margin:40px auto;color:#111}
+  h1{font-size:20px;margin-bottom:4px} h2{font-size:15px;margin-top:28px}
+  table{width:100%;border-collapse:collapse;margin-top:8px}
+  th,td{border:1px solid #ccc;padding:6px 10px;text-align:left;font-size:13px}
+  th{background:#f0f0f0}
+  .meta{color:#555;font-size:13px;margin-bottom:16px}
+  .score{font-size:28px;font-weight:bold}
+  @media print{.print-btn{display:none}}
+</style></head>
+<body>
+<button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
+<h1>DGMS Inspection Readiness Pack</h1>
+<div class="meta">Generated ${new Date().toLocaleString('en-IN')}</div>
+<h2>Mine</h2>
+<table>
+  <tr><th>Name</th><td>${mine?.name || '—'}</td></tr>
+  <tr><th>Lease Number</th><td>${mine?.leaseNumber || '—'}</td></tr>
+  <tr><th>State</th><td>${formatState(mine?.state || '')}</td></tr>
+  <tr><th>Mineral</th><td>${formatMineral(mine?.mineral || '')}</td></tr>
+</table>
+<h2>Overall Readiness</h2>
+<p class="score">${d.overallScore}/100 — ${d.verdict.replace('_', ' ')}</p>
+<h2>Statutory Registers</h2>
+<table>
+  <thead><tr><th>Register</th><th>Status</th><th>Score</th><th>Last Updated</th><th>Note</th></tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+</body></html>`);
+  win.document.close();
+}
+
 // ═══════════════════════════════════════════════════════════
 // ALERTS
 // ═══════════════════════════════════════════════════════════
@@ -960,6 +1022,9 @@ function buildAlerts() {
 
   if (d.kpis.overdue_filings > 0)
     alerts.push({ type:'critical', icon:'📋', title:`${d.kpis.overdue_filings} Filing(s) Overdue`, desc:'Statutory returns are past their due date. File immediately to avoid penalties and show-cause notices.', time:'Now', action:'View Calendar', nav:'calendar' });
+
+  if (d.kpis.expired_documents > 0)
+    alerts.push({ type:'critical', icon:'📄', title:`${d.kpis.expired_documents} Document(s) Expired`, desc:'An expired CTO, EC or DGMS certificate can halt operations. Renew immediately.', time:'Now', action:'View Documents', nav:'documents' });
 
   if (d.kpis.pending_filings > 0)
     alerts.push({ type:'warning', icon:'⏰', title:`${d.kpis.pending_filings} Deadline(s) Upcoming`, desc:'Review your compliance calendar and take action before due dates.', time:'Current', action:'View Calendar', nav:'calendar' });
@@ -984,7 +1049,7 @@ function buildAlerts() {
 
 function refreshAlertBadge(count) {
   const n = typeof count === 'number' ? count
-    : (STATE.dashData ? STATE.dashData.kpis.overdue_filings + (STATE.dashData.dgms.overall_score < 60 ? 1 : 0) : 0);
+    : (STATE.dashData ? STATE.dashData.kpis.overdue_filings + STATE.dashData.kpis.expired_documents + (STATE.dashData.dgms.overall_score < 60 ? 1 : 0) : 0);
   const badge   = document.getElementById('alert-badge');
   const topbadge= document.getElementById('topbar-alert-count');
   if (badge) badge.textContent = n;

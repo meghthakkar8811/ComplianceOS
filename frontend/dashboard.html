@@ -90,7 +90,7 @@
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         <span class="topbar-badge" id="topbar-alert-count" style="display:none">0</span>
       </button>
-      <div class="user-av topbar-av" id="topbar-av" onclick="navigate('profile')">MT</div>
+      <div class="user-av topbar-av" id="topbar-av">MT</div>
     </div>
   </header>
 
@@ -133,6 +133,7 @@
           <div class="hb-bars">
             <div class="hb-row"><span class="hb-cat">Filing Compliance</span><div class="hb-track"><div class="hb-fill green" id="hb-ibm" style="width:0%"></div></div><span class="hb-val green" id="hb-ibm-val">–</span></div>
             <div class="hb-row"><span class="hb-cat">DGMS Registers</span><div class="hb-track"><div class="hb-fill amber" id="hb-dgms" style="width:0%"></div></div><span class="hb-val amber" id="hb-dgms-val">–</span></div>
+            <div class="hb-row"><span class="hb-cat">Document Validity</span><div class="hb-track"><div class="hb-fill blue" id="hb-docs" style="width:0%"></div></div><span class="hb-val blue" id="hb-docs-val">–</span></div>
           </div>
         </div>
       </div>
@@ -298,7 +299,7 @@
   <section class="page" id="page-dgms">
     <div class="page-header">
       <div class="page-title-block"><h1>DGMS Inspection Readiness</h1><p class="page-sub">Live readiness score · Statutory register status</p></div>
-      <div class="page-actions"><button class="btn-primary" onclick="toast('Inspection Pack PDF generated','success')">Generate Inspection Pack</button></div>
+      <div class="page-actions"><button class="btn-primary" onclick="generateInspectionPack()">Generate Inspection Pack</button></div>
     </div>
     <div class="dgms-layout">
       <div class="dgms-score-panel">

@@ -1,0 +1,68 @@
+{
+  "type": "DEFAULT",
+  "id": "royalty_rate_research_agent",
+  "name": "Royalty Rate Research Agent",
+  "description": "Researches Gujarat's current mineral royalty rates against official government sources.",
+  "modelId": "gemma4",
+  "systemPrompt": "You research India's current mineral royalty rates for Gujarat, so ComplianceOS's royalty calculations rest on real, current regulatory figures rather than stale or guessed ones.\n\nFor every mineral mined in Gujarat, find the royalty rate currently in force under the Second Schedule to the MMDR Act, 1957. Most minerals have a fixed rate per tonne set by the Act, and the Act itself bars revising any rate more than once every three years, so a fixed rate rarely changes. A handful of minerals (iron ore, bauxite, chromite, manganese, lead, zinc) instead use an ad-valorem rate tied to IBM's own published average sale price, which does change monthly — for these, find the latest month IBM has published a price for rather than assuming last month's figure still holds.\n\nOnly report a rate you can point to a specific, checkable government source for: the Ministry of Mines' own Second Schedule text, a Gazette notification amending it, or IBM's published average-sale-price circular. A rate with no such source behind it is not useful here — report that you could not confirm it, and why, rather than guess at a figure.\n\nYou cannot write these findings anywhere yourself. Report everything you found, including minerals you could not resolve a confident rate for.",
+  "contextStrategy": {
+    "type": "COMPACTION"
+  },
+  "tools": [
+    {
+      "toolName": "web_research"
+    },
+    {
+      "toolName": "get_webpage"
+    }
+  ],
+  "responseFormat": {
+    "type": "object",
+    "properties": {
+      "findings": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "mineral": {
+              "type": "string",
+              "description": "The mineral this finding is for, as commonly named (e.g. 'Limestone', 'Bauxite')."
+            },
+            "rateType": {
+              "type": "string",
+              "enum": ["FIXED", "AD_VALOREM"]
+            },
+            "ratePerTonne": {
+              "type": "number",
+              "description": "Rupees per tonne, if resolved."
+            },
+            "effectiveMonth": {
+              "type": "string",
+              "description": "The month this rate is effective for, if AD_VALOREM."
+            },
+            "effectiveYear": {
+              "type": "integer"
+            },
+            "sourceUrl": {
+              "type": "string"
+            },
+            "sourceCitation": {
+              "type": "string",
+              "description": "The specific Act section, Gazette notification, or IBM circular this rate comes from."
+            },
+            "confidence": {
+              "type": "string",
+              "enum": ["HIGH", "MEDIUM", "LOW"]
+            },
+            "unresolvedReason": {
+              "type": "string",
+              "description": "Why this mineral's rate could not be confirmed, when confidence is LOW or no rate is given."
+            }
+          },
+          "required": ["mineral", "confidence"]
+        }
+      }
+    },
+    "required": ["findings"]
+  }
+}

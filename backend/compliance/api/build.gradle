@@ -14,4 +14,5 @@ dependencies {
 
     implementation 'io.quarkus:quarkus-arc'
     implementation 'com.fasterxml.jackson.core:jackson-annotations'
+    api libs.jakarta.validation.api
 }

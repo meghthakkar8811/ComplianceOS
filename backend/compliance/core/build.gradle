@@ -11,6 +11,10 @@ dependencies {
     // hosts catalog's own agent/model/session services in-process — ComplianceOS is an agentic
     // platform in its own right, not just the mining/compliance domain.
     implementation 'com.agentengine.catalog:core:1.0.1-SNAPSHOT'
+    // For RuntimeService/UserMessage/BaseAgentConfig, invoking the royalty rate research agent
+    // at environment provisioning time (see ComplianceProvisioningServiceImpl).
+    implementation 'com.agentengine.agent:api:1.0.1-SNAPSHOT'
+    implementation 'com.agentengine.util:agents:1.0.1-SNAPSHOT'
 
     implementation 'com.agentengine.util:common:1.0.1-SNAPSHOT'
     implementation 'com.agentengine.util:tenancy:1.0.1-SNAPSHOT'

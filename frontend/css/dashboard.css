@@ -175,9 +175,9 @@ body{font-family:var(--font);background:var(--bg0);color:var(--text0);display:fl
 .hb-cat{font-size:12px;color:var(--text1)}
 .hb-track{height:5px;background:var(--bg3);border-radius:3px;overflow:hidden}
 .hb-fill{height:100%;border-radius:3px;transition:width 1s cubic-bezier(.4,0,.2,1)}
-.hb-fill.green{background:var(--green)} .hb-fill.amber{background:var(--amber)} .hb-fill.red{background:var(--red)}
+.hb-fill.green{background:var(--green)} .hb-fill.amber{background:var(--amber)} .hb-fill.red{background:var(--red)} .hb-fill.blue{background:var(--blue)}
 .hb-val{font-family:var(--mono);font-size:11px;font-weight:600;text-align:right}
-.hb-val.green{color:var(--green)} .hb-val.amber{color:var(--amber)} .hb-val.red{color:var(--red)}
+.hb-val.green{color:var(--green)} .hb-val.amber{color:var(--amber)} .hb-val.red{color:var(--red)} .hb-val.blue{color:var(--blue)}
 .health-actions{display:flex;flex-direction:column}
 .ha-title{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--text2);margin-bottom:10px}
 .action-card{padding:12px 14px;border-radius:var(--r);cursor:pointer;border:1px solid;transition:all .15s;margin-bottom:8px}
