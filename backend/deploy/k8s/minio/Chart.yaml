@@ -1,9 +1,9 @@
 apiVersion: v2
-name: complianceos-localstack
-description: LocalStack for Agent Engine
+name: complianceos-minio
+description: MinIO S3-compatible object storage for ComplianceOS
 type: application
 version: 0.1.0
-appVersion: "3"
+appVersion: "RELEASE.2025-10-15T17-29-55Z"
 dependencies:
   - name: infra-base
     version: 0.1.0

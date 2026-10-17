@@ -18,4 +18,4 @@ spec:
               kubernetes.io/metadata.name: {{ include "complianceos.infra-base.appNamespace" . }}
       ports:
         - protocol: TCP
-          port: 4566
+          port: 9000

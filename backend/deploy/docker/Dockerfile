@@ -10,5 +10,11 @@ ARG SERVICE_MODULE
 COPY --chown=quarkus ${SERVICE_MODULE}/build/quarkus-app/*.jar /deployments/
 COPY --chown=quarkus ${SERVICE_MODULE}/build/quarkus-app/app/ /deployments/app/
 COPY --chown=quarkus ${SERVICE_MODULE}/build/quarkus-app/quarkus/ /deployments/quarkus/
+# Quarkus fast-jar places agent-engine's own SNAPSHOT dependency jars into lib/main/ rather than
+# app/. Because DEPS_BASE_IMAGE is keyed on the hash of gradle/libs.versions.toml, a republished
+# agent-engine artifact under the same SNAPSHOT coordinates does not invalidate the base image;
+# copying them here ensures the service container always runs the freshly-resolved jars without
+# duplicating the 3rd-party libs the base image already carries.
+COPY --chown=quarkus ${SERVICE_MODULE}/build/quarkus-app/lib/main/com.agentengine.*.jar /deployments/lib/main/
 
 ENTRYPOINT [ "sh", "-c", "java $JAVA_OPTS $JAVA_ARGS -jar /deployments/quarkus-run.jar" ]
