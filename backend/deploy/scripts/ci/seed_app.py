@@ -58,7 +58,7 @@ def seed():
     except Exception as e:
         print(f"Warning: Failed to login, proceeding without session cookie: {e}")
 
-    def post_json(url, data, retries=3):
+    def post_json(url, data, retries=5):
         headers = {"Content-Type": "application/json", "Origin": origin}
         if session_cookie:
             headers["Cookie"] = session_cookie
@@ -70,7 +70,15 @@ def seed():
                 with urllib.request.urlopen(req, timeout=60) as f:
                     return f.read().decode("utf-8")
             except urllib.error.HTTPError as e:
-                raise RuntimeError(f"Failed to post to {url}: HTTP {e.code} {e.read().decode('utf-8', errors='replace')}")
+                body = e.read().decode("utf-8", errors="replace")
+                # A freshly-rolled-out pod can report Ready before its own egress networking
+                # (needed for e.g. the Mongo driver's external DNS lookup) is fully programmed,
+                # so its first real request can 500 even though the service is otherwise healthy
+                # and the identical request succeeds moments later. Retry 5xx same as a dropped
+                # connection; a 4xx means the request itself is wrong and retrying won't help.
+                if e.code < 500 or attempt == retries - 1:
+                    raise RuntimeError(f"Failed to post to {url}: HTTP {e.code} {body}")
+                time.sleep(2)
             except Exception:
                 if attempt == retries - 1:
                     raise
