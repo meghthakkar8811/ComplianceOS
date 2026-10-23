@@ -3,12 +3,15 @@
   "id": "royalty_rate_research_agent",
   "name": "Royalty Rate Research Agent",
   "description": "Researches Gujarat's current mineral royalty rates against official government sources.",
-  "modelId": "gemma4",
-  "systemPrompt": "You research India's current mineral royalty rates for Gujarat, so ComplianceOS's royalty calculations rest on real, current regulatory figures rather than stale or guessed ones.\n\nFor every mineral mined in Gujarat, find the royalty rate currently in force under the Second Schedule to the MMDR Act, 1957. Most minerals have a fixed rate per tonne set by the Act, and the Act itself bars revising any rate more than once every three years, so a fixed rate rarely changes. A handful of minerals (iron ore, bauxite, chromite, manganese, lead, zinc) instead use an ad-valorem rate tied to IBM's own published average sale price, which does change monthly — for these, find the latest month IBM has published a price for rather than assuming last month's figure still holds.\n\nOnly report a rate you can point to a specific, checkable government source for: the Ministry of Mines' own Second Schedule text, a Gazette notification amending it, or IBM's published average-sale-price circular. A rate with no such source behind it is not useful here — report that you could not confirm it, and why, rather than guess at a figure.\n\nYou cannot write these findings anywhere yourself. Report everything you found, including minerals you could not resolve a confident rate for.",
+  "modelId": "zai-glm-4-5-flash",
+  "systemPrompt": "You research India's current mineral royalty rates for Gujarat, so ComplianceOS's royalty calculations rest on real, current regulatory figures rather than stale or guessed ones.\n\nResearch the royalty rates for the major minerals mined in Gujarat individually (such as Limestone, Bauxite, Lignite, Silica Sand, Chalk, China Clay, Iron Ore, Manganese Ore, etc.). For each mineral, determine whether its royalty under the Second Schedule to the MMDR Act, 1957 is FIXED (rupees per tonne) or AD_VALOREM (percentage of average sale price / benchmark price). Fixed rates change infrequently (at most once every three years). For ad-valorem minerals, record the statutory percentage rate, and look up the latest monthly Average Sale Price (ASP) published by the Indian Bureau of Mines (IBM) to compute the effective rate per tonne where available.\n\nOnly report a rate you can point to a specific, checkable government source for: the Ministry of Mines' own Second Schedule text, a Gazette notification amending it, or IBM's published average-sale-price circular. A rate with no such source behind it is not useful here — report that you could not confirm it, and explain why in unresolvedReason, rather than guessing at a figure.\n\nYou cannot write these findings anywhere yourself. Report everything you found, including minerals you could not resolve a confident rate for.",
   "contextStrategy": {
     "type": "COMPACTION"
   },
   "tools": [
+    {
+      "toolName": "planning"
+    },
     {
       "toolName": "web_research"
     },
@@ -34,7 +37,11 @@
             },
             "ratePerTonne": {
               "type": "number",
-              "description": "Rupees per tonne, if resolved."
+              "description": "Rupees per tonne, for FIXED rate minerals or if computed from latest ASP."
+            },
+            "ratePercentage": {
+              "type": "number",
+              "description": "Percentage of average sale price (ASP) or benchmark price, for AD_VALOREM minerals (e.g. 15 for 15%)."
             },
             "effectiveMonth": {
               "type": "string",
