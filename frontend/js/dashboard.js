@@ -10,6 +10,7 @@ let STATE = {
   mines:    [],
   dashData: null,
   prodData: [],
+  saleData: [],
   chartType:'produced',
   chartData: [],
 };
@@ -245,11 +246,15 @@ async function loadDashboard() {
     const todayStart = new Date().setHours(0,0,0,0);
     const sixMonthsAgoStart = new Date(new Date().getFullYear(), new Date().getMonth()-5, 1).getTime();
 
-    const [recordsResult, entriesResult, dgms, royalties] = await Promise.all([
+    const [recordsResult, entriesResult, salesResult, dgms, royalties] = await Promise.all([
       catalogSearch('ComplianceRecord', { filter: { field:'mineId', op:'EQ', values:[STATE.mineId] } }),
       catalogSearch('ProductionEntry', { filter: { op:'AND', values: [
         { field:'mineId', op:'EQ', values:[STATE.mineId] },
         { field:'entryTime', op:'GTE', values:[sixMonthsAgoStart] },
+      ] } }),
+      catalogSearch('Sale', { filter: { op:'AND', values: [
+        { field:'mineId', op:'EQ', values:[STATE.mineId] },
+        { field:'dispatchedOn', op:'GTE', values:[sixMonthsAgoStart] },
       ] } }),
       apiFetch(`/mines/${STATE.mineId}/dgms-readiness`),
       apiFetch(`/mines/${STATE.mineId}/royalty`),
@@ -257,6 +262,7 @@ async function loadDashboard() {
 
     const records = recordsResult.items || [];
     const entries = entriesResult.items || [];
+    const sales = salesResult.items || [];
 
     const filings = records.filter(r => r.recordType !== 'REGISTER');
     const pendingFilings = filings.filter(r => r.status === 'PENDING_SUBMISSION');
@@ -266,8 +272,8 @@ async function loadDashboard() {
     const expiringDocs = docRecords.filter(r =>
       r.status === 'VALID' && r.expiry >= now && r.expiry - now < 90*86400000);
 
-    const monthProduced = entries.filter(e => e.entryTime >= monthStart).reduce((s,e)=>s+(e.quantityProduced||0),0);
-    const todayProduced  = entries.filter(e => e.entryTime >= todayStart).reduce((s,e)=>s+(e.quantityProduced||0),0);
+    const monthProduced = entries.filter(e => e.entryTime >= monthStart).reduce((s,e)=>s+(e.quantity||0),0);
+    const todayProduced  = entries.filter(e => e.entryTime >= todayStart).reduce((s,e)=>s+(e.quantity||0),0);
 
     const chart = [];
     for (let i = 5; i >= 0; i--) {
@@ -275,10 +281,11 @@ async function loadDashboard() {
       const start = monthDate.getTime();
       const end   = new Date(monthDate.getFullYear(), monthDate.getMonth()+1, 1).getTime();
       const inMonth = entries.filter(e => e.entryTime >= start && e.entryTime < end);
+      const dispatchedInMonth = sales.filter(s => s.dispatchedOn >= start && s.dispatchedOn < end);
       chart.push({
         month: monthDate.toLocaleString('default',{month:'short'}),
-        produced:   inMonth.reduce((s,e)=>s+(e.quantityProduced||0),0),
-        dispatched: inMonth.reduce((s,e)=>s+(e.quantityDispatched||0),0),
+        produced:   inMonth.reduce((s,e)=>s+(e.quantity||0),0),
+        dispatched: dispatchedInMonth.reduce((s,e)=>s+(e.quantity||0),0),
       });
     }
 
@@ -287,7 +294,7 @@ async function loadDashboard() {
     const docsScore = docRecords.length === 0 ? 100 : Math.max(0, Math.round((1 - expiredDocs.length / docRecords.length) * 100));
     const overall   = Math.round((ibmScore + dgmsScore + docsScore) / 3);
 
-    const royaltyCurrent = (royalties.items || []).slice()
+    const royaltyCurrent = (royalties || []).slice()
       .sort((a,b) => (b.year*12+MONTH_INDEX[b.month]) - (a.year*12+MONTH_INDEX[a.month]))[0] || null;
 
     const deadlines = pendingFilings.slice().sort((a,b) => a.expiry - b.expiry).map(r => ({
@@ -617,7 +624,7 @@ async function loadRoyalty() {
     toast('Failed to load royalty', 'error');
     return;
   }
-  const periods = (result.items || []).slice()
+  const periods = (result || []).slice()
     .sort((a,b) => (b.year*12+MONTH_INDEX[b.month]) - (a.year*12+MONTH_INDEX[a.month]));
   const current = periods[0];
 
@@ -655,6 +662,8 @@ function initProduction() {
   if (monthEl && !monthEl.value) monthEl.value = new Date().toISOString().slice(0,7);
   const dateEl = document.getElementById('pf-date');
   if (dateEl && !dateEl.value) dateEl.value = new Date().toISOString().slice(0,10);
+  const saleDateEl = document.getElementById('sf-date');
+  if (saleDateEl && !saleDateEl.value) saleDateEl.value = new Date().toISOString().slice(0,10);
   loadProduction();
 }
 
@@ -679,6 +688,7 @@ async function loadProduction() {
   STATE.prodData = (result.items || []).sort((a,b) => b.entryTime - a.entryTime);
   renderProdTable(STATE.prodData);
   renderProdSummary();
+  loadSales();
 }
 
 function renderProdTable(rows) {
@@ -688,8 +698,7 @@ function renderProdTable(rows) {
       <td>${r.shift}</td>
       <td>${r.pitSection}</td>
       <td>${r.mineralGrade}</td>
-      <td class="num-col">${r.quantityProduced.toLocaleString('en-IN')}</td>
-      <td class="num-col">${r.quantityDispatched.toLocaleString('en-IN')}</td>
+      <td class="num-col">${r.quantity.toLocaleString('en-IN')}</td>
       <td>${r.supervisorName || '—'}</td>
       <td><span class="status-pill ${r.status}">${r.status}</span></td>
       <td>${r.status === 'PENDING' ? `<button class="action-link" onclick="verifyEntry('${r.id}')">Verify</button>` : '—'}</td>
@@ -697,12 +706,91 @@ function renderProdTable(rows) {
 }
 
 function renderProdSummary() {
-  const totalP = STATE.prodData.reduce((s,r) => s + (r.quantityProduced||0), 0);
-  const totalD = STATE.prodData.reduce((s,r) => s + (r.quantityDispatched||0), 0);
+  const totalP = STATE.prodData.reduce((s,r) => s + (r.quantity||0), 0);
   document.getElementById('prod-summary').innerHTML = `
     <div class="psr-card"><span class="psr-label">Total Produced</span><span class="psr-val">${totalP.toLocaleString('en-IN',{maximumFractionDigits:1})} MT</span></div>
-    <div class="psr-card"><span class="psr-label">Total Dispatched</span><span class="psr-val">${totalD.toLocaleString('en-IN',{maximumFractionDigits:1})} MT</span></div>
     <div class="psr-card"><span class="psr-label">Entries</span><span class="psr-val">${STATE.prodData.length}</span></div>`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// DISPATCHES / SALES
+// ═══════════════════════════════════════════════════════════
+async function loadSales() {
+  if (!STATE.mineId) return;
+  const month = document.getElementById('prod-month')?.value || new Date().toISOString().slice(0,7);
+  const [year, mon] = month.split('-').map(Number);
+  const start = new Date(year, mon-1, 1).getTime();
+  const end   = new Date(year, mon, 1).getTime();
+
+  let result;
+  try {
+    result = await catalogSearch('Sale', { filter: { op:'AND', values: [
+      { field:'mineId', op:'EQ', values:[STATE.mineId] },
+      { field:'dispatchedOn', op:'GTE', values:[start] },
+      { field:'dispatchedOn', op:'LT', values:[end] },
+    ] } });
+  } catch (err) {
+    toast('Failed to load dispatches', 'error');
+    return;
+  }
+  STATE.saleData = (result.items || []).sort((a,b) => b.dispatchedOn - a.dispatchedOn);
+  renderSaleTable(STATE.saleData);
+  renderSaleSummary();
+}
+
+function renderSaleTable(rows) {
+  document.getElementById('sale-tbody').innerHTML = rows.map(r => `
+    <tr>
+      <td>${new Date(r.dispatchedOn).toLocaleDateString('en-IN')}</td>
+      <td>${r.mineralGrade}</td>
+      <td>${formatSaleNature(r.nature)}</td>
+      <td>${r.buyerName || '—'}</td>
+      <td class="num-col">${(r.quantity||0).toLocaleString('en-IN')}</td>
+      <td class="num-col">₹${fmtINR((r.saleValue||0)/100)}</td>
+      <td class="num-col">${r.deductionPerUnit ? '₹'+fmtINR(r.deductionPerUnit/100) : '—'}</td>
+    </tr>`).join('');
+}
+
+function renderSaleSummary() {
+  const totalQty   = STATE.saleData.reduce((s,r) => s + (r.quantity||0), 0);
+  const totalValue = STATE.saleData.reduce((s,r) => s + (r.saleValue||0), 0);
+  document.getElementById('sale-summary').innerHTML = `
+    <div class="psr-card"><span class="psr-label">Total Dispatched</span><span class="psr-val">${totalQty.toLocaleString('en-IN',{maximumFractionDigits:1})} MT</span></div>
+    <div class="psr-card"><span class="psr-label">Total Sale Value</span><span class="psr-val">₹${fmtINR(totalValue/100)}</span></div>
+    <div class="psr-card"><span class="psr-label">Dispatches</span><span class="psr-val">${STATE.saleData.length}</span></div>`;
+}
+
+function formatSaleNature(n) {
+  return ({ DOMESTIC_SALE:'Domestic Sale', EXPORT:'Export', DOMESTIC_TRANSFER:'Domestic (Transfer)', CAPTIVE_CONSUMPTION:'Captive Consumption' })[n] || n || '—';
+}
+
+let saleFormVisible = false;
+function toggleSaleForm() {
+  saleFormVisible = !saleFormVisible;
+  document.getElementById('sale-form-card').style.display = saleFormVisible ? 'block' : 'none';
+}
+
+async function saveSaleEntry() {
+  if (!STATE.mineId) { toast('Select a mine first','error'); return; }
+  const body = {
+    dispatchedOn:       Date.parse(document.getElementById('sf-date').value + 'T00:00:00Z'),
+    mineralGrade:        document.getElementById('sf-grade').value.trim(),
+    nature:              document.getElementById('sf-nature').value,
+    buyerName:           document.getElementById('sf-buyer').value.trim(),
+    buyerRegistrationNumber: document.getElementById('sf-buyer-reg').value.trim(),
+    quantity:            parseFloat(document.getElementById('sf-qty').value)||0,
+    saleValue:           Math.round((parseFloat(document.getElementById('sf-value').value)||0) * 100),
+    deductionPerUnit:    Math.round((parseFloat(document.getElementById('sf-deduction').value)||0) * 100),
+  };
+  if (!body.mineralGrade || !body.quantity) { toast('Grade and quantity are required','error'); return; }
+  try {
+    await apiFetch(`/mines/${STATE.mineId}/sales`, { method:'POST', body:JSON.stringify(body) });
+    toast('Dispatch saved','success');
+    toggleSaleForm();
+    loadSales();
+  } catch (err) {
+    toast(err.message || 'Failed to save dispatch', 'error');
+  }
 }
 
 function filterProd() {
@@ -727,8 +815,7 @@ async function saveProdEntry() {
     shift:               document.getElementById('pf-shift').value,
     pitSection:          document.getElementById('pf-pit').value.trim(),
     mineralGrade:        document.getElementById('pf-grade').value.trim(),
-    quantityProduced:    parseFloat(document.getElementById('pf-prod').value)||0,
-    quantityDispatched:  parseFloat(document.getElementById('pf-disp').value)||0,
+    quantity:            parseFloat(document.getElementById('pf-prod').value)||0,
     supervisorName:      document.getElementById('pf-sup').value.trim(),
     remarks:             document.getElementById('pf-rem').value.trim(),
   };
@@ -759,8 +846,8 @@ async function verifyEntry(id) {
 
 function exportProdCSV() {
   const month = document.getElementById('prod-month')?.value || new Date().toISOString().slice(0,7);
-  const rows  = [['Date','Shift','Pit','Grade','Produced (MT)','Dispatched (MT)','Supervisor','Status'],
-    ...STATE.prodData.map(r=>[new Date(r.entryTime).toLocaleDateString('en-IN'),r.shift,r.pitSection,r.mineralGrade,r.quantityProduced,r.quantityDispatched,r.supervisorName||'',r.status])];
+  const rows  = [['Date','Shift','Pit','Grade','Produced (MT)','Supervisor','Status'],
+    ...STATE.prodData.map(r=>[new Date(r.entryTime).toLocaleDateString('en-IN'),r.shift,r.pitSection,r.mineralGrade,r.quantity,r.supervisorName||'',r.status])];
   const csv  = rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
   const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
   const url  = URL.createObjectURL(blob);
@@ -1107,17 +1194,26 @@ async function openFormB() {
   const per = reportStart.toLocaleString('default',{month:'long',year:'numeric'});
 
   let entries = [];
+  let sales = [];
   try {
-    const result = await catalogSearch('ProductionEntry', { filter: { op:'AND', values: [
-      { field:'mineId', op:'EQ', values:[STATE.mineId] },
-      { field:'entryTime', op:'GTE', values:[reportStart.getTime()] },
-      { field:'entryTime', op:'LT', values:[reportEnd.getTime()] },
-    ] } });
-    entries = result.items || [];
-  } catch (err) { /* leave entries empty; the form still opens with zeros */ }
+    const [prodResult, saleResult] = await Promise.all([
+      catalogSearch('ProductionEntry', { filter: { op:'AND', values: [
+        { field:'mineId', op:'EQ', values:[STATE.mineId] },
+        { field:'entryTime', op:'GTE', values:[reportStart.getTime()] },
+        { field:'entryTime', op:'LT', values:[reportEnd.getTime()] },
+      ] } }),
+      catalogSearch('Sale', { filter: { op:'AND', values: [
+        { field:'mineId', op:'EQ', values:[STATE.mineId] },
+        { field:'dispatchedOn', op:'GTE', values:[reportStart.getTime()] },
+        { field:'dispatchedOn', op:'LT', values:[reportEnd.getTime()] },
+      ] } }),
+    ]);
+    entries = prodResult.items || [];
+    sales = saleResult.items || [];
+  } catch (err) { /* leave entries/sales empty; the form still opens with zeros */ }
 
-  const totalProduced   = entries.reduce((s,r)=>s+(r.quantityProduced||0),0);
-  const totalDispatched = entries.reduce((s,r)=>s+(r.quantityDispatched||0),0);
+  const totalProduced   = entries.reduce((s,r)=>s+(r.quantity||0),0);
+  const totalDispatched = sales.reduce((s,r)=>s+(r.quantity||0),0);
 
   document.getElementById('formb-period').textContent = `${per} · Auto-filled from ComplianceOS`;
   document.getElementById('formb-content').innerHTML = `
