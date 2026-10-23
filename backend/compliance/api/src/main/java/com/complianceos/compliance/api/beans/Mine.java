@@ -44,6 +44,13 @@ public class Mine extends BaseEntity {
   @NotBlank
   private String mineral;
 
+  // An OreType name; parse with OreType.valueOfOrDefault, never typed as the enum itself so a
+  // value an older/newer version doesn't recognize degrades to UNKNOWN instead of failing to
+  // load. Only meaningful when mineral is iron ore.
+  @UiField(label = "Ore Type", order = 55)
+  @UiSelect(enumType = OreType.class)
+  private String oreType;
+
   @UiField(label = "Mine Type", order = 60)
   @UiSelect(optionsResource = "mine_types.json")
   private String mineType;
@@ -97,6 +104,14 @@ public class Mine extends BaseEntity {
 
   public void setMineral(String mineral) {
     this.mineral = mineral;
+  }
+
+  public String getOreType() {
+    return oreType;
+  }
+
+  public void setOreType(String oreType) {
+    this.oreType = oreType;
   }
 
   public String getMineType() {

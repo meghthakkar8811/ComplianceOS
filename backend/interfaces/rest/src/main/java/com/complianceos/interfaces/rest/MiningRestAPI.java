@@ -8,15 +8,28 @@ import com.agentengine.util.context.ContextAware;
 import com.agentengine.util.ms.client.MicroServiceClientProvider;
 import com.complianceos.compliance.api.beans.ComplianceRecord;
 import com.complianceos.compliance.api.beans.DgmsScore;
+import com.complianceos.compliance.api.beans.ExMinePrice;
+import com.complianceos.compliance.api.beans.ExMinePriceOverride;
+import com.complianceos.compliance.api.beans.LaborDay;
+import com.complianceos.compliance.api.beans.LaborSummary;
 import com.complianceos.compliance.api.beans.Mine;
+import com.complianceos.compliance.api.beans.MineLabor;
+import com.complianceos.compliance.api.beans.MinePayment;
+import com.complianceos.compliance.api.beans.MineRent;
 import com.complianceos.compliance.api.beans.ProductionEntry;
 import com.complianceos.compliance.api.beans.Royalty;
+import com.complianceos.compliance.api.beans.Sale;
+import com.complianceos.compliance.api.beans.StockBalance;
+import com.complianceos.compliance.api.beans.StockBaseline;
+import com.complianceos.compliance.api.beans.Stoppage;
 import com.complianceos.compliance.api.services.MiningService;
 import io.smallrye.common.annotation.RunOnVirtualThread;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
+
+import java.util.List;
 
 /**
  * Everything mine-related that a mine's own id addresses directly: saving/deleting a mine,
@@ -92,15 +105,24 @@ public class MiningRestAPI {
   }
 
   // ── Royalty ────────────────────────────────────────────────────────────
-  // A mine's royalty is calculated from its production entries and the applicable royalty rate —
-  // there is no save endpoint; it is recalculated automatically whenever production changes.
+  // A mine's royalty is computed fresh from its dispatches and the applicable rates on every
+  // call — there is no save endpoint, and nothing to recalculate on a write.
 
   @GET
   @Path("/{mineId}/royalty")
   @Produces(APPLICATION_JSON)
-  @Operation(summary = "Get the mine's calculated royalty for every period")
-  public PaginatedResult<Royalty> getRoyalties(@PathParam("mineId") final String mineId) {
+  @Operation(summary = "Get the mine's calculated royalty for every period with a dispatch")
+  public List<Royalty> getRoyalties(@PathParam("mineId") final String mineId) {
     return service.getRoyaltiesByMine(mineId);
+  }
+
+  @GET
+  @Path("/{mineId}/royalty/period")
+  @Produces(APPLICATION_JSON)
+  @Operation(summary = "Get the mine's calculated royalty for the month a given timestamp falls in")
+  public Royalty getRoyalty(
+      @PathParam("mineId") final String mineId, @QueryParam("asOf") final long asOf) {
+    return service.getRoyalty(mineId, asOf);
   }
 
   // ── Compliance records ────────────────────────────────────────────────
@@ -126,5 +148,162 @@ public class MiningRestAPI {
   @Operation(summary = "Get the mine's DGMS inspection readiness score")
   public DgmsScore getDgmsReadiness(@PathParam("mineId") final String mineId) {
     return service.getDgmsReadinessScore(mineId);
+  }
+
+  // ── Rent ───────────────────────────────────────────────────────────────
+
+  @POST
+  @Path("/{mineId}/rent")
+  @Consumes(APPLICATION_JSON)
+  @Produces(APPLICATION_JSON)
+  @Operation(summary = "Save a rent or dead rent revision")
+  public MineRent saveMineRent(
+      @PathParam("mineId") final String mineId,
+      @QueryParam("skipVersion") @DefaultValue("false") final boolean skipVersion,
+      final MineRent rent) {
+    rent.setMineId(mineId);
+    return service.saveMineRent(rent, skipVersion);
+  }
+
+  // ── Payments ───────────────────────────────────────────────────────────
+
+  @POST
+  @Path("/{mineId}/payments")
+  @Consumes(APPLICATION_JSON)
+  @Produces(APPLICATION_JSON)
+  @Operation(summary = "Record a royalty, rent, or dead rent payment")
+  public MinePayment savePayment(
+      @PathParam("mineId") final String mineId,
+      @QueryParam("skipVersion") @DefaultValue("false") final boolean skipVersion,
+      final MinePayment payment) {
+    payment.setMineId(mineId);
+    return service.savePayment(payment, skipVersion);
+  }
+
+  // ── Stoppages ──────────────────────────────────────────────────────────
+
+  @POST
+  @Path("/{mineId}/stoppages")
+  @Consumes(APPLICATION_JSON)
+  @Produces(APPLICATION_JSON)
+  @Operation(summary = "Record a day the mine didn't work, and why")
+  public Stoppage saveStoppage(
+      @PathParam("mineId") final String mineId,
+      @QueryParam("skipVersion") @DefaultValue("false") final boolean skipVersion,
+      final Stoppage stoppage) {
+    stoppage.setMineId(mineId);
+    return service.saveStoppage(stoppage, skipVersion);
+  }
+
+  @GET
+  @Path("/{mineId}/days-worked")
+  @Produces(APPLICATION_JSON)
+  @Operation(summary = "Get the mine's days worked in the month a given timestamp falls in")
+  public int getDaysWorked(
+      @PathParam("mineId") final String mineId, @QueryParam("asOf") final long asOf) {
+    return service.getDaysWorked(mineId, asOf);
+  }
+
+  // ── Labor ──────────────────────────────────────────────────────────────
+
+  @POST
+  @Path("/{mineId}/labor-days")
+  @Consumes(APPLICATION_JSON)
+  @Produces(APPLICATION_JSON)
+  @Operation(summary = "Record a day's employment headcount by category")
+  public LaborDay saveLaborDay(
+      @PathParam("mineId") final String mineId,
+      @QueryParam("skipVersion") @DefaultValue("false") final boolean skipVersion,
+      final LaborDay day) {
+    day.setMineId(mineId);
+    return service.saveLaborDay(day, skipVersion);
+  }
+
+  @GET
+  @Path("/{mineId}/labor-summary")
+  @Produces(APPLICATION_JSON)
+  @Operation(
+      summary = "Get the mine's average daily employment by category for the month a given timestamp falls in")
+  public LaborSummary getLaborSummary(
+      @PathParam("mineId") final String mineId, @QueryParam("asOf") final long asOf) {
+    return service.getLaborSummary(mineId, asOf);
+  }
+
+  @POST
+  @Path("/{mineId}/labor")
+  @Consumes(APPLICATION_JSON)
+  @Produces(APPLICATION_JSON)
+  @Operation(summary = "Save a month's wages and technical-staff labor return")
+  public MineLabor saveMineLabor(
+      @PathParam("mineId") final String mineId,
+      @QueryParam("skipVersion") @DefaultValue("false") final boolean skipVersion,
+      final MineLabor labor) {
+    labor.setMineId(mineId);
+    return service.saveMineLabor(labor, skipVersion);
+  }
+
+  // ── Stock ──────────────────────────────────────────────────────────────
+
+  @POST
+  @Path("/{mineId}/stock-baselines")
+  @Consumes(APPLICATION_JSON)
+  @Produces(APPLICATION_JSON)
+  @Operation(summary = "Set a grade's opening stock as of mine provisioning")
+  public StockBaseline saveStockBaseline(
+      @PathParam("mineId") final String mineId,
+      @QueryParam("skipVersion") @DefaultValue("false") final boolean skipVersion,
+      final StockBaseline baseline) {
+    baseline.setMineId(mineId);
+    return service.saveStockBaseline(baseline, skipVersion);
+  }
+
+  @GET
+  @Path("/{mineId}/stock-balance")
+  @Produces(APPLICATION_JSON)
+  @Operation(summary = "Get a grade's opening/closing stock for the month a given timestamp falls in")
+  public StockBalance getStockBalance(
+      @PathParam("mineId") final String mineId,
+      @QueryParam("mineralGrade") final String mineralGrade,
+      @QueryParam("asOf") final long asOf) {
+    return service.getStockBalance(mineId, mineralGrade, asOf);
+  }
+
+  // ── Dispatches & ex-mine price ────────────────────────────────────────
+
+  @POST
+  @Path("/{mineId}/sales")
+  @Consumes(APPLICATION_JSON)
+  @Produces(APPLICATION_JSON)
+  @Operation(summary = "Record one buyer's purchase of one grade")
+  public Sale saveSale(
+      @PathParam("mineId") final String mineId,
+      @QueryParam("skipVersion") @DefaultValue("false") final boolean skipVersion,
+      final Sale sale) {
+    sale.setMineId(mineId);
+    return service.saveSale(sale, skipVersion);
+  }
+
+  @GET
+  @Path("/{mineId}/ex-mine-price")
+  @Produces(APPLICATION_JSON)
+  @Operation(summary = "Get a grade's ex-mine price for the month a given timestamp falls in")
+  public ExMinePrice getExMinePrice(
+      @PathParam("mineId") final String mineId,
+      @QueryParam("mineralGrade") final String mineralGrade,
+      @QueryParam("asOf") final long asOf) {
+    return service.getExMinePrice(mineId, mineralGrade, asOf);
+  }
+
+  @POST
+  @Path("/{mineId}/ex-mine-price-overrides")
+  @Consumes(APPLICATION_JSON)
+  @Produces(APPLICATION_JSON)
+  @Operation(summary = "Manually set a grade's ex-mine price for a month")
+  public ExMinePriceOverride saveExMinePriceOverride(
+      @PathParam("mineId") final String mineId,
+      @QueryParam("skipVersion") @DefaultValue("false") final boolean skipVersion,
+      final ExMinePriceOverride override) {
+    override.setMineId(mineId);
+    return service.saveExMinePriceOverride(override, skipVersion);
   }
 }

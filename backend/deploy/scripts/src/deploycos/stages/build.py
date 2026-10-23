@@ -48,8 +48,21 @@ class BuildGradleStage(Stage):
     def _build(self) -> None:
         """Builds every component's Quarkus artifacts in one invocation — a real
         prerequisite the Dockerfile depends on, and cheaper than one gradle process per
-        component since `--parallel` already parallelizes across modules internally."""
+        component since `--parallel` already parallelizes across modules internally.
+
+        Cleans each selected component first, in its own prior invocation. `--refresh-
+        dependencies` busts Gradle's own dependency cache, but quarkusBuild's own build-time
+        dependency resolution can still leave a stale agent-engine SNAPSHOT jar bundled into
+        build/quarkus-app if that component's build/ directory survives from an earlier
+        build — observed concretely: a republished agent-engine SNAPSHOT was correctly
+        re-resolved by plain Gradle dependency resolution, but an un-cleaned quarkusBuild
+        still bundled the previous jar. Cleaning first is the fix. It must be a separate
+        invocation, never combined with the build tasks under --parallel: Gradle does not
+        order `clean` before a build task within one invocation, so the two can race (clean
+        can even delete output the build just produced)."""
         tasks = [GRADLE_TASKS[component] for component in self.components]
+        clean_tasks = [f"{task.rsplit(':', 1)[0]}:clean" for task in tasks]
+        subprocess.run(["./gradlew", *clean_tasks], cwd=REPO_ROOT, check=True)
         subprocess.run(
             ["./gradlew", *tasks, "-x", "test", "--parallel", "--refresh-dependencies"],
             cwd=REPO_ROOT,

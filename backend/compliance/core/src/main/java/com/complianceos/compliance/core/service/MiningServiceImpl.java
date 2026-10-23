@@ -15,27 +15,49 @@ import com.agentengine.util.scripts.TemplateUtils;
 import com.agentengine.util.scripts.templated.Template;
 import com.agentengine.util.tenancy.Permission;
 import com.complianceos.compliance.api.beans.AssetClass;
+import com.complianceos.compliance.api.beans.Authority;
 import com.complianceos.compliance.api.beans.ComplianceRecord;
+import com.complianceos.compliance.api.beans.ComplianceStatus;
 import com.complianceos.compliance.api.beans.DgmsRecordScore;
 import com.complianceos.compliance.api.beans.DgmsScore;
 import com.complianceos.compliance.api.beans.DmfRate;
+import com.complianceos.compliance.api.beans.ExMinePrice;
+import com.complianceos.compliance.api.beans.ExMinePriceOverride;
+import com.complianceos.compliance.api.beans.ExMinePriceSource;
+import com.complianceos.compliance.api.beans.LaborDay;
+import com.complianceos.compliance.api.beans.LaborSummary;
 import com.complianceos.compliance.api.beans.Mine;
+import com.complianceos.compliance.api.beans.MineLabor;
+import com.complianceos.compliance.api.beans.MinePayment;
+import com.complianceos.compliance.api.beans.MineRent;
 import com.complianceos.compliance.api.beans.MiningConstants;
 import com.complianceos.compliance.api.beans.NmetRate;
+import com.complianceos.compliance.api.beans.PaymentType;
 import com.complianceos.compliance.api.beans.ProductionEntry;
 import com.complianceos.compliance.api.beans.DgmsRecordStatus;
 import com.complianceos.compliance.api.beans.DgmsVerdict;
 import com.complianceos.compliance.api.beans.RecordType;
 import com.complianceos.compliance.api.beans.Royalty;
 import com.complianceos.compliance.api.beans.RoyaltyRate;
+import com.complianceos.compliance.api.beans.Sale;
+import com.complianceos.compliance.api.beans.StockBalance;
+import com.complianceos.compliance.api.beans.StockBaseline;
+import com.complianceos.compliance.api.beans.Stoppage;
 import com.complianceos.compliance.api.services.MiningService;
 import com.complianceos.compliance.core.repository.ComplianceRecordRepository;
 import com.complianceos.compliance.core.repository.DmfRateRepository;
+import com.complianceos.compliance.core.repository.ExMinePriceOverrideRepository;
+import com.complianceos.compliance.core.repository.LaborDayRepository;
+import com.complianceos.compliance.core.repository.MineLaborRepository;
+import com.complianceos.compliance.core.repository.MinePaymentRepository;
+import com.complianceos.compliance.core.repository.MineRentRepository;
 import com.complianceos.compliance.core.repository.MineRepository;
 import com.complianceos.compliance.core.repository.NmetRateRepository;
 import com.complianceos.compliance.core.repository.ProductionEntryRepository;
 import com.complianceos.compliance.core.repository.RoyaltyRateRepository;
-import com.complianceos.compliance.core.repository.RoyaltyRepository;
+import com.complianceos.compliance.core.repository.SaleRepository;
+import com.complianceos.compliance.core.repository.StockBaselineRepository;
+import com.complianceos.compliance.core.repository.StoppageRepository;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import java.time.Duration;
@@ -43,10 +65,14 @@ import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.function.ToDoubleFunction;
+import java.util.function.ToLongFunction;
 import java.util.stream.Collectors;
 
 @Singleton
@@ -110,28 +136,49 @@ public class MiningServiceImpl implements MiningService {
 
   private final MineRepository mineRepository;
   private final ProductionEntryRepository productionEntryRepository;
-  private final RoyaltyRepository royaltyRepository;
   private final RoyaltyRateRepository royaltyRateRepository;
   private final DmfRateRepository dmfRateRepository;
   private final NmetRateRepository nmetRateRepository;
   private final ComplianceRecordRepository complianceRecordRepository;
+  private final MineRentRepository mineRentRepository;
+  private final MinePaymentRepository minePaymentRepository;
+  private final StoppageRepository stoppageRepository;
+  private final LaborDayRepository laborDayRepository;
+  private final MineLaborRepository mineLaborRepository;
+  private final StockBaselineRepository stockBaselineRepository;
+  private final SaleRepository saleRepository;
+  private final ExMinePriceOverrideRepository exMinePriceOverrideRepository;
 
   @Inject
   public MiningServiceImpl(
       final MineRepository mineRepository,
       final ProductionEntryRepository productionEntryRepository,
-      final RoyaltyRepository royaltyRepository,
       final RoyaltyRateRepository royaltyRateRepository,
       final DmfRateRepository dmfRateRepository,
       final NmetRateRepository nmetRateRepository,
-      final ComplianceRecordRepository complianceRecordRepository) {
+      final ComplianceRecordRepository complianceRecordRepository,
+      final MineRentRepository mineRentRepository,
+      final MinePaymentRepository minePaymentRepository,
+      final StoppageRepository stoppageRepository,
+      final LaborDayRepository laborDayRepository,
+      final MineLaborRepository mineLaborRepository,
+      final StockBaselineRepository stockBaselineRepository,
+      final SaleRepository saleRepository,
+      final ExMinePriceOverrideRepository exMinePriceOverrideRepository) {
     this.mineRepository = mineRepository;
     this.productionEntryRepository = productionEntryRepository;
-    this.royaltyRepository = royaltyRepository;
     this.royaltyRateRepository = royaltyRateRepository;
     this.dmfRateRepository = dmfRateRepository;
     this.nmetRateRepository = nmetRateRepository;
     this.complianceRecordRepository = complianceRecordRepository;
+    this.mineRentRepository = mineRentRepository;
+    this.minePaymentRepository = minePaymentRepository;
+    this.stoppageRepository = stoppageRepository;
+    this.laborDayRepository = laborDayRepository;
+    this.mineLaborRepository = mineLaborRepository;
+    this.stockBaselineRepository = stockBaselineRepository;
+    this.saleRepository = saleRepository;
+    this.exMinePriceOverrideRepository = exMinePriceOverrideRepository;
   }
 
   @Override
@@ -155,9 +202,20 @@ public class MiningServiceImpl implements MiningService {
     if (mineRepository.deleteByIdIgnoringVersion(id)) {
       productionEntryRepository.deleteByFilterIgnoringVersion(
           Filters.eq(ProductionEntry.FIELD_MINE_ID, id));
-      royaltyRepository.deleteByFilterIgnoringVersion(Filters.eq(Royalty.FIELD_MINE_ID, id));
       complianceRecordRepository.deleteByFilterIgnoringVersion(
           Filters.eq(ComplianceRecord.FIELD_MINE_ID, id));
+      mineRentRepository.deleteByFilterIgnoringVersion(Filters.eq(MineRent.FIELD_MINE_ID, id));
+      minePaymentRepository.deleteByFilterIgnoringVersion(
+          Filters.eq(MinePayment.FIELD_MINE_ID, id));
+      stoppageRepository.deleteByFilterIgnoringVersion(Filters.eq(Stoppage.FIELD_MINE_ID, id));
+      laborDayRepository.deleteByFilterIgnoringVersion(Filters.eq(LaborDay.FIELD_MINE_ID, id));
+      mineLaborRepository.deleteByFilterIgnoringVersion(Filters.eq(MineLabor.FIELD_MINE_ID, id));
+      stockBaselineRepository.deleteByFilterIgnoringVersion(
+          Filters.eq(StockBaseline.FIELD_MINE_ID, id));
+      saleRepository.deleteByFilterIgnoringVersion(
+          Filters.eq(Sale.FIELD_MINE_ID, id));
+      exMinePriceOverrideRepository.deleteByFilterIgnoringVersion(
+          Filters.eq(ExMinePriceOverride.FIELD_MINE_ID, id));
     }
   }
 
@@ -169,19 +227,9 @@ public class MiningServiceImpl implements MiningService {
   @Override
   public ProductionEntry saveProductionEntry(final ProductionEntry entry, final boolean skipVersion) {
     requireMineEdit(entry.getMineId());
-    final ProductionEntry existing =
-        StringUtils.isNotBlank(entry.getId()) ? productionEntryRepository.findById(entry.getId()) : null;
-    final ProductionEntry saved =
-        skipVersion
-            ? productionEntryRepository.saveIgnoringVersion(entry)
-            : productionEntryRepository.save(entry);
-    if (existing != null
-        && (!existing.getMineId().equals(saved.getMineId())
-            || !periodOf(existing.getEntryTime()).equals(periodOf(saved.getEntryTime())))) {
-      recalculateRoyalty(existing.getMineId(), periodOf(existing.getEntryTime()));
-    }
-    recalculateRoyalty(saved.getMineId(), periodOf(saved.getEntryTime()));
-    return saved;
+    return skipVersion
+        ? productionEntryRepository.saveIgnoringVersion(entry)
+        : productionEntryRepository.save(entry);
   }
 
   @Override
@@ -214,18 +262,36 @@ public class MiningServiceImpl implements MiningService {
       return;
     }
     requireMineEdit(entry.getMineId());
-    if (productionEntryRepository.deleteByIdIgnoringVersion(id)) {
-      recalculateRoyalty(entry.getMineId(), periodOf(entry.getEntryTime()));
-    }
+    productionEntryRepository.deleteByIdIgnoringVersion(id);
   }
 
   @Override
-  public PaginatedResult<Royalty> getRoyaltiesByMine(final String mineId) {
+  public List<Royalty> getRoyaltiesByMine(final String mineId) {
     if (!mineRepository.hasPermission(mineId, Permission.READ)) {
-      return PaginatedResult.empty();
+      return List.of();
     }
-    return royaltyRepository.findByQuery(
-        new Query().withFilter(Filters.eq(Royalty.FIELD_MINE_ID, mineId)));
+    final List<Sale> sales =
+        saleRepository
+            .findByQuery(
+                new Query()
+                    .withFilter(Filters.eq(Sale.FIELD_MINE_ID, mineId))
+                    .withPage(Page.UNBOUNDED))
+            .getItems();
+      return sales.stream()
+          .map(sale -> periodOf(sale.getDispatchedOn()))
+          .distinct()
+          .sorted(Comparator.reverseOrder())
+          .map(period -> computeRoyalty(mineId, period))
+          .filter(Objects::nonNull)
+          .toList();
+  }
+
+  @Override
+  public Royalty getRoyalty(final String mineId, final long asOf) {
+    if (!mineRepository.hasPermission(mineId, Permission.READ)) {
+      return null;
+    }
+    return computeRoyalty(mineId, periodOf(asOf));
   }
 
   @Override
@@ -324,6 +390,392 @@ public class MiningServiceImpl implements MiningService {
   }
 
   @Override
+  public MineRent saveMineRent(final MineRent rent, final boolean skipVersion) {
+    requireMineEdit(rent.getMineId());
+    if (PaymentType.valueOfOrDefault(rent.getType()) == PaymentType.DEAD_RENT) {
+      // Dead rent always goes to the state government, by law — not a per-lease choice like
+      // surface rent's payee is, so this isn't a default: it overrides whatever was passed in.
+      final Mine mine = mineRepository.findById(rent.getMineId());
+      if (mine != null) {
+        rent.setPayee("Government of " + mine.getState());
+      }
+    }
+    rent.setId(MineRent.id(rent.getMineId(), rent.getType(), rent.getValidFrom()));
+    final MineRent current = currentMineRent(rent.getMineId(), rent.getType());
+    if (current != null
+        && !current.getId().equals(rent.getId())
+        && current.getValidFrom() < rent.getValidFrom()) {
+      current.setValidTill(rent.getValidFrom());
+      mineRentRepository.saveIgnoringVersion(current);
+    }
+    return skipVersion ? mineRentRepository.saveIgnoringVersion(rent) : mineRentRepository.save(rent);
+  }
+
+  @Override
+  public Map<String, MineRent> getMineRents(final List<String> ids) {
+    if (CollectionUtils.isEmpty(ids)) {
+      return Map.of();
+    }
+    final Map<String, Boolean> mineIdVsReadable = new HashMap<>();
+    return mineRentRepository.findByIds(ids).entrySet().stream()
+        .filter(entry -> isMineReadable(entry.getValue().getMineId(), mineIdVsReadable))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+  }
+
+  @Override
+  public PaginatedResult<MineRent> findMineRents(final Query query) {
+    final PaginatedResult<MineRent> result =
+        mineRentRepository.findByQuery(query == null ? new Query() : query);
+    final Map<String, Boolean> mineIdVsReadable = new HashMap<>();
+    result.setItems(
+        result.getItems().stream()
+            .filter(rent -> isMineReadable(rent.getMineId(), mineIdVsReadable))
+            .toList());
+    return result;
+  }
+
+  @Override
+  public MinePayment savePayment(final MinePayment payment, final boolean skipVersion) {
+    requireMineEdit(payment.getMineId());
+    return skipVersion
+        ? minePaymentRepository.saveIgnoringVersion(payment)
+        : minePaymentRepository.save(payment);
+  }
+
+  @Override
+  public Map<String, MinePayment> getPayments(final List<String> ids) {
+    if (CollectionUtils.isEmpty(ids)) {
+      return Map.of();
+    }
+    final Map<String, Boolean> mineIdVsReadable = new HashMap<>();
+    return minePaymentRepository.findByIds(ids).entrySet().stream()
+        .filter(entry -> isMineReadable(entry.getValue().getMineId(), mineIdVsReadable))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+  }
+
+  @Override
+  public PaginatedResult<MinePayment> findPayments(final Query query) {
+    final PaginatedResult<MinePayment> result =
+        minePaymentRepository.findByQuery(query == null ? new Query() : query);
+    final Map<String, Boolean> mineIdVsReadable = new HashMap<>();
+    result.setItems(
+        result.getItems().stream()
+            .filter(payment -> isMineReadable(payment.getMineId(), mineIdVsReadable))
+            .toList());
+    return result;
+  }
+
+  @Override
+  public Stoppage saveStoppage(final Stoppage stoppage, final boolean skipVersion) {
+    requireMineEdit(stoppage.getMineId());
+    stoppage.setId(Stoppage.id(stoppage.getMineId(), stoppage.getStoppedOn()));
+    return skipVersion
+        ? stoppageRepository.saveIgnoringVersion(stoppage)
+        : stoppageRepository.save(stoppage);
+  }
+
+  @Override
+  public Map<String, Stoppage> getStoppages(final List<String> ids) {
+    if (CollectionUtils.isEmpty(ids)) {
+      return Map.of();
+    }
+    final Map<String, Boolean> mineIdVsReadable = new HashMap<>();
+    return stoppageRepository.findByIds(ids).entrySet().stream()
+        .filter(entry -> isMineReadable(entry.getValue().getMineId(), mineIdVsReadable))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+  }
+
+  @Override
+  public PaginatedResult<Stoppage> findStoppages(final Query query) {
+    final PaginatedResult<Stoppage> result =
+        stoppageRepository.findByQuery(query == null ? new Query() : query);
+    final Map<String, Boolean> mineIdVsReadable = new HashMap<>();
+    result.setItems(
+        result.getItems().stream()
+            .filter(stoppage -> isMineReadable(stoppage.getMineId(), mineIdVsReadable))
+            .toList());
+    return result;
+  }
+
+  @Override
+  public int getDaysWorked(final String mineId, final long asOf) {
+    if (!mineRepository.hasPermission(mineId, Permission.READ)) {
+      return 0;
+    }
+    final YearMonth period = periodOf(asOf);
+    final long periodStart = monthStartMillis(period);
+    final long periodEnd = monthStartMillis(period.plusMonths(1));
+    final PaginatedResult<Stoppage> stoppages =
+        stoppageRepository.findByQuery(
+            new Query()
+                .withFilter(
+                    Filters.and(
+                        Filters.eq(Stoppage.FIELD_MINE_ID, mineId),
+                        Filters.gte(Stoppage.FIELD_STOPPED_ON, periodStart),
+                        Filters.lt(Stoppage.FIELD_STOPPED_ON, periodEnd)))
+                .withPage(Page.UNBOUNDED));
+    return period.lengthOfMonth() - stoppages.getItems().size();
+  }
+
+  @Override
+  public LaborDay saveLaborDay(final LaborDay day, final boolean skipVersion) {
+    requireMineEdit(day.getMineId());
+    day.setId(LaborDay.id(day.getMineId(), day.getWorkedOn()));
+    return skipVersion
+        ? laborDayRepository.saveIgnoringVersion(day)
+        : laborDayRepository.save(day);
+  }
+
+  @Override
+  public Map<String, LaborDay> getLaborDays(final List<String> ids) {
+    if (CollectionUtils.isEmpty(ids)) {
+      return Map.of();
+    }
+    final Map<String, Boolean> mineIdVsReadable = new HashMap<>();
+    return laborDayRepository.findByIds(ids).entrySet().stream()
+        .filter(entry -> isMineReadable(entry.getValue().getMineId(), mineIdVsReadable))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+  }
+
+  @Override
+  public PaginatedResult<LaborDay> findLaborDays(final Query query) {
+    final PaginatedResult<LaborDay> result =
+        laborDayRepository.findByQuery(query == null ? new Query() : query);
+    final Map<String, Boolean> mineIdVsReadable = new HashMap<>();
+    result.setItems(
+        result.getItems().stream()
+            .filter(day -> isMineReadable(day.getMineId(), mineIdVsReadable))
+            .toList());
+    return result;
+  }
+
+  @Override
+  public LaborSummary getLaborSummary(final String mineId, final long asOf) {
+    if (!mineRepository.hasPermission(mineId, Permission.READ)) {
+      return new LaborSummary(0, 0, 0);
+    }
+    final int daysWorked = getDaysWorked(mineId, asOf);
+    if (daysWorked == 0) {
+      return new LaborSummary(0, 0, 0);
+    }
+    final YearMonth period = periodOf(asOf);
+    final long periodStart = monthStartMillis(period);
+    final long periodEnd = monthStartMillis(period.plusMonths(1));
+    final PaginatedResult<LaborDay> laborDays =
+        laborDayRepository.findByQuery(
+            new Query()
+                .withFilter(
+                    Filters.and(
+                        Filters.eq(LaborDay.FIELD_MINE_ID, mineId),
+                        Filters.gte(LaborDay.FIELD_WORKED_ON, periodStart),
+                        Filters.lt(LaborDay.FIELD_WORKED_ON, periodEnd)))
+                .withPage(Page.UNBOUNDED));
+    long belowGroundManDays = 0;
+    long openCastManDays = 0;
+    long aboveGroundManDays = 0;
+    for (final LaborDay day : laborDays.getItems()) {
+      belowGroundManDays += day.getBelowGroundCount();
+      openCastManDays += day.getOpenCastCount();
+      aboveGroundManDays += day.getAboveGroundCount();
+    }
+    return new LaborSummary(
+        (double) belowGroundManDays / daysWorked,
+        (double) openCastManDays / daysWorked,
+        (double) aboveGroundManDays / daysWorked);
+  }
+
+  @Override
+  public MineLabor saveMineLabor(final MineLabor labor, final boolean skipVersion) {
+    requireMineEdit(labor.getMineId());
+    labor.setId(MineLabor.id(labor.getMineId(), labor.getPeriodStart()));
+    return skipVersion
+        ? mineLaborRepository.saveIgnoringVersion(labor)
+        : mineLaborRepository.save(labor);
+  }
+
+  @Override
+  public Map<String, MineLabor> getMineLabors(final List<String> ids) {
+    if (CollectionUtils.isEmpty(ids)) {
+      return Map.of();
+    }
+    final Map<String, Boolean> mineIdVsReadable = new HashMap<>();
+    return mineLaborRepository.findByIds(ids).entrySet().stream()
+        .filter(entry -> isMineReadable(entry.getValue().getMineId(), mineIdVsReadable))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+  }
+
+  @Override
+  public PaginatedResult<MineLabor> findMineLabors(final Query query) {
+    final PaginatedResult<MineLabor> result =
+        mineLaborRepository.findByQuery(query == null ? new Query() : query);
+    final Map<String, Boolean> mineIdVsReadable = new HashMap<>();
+    result.setItems(
+        result.getItems().stream()
+            .filter(labor -> isMineReadable(labor.getMineId(), mineIdVsReadable))
+            .toList());
+    return result;
+  }
+
+  @Override
+  public StockBaseline saveStockBaseline(final StockBaseline baseline, final boolean skipVersion) {
+    requireMineEdit(baseline.getMineId());
+    baseline.setId(StockBaseline.id(baseline.getMineId(), baseline.getMineralGrade()));
+    return skipVersion
+        ? stockBaselineRepository.saveIgnoringVersion(baseline)
+        : stockBaselineRepository.save(baseline);
+  }
+
+  @Override
+  public Map<String, StockBaseline> getStockBaselines(final List<String> ids) {
+    if (CollectionUtils.isEmpty(ids)) {
+      return Map.of();
+    }
+    final Map<String, Boolean> mineIdVsReadable = new HashMap<>();
+    return stockBaselineRepository.findByIds(ids).entrySet().stream()
+        .filter(entry -> isMineReadable(entry.getValue().getMineId(), mineIdVsReadable))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+  }
+
+  @Override
+  public PaginatedResult<StockBaseline> findStockBaselines(final Query query) {
+    final PaginatedResult<StockBaseline> result =
+        stockBaselineRepository.findByQuery(query == null ? new Query() : query);
+    final Map<String, Boolean> mineIdVsReadable = new HashMap<>();
+    result.setItems(
+        result.getItems().stream()
+            .filter(baseline -> isMineReadable(baseline.getMineId(), mineIdVsReadable))
+            .toList());
+    return result;
+  }
+
+  @Override
+  public StockBalance getStockBalance(final String mineId, final String mineralGrade, final long asOf) {
+    if (!mineRepository.hasPermission(mineId, Permission.READ)) {
+      return new StockBalance(0, 0, 0, 0);
+    }
+    final StockBaseline baseline =
+        stockBaselineRepository.findById(StockBaseline.id(mineId, mineralGrade));
+    final double baselineStock = baseline == null ? 0 : baseline.getOpeningStock();
+    final long baselineAsOf = baseline == null ? 0 : baseline.getAsOf();
+
+    final YearMonth period = periodOf(asOf);
+    final long periodStart = monthStartMillis(period);
+    final long periodEnd = monthStartMillis(period.plusMonths(1));
+
+    final double[] productionSplit =
+        splitSum(
+            productionEntryRepository
+                .findByQuery(
+                    new Query()
+                        .withFilter(
+                            Filters.and(
+                                Filters.eq(ProductionEntry.FIELD_MINE_ID, mineId),
+                                Filters.eq(ProductionEntry.FIELD_MINERAL_GRADE, mineralGrade),
+                                Filters.gte(ProductionEntry.FIELD_ENTRY_TIME, baselineAsOf),
+                                Filters.lt(ProductionEntry.FIELD_ENTRY_TIME, periodEnd)))
+                        .withPage(Page.UNBOUNDED))
+                .getItems(),
+            ProductionEntry::getEntryTime,
+            ProductionEntry::getQuantity,
+            periodStart);
+    final double[] dispatchSplit =
+        splitSum(
+            saleRepository
+                .findByQuery(
+                    new Query()
+                        .withFilter(
+                            Filters.and(
+                                Filters.eq(Sale.FIELD_MINE_ID, mineId),
+                                Filters.eq(Sale.FIELD_MINERAL_GRADE, mineralGrade),
+                                Filters.gte(Sale.FIELD_DISPATCHED_ON, baselineAsOf),
+                                Filters.lt(Sale.FIELD_DISPATCHED_ON, periodEnd)))
+                        .withPage(Page.UNBOUNDED))
+                .getItems(),
+            Sale::getDispatchedOn,
+            Sale::getQuantity,
+            periodStart);
+
+    final double openingStock = baselineStock + productionSplit[0] - dispatchSplit[0];
+    final double production = productionSplit[1];
+    final double dispatched = dispatchSplit[1];
+    return new StockBalance(openingStock, production, dispatched, openingStock + production - dispatched);
+  }
+
+  @Override
+  public Sale saveSale(final Sale sale, final boolean skipVersion) {
+    requireMineEdit(sale.getMineId());
+    return skipVersion
+        ? saleRepository.saveIgnoringVersion(sale)
+        : saleRepository.save(sale);
+  }
+
+  @Override
+  public Map<String, Sale> getSales(final List<String> ids) {
+    if (CollectionUtils.isEmpty(ids)) {
+      return Map.of();
+    }
+    final Map<String, Boolean> mineIdVsReadable = new HashMap<>();
+    return saleRepository.findByIds(ids).entrySet().stream()
+        .filter(entry -> isMineReadable(entry.getValue().getMineId(), mineIdVsReadable))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+  }
+
+  @Override
+  public PaginatedResult<Sale> findSales(final Query query) {
+    final PaginatedResult<Sale> result =
+        saleRepository.findByQuery(query == null ? new Query() : query);
+    final Map<String, Boolean> mineIdVsReadable = new HashMap<>();
+    result.setItems(
+        result.getItems().stream()
+            .filter(sale -> isMineReadable(sale.getMineId(), mineIdVsReadable))
+            .toList());
+    return result;
+  }
+
+  @Override
+  public ExMinePrice getExMinePrice(final String mineId, final String mineralGrade, final long asOf) {
+    if (!mineRepository.hasPermission(mineId, Permission.READ)) {
+      return new ExMinePrice(0, ExMinePriceSource.NONE.name());
+    }
+    return exMinePriceAsOf(mineId, mineralGrade, monthStartMillis(periodOf(asOf).plusMonths(1)));
+  }
+
+  @Override
+  public ExMinePriceOverride saveExMinePriceOverride(
+      final ExMinePriceOverride override, final boolean skipVersion) {
+    requireMineEdit(override.getMineId());
+    override.setId(
+        ExMinePriceOverride.id(
+            override.getMineId(), override.getMineralGrade(), override.getPeriodStart()));
+    return skipVersion
+        ? exMinePriceOverrideRepository.saveIgnoringVersion(override)
+        : exMinePriceOverrideRepository.save(override);
+  }
+
+  @Override
+  public Map<String, ExMinePriceOverride> getExMinePriceOverrides(final List<String> ids) {
+    if (CollectionUtils.isEmpty(ids)) {
+      return Map.of();
+    }
+    final Map<String, Boolean> mineIdVsReadable = new HashMap<>();
+    return exMinePriceOverrideRepository.findByIds(ids).entrySet().stream()
+        .filter(entry -> isMineReadable(entry.getValue().getMineId(), mineIdVsReadable))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+  }
+
+  @Override
+  public PaginatedResult<ExMinePriceOverride> findExMinePriceOverrides(final Query query) {
+    final PaginatedResult<ExMinePriceOverride> result =
+        exMinePriceOverrideRepository.findByQuery(query == null ? new Query() : query);
+    final Map<String, Boolean> mineIdVsReadable = new HashMap<>();
+    result.setItems(
+        result.getItems().stream()
+            .filter(override -> isMineReadable(override.getMineId(), mineIdVsReadable))
+            .toList());
+    return result;
+  }
+
+  @Override
   public void ensureComplianceRecords(final String mineId) {
     final Mine mine = mineRepository.findById(mineId);
     if (mine == null) {
@@ -366,6 +818,26 @@ public class MiningServiceImpl implements MiningService {
           desired.put(code + ":" + mineId + ":" + period, record);
         }
       }
+    }
+    for (final MineRent rent :
+        mineRentRepository
+            .findByQuery(
+                new Query()
+                    .withFilter(
+                        Filters.and(
+                            Filters.eq(MineRent.FIELD_MINE_ID, mineId),
+                            Filters.notExists(MineRent.FIELD_VALID_TILL)))
+                    .withPage(Page.UNBOUNDED))
+            .getItems()) {
+      final ComplianceRecord record = new ComplianceRecord();
+      record.setMineId(mineId);
+      record.setRecordType(RecordType.RETURN.name());
+      record.setAuthority(
+          StringUtils.isNotBlank(rent.getPayee()) ? rent.getPayee() : Authority.UNKNOWN.name());
+      record.setStatus(ComplianceStatus.PENDING_SUBMISSION.name());
+      record.setTitle(rentReminderTitle(rent));
+      record.setExpiry(rent.getNextDueOn());
+      desired.put("RENT_DUE:" + rent.getId() + ":" + rent.getNextDueOn(), record);
     }
     final Map<String, ComplianceRecord> existing =
         complianceRecordRepository.findByIds(desired.keySet());
@@ -425,49 +897,166 @@ public class MiningServiceImpl implements MiningService {
     return YearMonth.from(Instant.ofEpochMilli(entryTime).atZone(ZoneOffset.UTC));
   }
 
-  /**
-   * Recomputes the mine's royalty for {@code period} from its production entries and the
-   * applicable {@link RoyaltyRate}, and upserts it under {@link Royalty#id}. Deletes the royalty
-   * instead when the mine now has no production for the period at all (e.g. its last entry was
-   * deleted).
-   */
-  private void recalculateRoyalty(final String mineId, final YearMonth period) {
-    final Mine mine = mineRepository.findById(mineId);
-    if (mine == null) {
-      return;
-    }
-    final String month = period.getMonth().name();
-    final String royaltyId = Royalty.id(mineId, period.getYear(), month);
+  private static long monthStartMillis(final YearMonth period) {
+    return period.atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli();
+  }
 
-    final long periodStart = period.atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli();
-    final long periodEnd =
-        period.plusMonths(1).atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli();
-    final double quantity =
-        productionEntryRepository
+  /**
+   * Splits one fetch's worth of items into the sum of {@code quantity} for those whose
+   * {@code timestamp} falls before {@code splitPoint} (index 0) and at or after it (index 1) —
+   * one query covering both halves of a range, rather than a separate query per half.
+   */
+  private static <T> double[] splitSum(
+      final List<T> items,
+      final ToLongFunction<T> timestamp,
+      final ToDoubleFunction<T> quantity,
+      final long splitPoint) {
+    double before = 0;
+    double fromSplit = 0;
+    for (final T item : items) {
+      if (timestamp.applyAsLong(item) < splitPoint) {
+        before += quantity.applyAsDouble(item);
+      } else {
+        fromSplit += quantity.applyAsDouble(item);
+      }
+    }
+    return new double[] {before, fromSplit};
+  }
+
+  /**
+   * The grade's ex-mine price as of the most recent month strictly before {@code beforeMillis}
+   * that has either an {@link ExMinePriceOverride} or a {@link Sale} — whichever of the
+   * two is more recent wins; a tie favors the override. {@code NONE} if neither ever existed.
+   */
+  private ExMinePrice exMinePriceAsOf(
+      final String mineId, final String mineralGrade, final long beforeMillis) {
+    final ExMinePriceOverride latestOverride =
+        exMinePriceOverrideRepository
             .findByQuery(
                 new Query()
                     .withFilter(
                         Filters.and(
-                            Filters.eq(ProductionEntry.FIELD_MINE_ID, mineId),
-                            Filters.gte("entryTime", periodStart),
-                            Filters.lt("entryTime", periodEnd)))
+                            Filters.eq(ExMinePriceOverride.FIELD_MINE_ID, mineId),
+                            Filters.eq(ExMinePriceOverride.FIELD_MINERAL_GRADE, mineralGrade),
+                            Filters.lt(ExMinePriceOverride.FIELD_PERIOD_START, beforeMillis)))
+                    .withSort(new Sort(ExMinePriceOverride.FIELD_PERIOD_START, Sort.Order.DESC))
+                    .withPage(new Page(0, 1)))
+            .getItems()
+            .stream()
+            .findFirst()
+            .orElse(null);
+
+    final Sale latestSale =
+        saleRepository
+            .findByQuery(
+                new Query()
+                    .withFilter(
+                        Filters.and(
+                            Filters.eq(Sale.FIELD_MINE_ID, mineId),
+                            Filters.eq(Sale.FIELD_MINERAL_GRADE, mineralGrade),
+                            Filters.lt(Sale.FIELD_DISPATCHED_ON, beforeMillis)))
+                    .withSort(new Sort(Sale.FIELD_DISPATCHED_ON, Sort.Order.DESC))
+                    .withPage(new Page(0, 1)))
+            .getItems()
+            .stream()
+            .findFirst()
+            .orElse(null);
+
+    final long overrideMonthStart = latestOverride == null ? -1 : latestOverride.getPeriodStart();
+    final long saleMonthStart =
+        latestSale == null ? -1 : monthStartMillis(periodOf(latestSale.getDispatchedOn()));
+
+    if (overrideMonthStart < 0 && saleMonthStart < 0) {
+      return new ExMinePrice(0, ExMinePriceSource.NONE.name());
+    }
+    if (overrideMonthStart >= saleMonthStart) {
+      return new ExMinePrice(latestOverride.getPricePerUnit(), ExMinePriceSource.OVERRIDE.name());
+    }
+
+    final YearMonth saleMonth = periodOf(latestSale.getDispatchedOn());
+    final long periodStart = monthStartMillis(saleMonth);
+    final long periodEnd = monthStartMillis(saleMonth.plusMonths(1));
+    final List<Sale> monthSales =
+        saleRepository
+            .findByQuery(
+                new Query()
+                    .withFilter(
+                        Filters.and(
+                            Filters.eq(Sale.FIELD_MINE_ID, mineId),
+                            Filters.eq(Sale.FIELD_MINERAL_GRADE, mineralGrade),
+                            Filters.gte(Sale.FIELD_DISPATCHED_ON, periodStart),
+                            Filters.lt(Sale.FIELD_DISPATCHED_ON, periodEnd)))
+                    .withPage(Page.UNBOUNDED))
+            .getItems();
+    double totalExMineValue = 0;
+    double totalQuantity = 0;
+    for (final Sale sale : monthSales) {
+      totalExMineValue += sale.getSaleValue() - (double) sale.getDeductionPerUnit() * sale.getQuantity();
+      totalQuantity += sale.getQuantity();
+    }
+    final String source =
+        periodEnd == beforeMillis
+            ? ExMinePriceSource.SALES.name()
+            : ExMinePriceSource.CARRIED_FORWARD.name();
+    return new ExMinePrice(totalQuantity <= 0 ? 0 : Math.round(totalExMineValue / totalQuantity), source);
+  }
+
+  /** The mine's current (not yet superseded) {@link MineRent} of {@code type}, or null if none is. */
+  private MineRent currentMineRent(final String mineId, final String type) {
+    return mineRentRepository
+        .findByQuery(
+            new Query()
+                .withFilter(
+                    Filters.and(
+                        Filters.eq(MineRent.FIELD_MINE_ID, mineId),
+                        Filters.eq(MineRent.FIELD_TYPE, PaymentType.valueOfOrDefault(type).name()),
+                        Filters.notExists(MineRent.FIELD_VALID_TILL))))
+        .getItems()
+        .stream()
+        .findFirst()
+        .orElse(null);
+  }
+
+  private static String rentReminderTitle(final MineRent rent) {
+    return switch (PaymentType.valueOfOrDefault(rent.getType())) {
+      case DEAD_RENT -> "Dead Rent Payment Due";
+      case RENT -> "Surface Rent Payment Due";
+      default -> "Rent Payment Due";
+    };
+  }
+
+  /**
+   * The mine's royalty for {@code period}, computed fresh from its {@link Sale} records
+   * and the applicable {@link RoyaltyRate}/{@code DmfRate}/{@code NmetRate} — null when the mine
+   * doesn't exist or has no dispatches for the period at all.
+   */
+  private Royalty computeRoyalty(final String mineId, final YearMonth period) {
+    final Mine mine = mineRepository.findById(mineId);
+    if (mine == null) {
+      return null;
+    }
+    final String month = period.getMonth().name();
+
+    final long periodStart = monthStartMillis(period);
+    final long periodEnd = monthStartMillis(period.plusMonths(1));
+    final double quantity =
+        saleRepository
+            .findByQuery(
+                new Query()
+                    .withFilter(
+                        Filters.and(
+                            Filters.eq(Sale.FIELD_MINE_ID, mineId),
+                            Filters.gte(Sale.FIELD_DISPATCHED_ON, periodStart),
+                            Filters.lt(Sale.FIELD_DISPATCHED_ON, periodEnd)))
                     .withPage(Page.UNBOUNDED))
             .getItems()
             .stream()
-            .mapToDouble(ProductionEntry::getQuantityDispatched)
+            .mapToDouble(Sale::getQuantity)
             .sum();
 
     if (quantity <= 0) {
-      royaltyRepository.deleteByIdIgnoringVersion(royaltyId);
-      return;
+      return null;
     }
-
-    final Royalty royalty = new Royalty();
-    royalty.setId(royaltyId);
-    royalty.setMineId(mineId);
-    royalty.setYear(period.getYear());
-    royalty.setMonth(month);
-    royalty.setQuantity(quantity);
 
     // Royalty rates, DMF rates, and NMET rates are environment-wide, stored under the system
     // customer (see saveRoyaltyRate/saveDmfRate/saveNmetRate).
@@ -477,23 +1066,31 @@ public class MiningServiceImpl implements MiningService {
                 () ->
                     royaltyRateRepository.findById(
                         RoyaltyRate.id(mine.getState(), mine.getMineral(), period.getYear(), month)));
-    if (rate != null) {
-      final String tier =
-          mine.getLeaseStartOn() >= MiningConstants.DMF_RATE_CHANGE_CUTOFF
-              ? MiningConstants.LEASE_TIER_POST_2015
-              : MiningConstants.LEASE_TIER_PRE_2015;
-      final DmfRate dmfRate = latestDmfRate(tier, periodStart);
-      final NmetRate nmetRate = latestNmetRate(periodStart);
-      final long baseAmount = Math.round(quantity * rate.getRatePerTonne());
-      final long dmfAmount = dmfRate == null ? 0 : Math.round(baseAmount * dmfRate.getRate());
-      final long nmetAmount = nmetRate == null ? 0 : Math.round(baseAmount * nmetRate.getRate());
-      royalty.setRoyaltyRateId(rate.getId());
-      royalty.setBaseAmount(baseAmount);
-      royalty.setDmfAmount(dmfAmount);
-      royalty.setNmetAmount(nmetAmount);
-      royalty.setGrossLiability(baseAmount + dmfAmount + nmetAmount);
+    if (rate == null) {
+      return new Royalty(
+          Royalty.id(mineId, period.getYear(), month), mineId, period.getYear(), month, null,
+          quantity, 0, 0, 0, 0);
     }
-    royaltyRepository.saveIgnoringVersion(royalty);
+    final String tier =
+        mine.getLeaseStartOn() >= MiningConstants.DMF_RATE_CHANGE_CUTOFF
+            ? MiningConstants.LEASE_TIER_POST_2015
+            : MiningConstants.LEASE_TIER_PRE_2015;
+    final DmfRate dmfRate = latestDmfRate(tier, periodStart);
+    final NmetRate nmetRate = latestNmetRate(periodStart);
+    final long baseAmount = Math.round(quantity * rate.getRatePerTonne());
+    final long dmfAmount = dmfRate == null ? 0 : Math.round(baseAmount * dmfRate.getRate());
+    final long nmetAmount = nmetRate == null ? 0 : Math.round(baseAmount * nmetRate.getRate());
+    return new Royalty(
+        Royalty.id(mineId, period.getYear(), month),
+        mineId,
+        period.getYear(),
+        month,
+        rate.getId(),
+        quantity,
+        baseAmount,
+        dmfAmount,
+        nmetAmount,
+        baseAmount + dmfAmount + nmetAmount);
   }
 
   /** The {@link DmfRate} for {@code tier} effective as of {@code asOf}, or null if none is. */

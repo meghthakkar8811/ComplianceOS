@@ -4,8 +4,9 @@ import com.agentengine.util.common.annotations.Index;
 import com.agentengine.util.common.beans.BaseEntity;
 
 /**
- * A mine's production/dispatch entry for one shift. Not independently permissioned — reached
- * only through its mine, whose access governs it, same as {@link Royalty} and
+ * A mine's production entry for one shift, one pit section, one grade. What it dispatches is
+ * tracked separately, per buyer, by {@link Sale} — not independently permissioned —
+ * reached only through its mine, whose access governs it, same as {@link Royalty} and
  * {@link ComplianceRecord}.
  */
 @Index(name = "production_mine_idx", def = "{'mineId': 1}")
@@ -13,6 +14,8 @@ import com.agentengine.util.common.beans.BaseEntity;
 public class ProductionEntry extends BaseEntity {
 
   public static final String FIELD_MINE_ID = "mineId";
+  public static final String FIELD_ENTRY_TIME = "entryTime";
+  public static final String FIELD_MINERAL_GRADE = "mineralGrade";
 
   private String mineId;
   private long entryTime;
@@ -23,8 +26,7 @@ public class ProductionEntry extends BaseEntity {
 
   private String pitSection;
   private String mineralGrade;
-  private double quantityProduced;
-  private double quantityDispatched;
+  private double quantity;
   private String supervisorName;
   private String remarks;
 
@@ -73,20 +75,12 @@ public class ProductionEntry extends BaseEntity {
     this.mineralGrade = mineralGrade;
   }
 
-  public double getQuantityProduced() {
-    return quantityProduced;
+  public double getQuantity() {
+    return quantity;
   }
 
-  public void setQuantityProduced(double quantityProduced) {
-    this.quantityProduced = quantityProduced;
-  }
-
-  public double getQuantityDispatched() {
-    return quantityDispatched;
-  }
-
-  public void setQuantityDispatched(double quantityDispatched) {
-    this.quantityDispatched = quantityDispatched;
+  public void setQuantity(double quantity) {
+    this.quantity = quantity;
   }
 
   public String getSupervisorName() {

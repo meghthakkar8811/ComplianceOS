@@ -5,22 +5,22 @@ import com.agentengine.util.common.repository.DocumentBackend;
 import com.agentengine.util.common.repository.DocumentRepositorySpec;
 import com.agentengine.util.common.validation.ValidationService;
 import com.complianceos.compliance.api.beans.ComplianceDocumentStoreClientType;
-import com.complianceos.compliance.api.beans.Royalty;
+import com.complianceos.compliance.api.beans.Stoppage;
 import io.quarkus.runtime.Startup;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 @Singleton
 @Startup
-public class RoyaltyRepository extends AbstractRepository<Royalty> {
+public class StoppageRepository extends AbstractRepository<Stoppage> {
 
   @Inject
-  public RoyaltyRepository(
+  public StoppageRepository(
       final DocumentBackend documentBackend, final ValidationService validationService) {
     super(
         documentBackend.getEntityStore(
             DocumentRepositorySpec.perCustomer(
-                ComplianceDocumentStoreClientType.COMPLIANCE, Royalty.class)),
+                ComplianceDocumentStoreClientType.COMPLIANCE, Stoppage.class)),
         validationService);
   }
 }
