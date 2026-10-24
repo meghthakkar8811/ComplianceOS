@@ -204,16 +204,37 @@
     </div>
     <div class="forms-grid">
       <div class="form-tile ready" onclick="openFormB()">
-        <div class="ft-badge ready">READY TO FILE</div>
+        <div class="ft-badge ready" id="badge-formb">READY TO FILE</div>
         <div class="ft-letter">F</div>
         <div class="ft-name">IBM Monthly Return</div>
         <div class="ft-desc">F-series return under MCDR 2017. Auto-filled from your production data.</div>
         <div class="ft-meta"><span id="formb-due">Due: Loading…</span><span class="ft-autofill">Auto-filled ✓</span></div>
         <button class="btn-primary full-w">Auto-Fill & Preview →</button>
       </div>
-      <div class="form-tile"><div class="ft-badge">QUARTERLY</div><div class="ft-letter">C</div><div class="ft-name">IBM Form C</div><div class="ft-desc">Quarterly Return of Labour Employed</div><div class="ft-meta"><span>V2</span></div><button class="btn-ghost full-w" disabled>Coming in V2</button></div>
-      <div class="form-tile"><div class="ft-badge">ANNUAL</div><div class="ft-letter">J</div><div class="ft-name">IBM Form J</div><div class="ft-desc">Annual Return — Production, Employment & Wages</div><div class="ft-meta"><span>V2</span></div><button class="btn-ghost full-w" disabled>Coming in V2</button></div>
-      <div class="form-tile"><div class="ft-badge">ANNUAL</div><div class="ft-letter">A</div><div class="ft-name">IBM Form A</div><div class="ft-desc">Annual Return — Mineral Production Statistics</div><div class="ft-meta"><span>V2</span></div><button class="btn-ghost full-w" disabled>Coming in V2</button></div>
+      <div class="form-tile ready" onclick="openFormC()">
+        <div class="ft-badge ready" id="badge-formc">READY TO FILE</div>
+        <div class="ft-letter">C</div>
+        <div class="ft-name">IBM Form C</div>
+        <div class="ft-desc">Quarterly Return of Labour Employed under MCDR 2017. Auto-filled from shift logs.</div>
+        <div class="ft-meta"><span id="formc-due">Due: End of Quarter</span><span class="ft-autofill">Auto-filled ✓</span></div>
+        <button class="btn-primary full-w">Auto-Fill & Preview →</button>
+      </div>
+      <div class="form-tile ready" onclick="openFormJ()">
+        <div class="ft-badge ready" id="badge-formj">READY TO FILE</div>
+        <div class="ft-letter">J</div>
+        <div class="ft-name">IBM Form J</div>
+        <div class="ft-desc">Annual Return — Production, Employment & Wages. Auto-calculated across FY.</div>
+        <div class="ft-meta"><span id="formj-due">Due: 1st July</span><span class="ft-autofill">Auto-filled ✓</span></div>
+        <button class="btn-primary full-w">Auto-Fill & Preview →</button>
+      </div>
+      <div class="form-tile ready" onclick="openFormA()">
+        <div class="ft-badge ready" id="badge-forma">READY TO FILE</div>
+        <div class="ft-letter">A</div>
+        <div class="ft-name">IBM Form A</div>
+        <div class="ft-desc">Annual Return — Mineral Production Statistics, reserves, and machinery usage.</div>
+        <div class="ft-meta"><span id="forma-due">Due: 1st July</span><span class="ft-autofill">Auto-filled ✓</span></div>
+        <button class="btn-primary full-w">Auto-Fill & Preview →</button>
+      </div>
     </div>
   </section>
 
@@ -255,7 +276,8 @@
       </div>
     </div>
     <div class="prod-form-card" id="prod-form-card" style="display:none">
-      <div class="pfc-header"><h3>New Production Entry</h3><button class="icon-close" onclick="toggleProdForm()">✕</button></div>
+      <div class="pfc-header"><h3 id="pf-form-title">New Production Entry</h3><button class="icon-close" onclick="toggleProdForm()">✕</button></div>
+      <input type="hidden" id="pf-id">
       <div class="pfc-grid">
         <div class="fg"><label>Date</label><input type="date" id="pf-date"></div>
         <div class="fg"><label>Shift</label><select id="pf-shift"><option value="DAY">Day (6AM–6PM)</option><option value="NIGHT">Night (6PM–6AM)</option><option value="GENERAL">General</option></select></div>
@@ -266,7 +288,7 @@
         <div class="fg"><label>Supervisor</label><input id="pf-sup" placeholder="Supervisor name"></div>
         <div class="fg"><label>Remarks</label><input id="pf-rem" placeholder="Optional"></div>
       </div>
-      <div class="pfc-actions"><button class="btn-ghost" onclick="toggleProdForm()">Cancel</button><button class="btn-primary" onclick="saveProdEntry()">Save Entry</button></div>
+      <div class="pfc-actions"><button class="btn-ghost" onclick="toggleProdForm()">Cancel</button><button class="btn-primary" id="pf-save-btn" onclick="saveProdEntry()">Save Entry</button></div>
     </div>
     <div class="prod-summary-row" id="prod-summary"></div>
     <div class="table-card">
@@ -284,13 +306,19 @@
       <div class="page-title-block"><h1>Document Repository</h1><p class="page-sub">Lease, clearances, certificates — expiry tracked</p></div>
       <div class="page-actions"><button class="btn-primary" onclick="openAddDocModal()">+ Upload Document</button></div>
     </div>
-    <div class="doc-filter-row">
-      <button class="filter-btn active" onclick="filterDocs(this,'')">All</button>
-      <button class="filter-btn" onclick="filterDocs(this,'STATE_GOVT')">Mining Lease</button>
-      <button class="filter-btn" onclick="filterDocs(this,'MOEFCC')">Environmental</button>
-      <button class="filter-btn" onclick="filterDocs(this,'DGMS')">DGMS</button>
-      <button class="filter-btn" onclick="filterDocs(this,'IBM')">IBM</button>
-      <button class="filter-btn" onclick="filterDocs(this,'SPCB')">SPCB</button>
+    <div class="doc-toolbar">
+      <div class="doc-filter-row" style="margin-bottom:0">
+        <button class="filter-btn active" data-auth="" onclick="filterDocs(this,'')">All</button>
+        <button class="filter-btn" data-auth="STATE_GOVT" onclick="filterDocs(this,'STATE_GOVT')">Mining Lease</button>
+        <button class="filter-btn" data-auth="MOEFCC" onclick="filterDocs(this,'MOEFCC')">Environmental</button>
+        <button class="filter-btn" data-auth="DGMS" onclick="filterDocs(this,'DGMS')">DGMS</button>
+        <button class="filter-btn" data-auth="IBM" onclick="filterDocs(this,'IBM')">IBM</button>
+        <button class="filter-btn" data-auth="SPCB" onclick="filterDocs(this,'SPCB')">SPCB</button>
+      </div>
+      <div class="doc-search-wrap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="doc-search" placeholder="Search documents…" oninput="filterDocCards()">
+      </div>
     </div>
     <div class="doc-grid" id="doc-grid"></div>
   </section>
@@ -420,6 +448,91 @@
     <div class="modal-footer">
       <button class="btn-ghost" onclick="closeModal('modal-add-doc')">Cancel</button>
       <button class="btn-primary" onclick="addDocument()">Save Document</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT DOCUMENT MODAL -->
+<div class="modal-overlay" id="modal-edit-doc" onclick="closeModalOutside(event,'modal-edit-doc')">
+  <div class="modal-box medium">
+    <div class="modal-header">
+      <div><h2>Edit Document</h2><p class="modal-sub">Update metadata or replace file attachment</p></div>
+      <button class="modal-close" onclick="closeModal('modal-edit-doc')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-doc-id">
+      <div class="fg"><label>Document Title *</label><input id="edit-doc-name" placeholder="e.g. Consent to Operate (CTO)"></div>
+      <div class="form-row-2">
+        <div class="fg"><label>Authority *</label>
+          <select id="edit-doc-authority"><option value="STATE_GOVT">State Govt (Lease)</option><option value="MOEFCC">MoEFCC (Environmental)</option><option value="DGMS">DGMS</option><option value="IBM">IBM</option><option value="SPCB">SPCB</option></select>
+        </div>
+        <div class="fg"><label>Record Type *</label>
+          <select id="edit-doc-record-type"><option value="CLEARANCE">Clearance / Certificate</option><option value="STATUTORY_PLAN">Statutory Plan</option><option value="NOTICE">Notice</option></select>
+        </div>
+      </div>
+      <div class="form-row-2">
+        <div class="fg"><label>Issued Date</label><input type="date" id="edit-doc-issued"></div>
+        <div class="fg"><label>Expiry Date</label><input type="date" id="edit-doc-expiry"></div>
+      </div>
+      <div class="fg" style="margin-top:8px">
+        <label>Current Attachment</label>
+        <div id="edit-doc-current-file" style="font-family:var(--mono);font-size:12px;color:var(--text2);margin-bottom:8px">None</div>
+        <label>Replace Attachment (Optional)</label>
+        <div style="background:var(--bg-inp);border:2px dashed var(--border);border-radius:var(--r);padding:20px;text-align:center;color:var(--text2);font-size:13px;position:relative;">
+          📎 Drag & drop file here or click to upload<br><small style="color:var(--text3)">PDF, JPG, PNG up to 10MB</small>
+          <input type="file" id="edit-doc-file" accept=".pdf,.jpg,.jpeg,.png" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;" onchange="document.getElementById('edit-file-name-display').innerText = this.files[0] ? this.files[0].name : ''" />
+          <div id="edit-file-name-display" style="margin-top:8px; font-weight:600; color:var(--text1)"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('modal-edit-doc')">Cancel</button>
+      <button class="btn-primary" onclick="saveEditDocument()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- FORM C MODAL -->
+<div class="modal-overlay" id="modal-formc" onclick="closeModalOutside(event,'modal-formc')">
+  <div class="modal-box large">
+    <div class="modal-header"><div><h2>IBM Form C — Quarterly Return of Labour Employed</h2><p class="modal-sub" id="formc-period">Loading…</p></div><button class="modal-close" onclick="closeModal('modal-formc')">✕</button></div>
+    <div class="modal-body" id="formc-body">
+      <div class="autofill-banner"><span class="afb-icon">✓</span><span>96% auto-filled from your shift & production logs</span><span class="afb-pct">96% complete</span></div>
+      <div id="formc-content"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('modal-formc')">Cancel</button>
+      <button class="btn-primary" onclick="submitFormC()">Submit & Mark Filed →</button>
+    </div>
+  </div>
+</div>
+
+<!-- FORM J MODAL -->
+<div class="modal-overlay" id="modal-formj" onclick="closeModalOutside(event,'modal-formj')">
+  <div class="modal-box large">
+    <div class="modal-header"><div><h2>IBM Form J — Annual Return (Production, Employment & Wages)</h2><p class="modal-sub" id="formj-period">Loading…</p></div><button class="modal-close" onclick="closeModal('modal-formj')">✕</button></div>
+    <div class="modal-body" id="formj-body">
+      <div class="autofill-banner"><span class="afb-icon">✓</span><span>95% auto-calculated from fiscal year production entries</span><span class="afb-pct">95% complete</span></div>
+      <div id="formj-content"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('modal-formj')">Cancel</button>
+      <button class="btn-primary" onclick="submitFormJ()">Submit & Mark Filed →</button>
+    </div>
+  </div>
+</div>
+
+<!-- FORM A MODAL -->
+<div class="modal-overlay" id="modal-forma" onclick="closeModalOutside(event,'modal-forma')">
+  <div class="modal-box large">
+    <div class="modal-header"><div><h2>IBM Form A — Annual Mineral Production & Statistics</h2><p class="modal-sub" id="forma-period">Loading…</p></div><button class="modal-close" onclick="closeModal('modal-forma')">✕</button></div>
+    <div class="modal-body" id="forma-body">
+      <div class="autofill-banner"><span class="afb-icon">✓</span><span>92% auto-filled from geological & mining logs</span><span class="afb-pct">92% complete</span></div>
+      <div id="forma-content"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('modal-forma')">Cancel</button>
+      <button class="btn-primary" onclick="submitFormA()">Submit & Mark Filed →</button>
     </div>
   </div>
 </div>

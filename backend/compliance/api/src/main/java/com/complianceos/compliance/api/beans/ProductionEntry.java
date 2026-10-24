@@ -27,6 +27,8 @@ public class ProductionEntry extends BaseEntity {
   private String pitSection;
   private String mineralGrade;
   private double quantity;
+  private double quantityProduced;
+  private double quantityDispatched;
   private String supervisorName;
   private String remarks;
 
@@ -76,11 +78,33 @@ public class ProductionEntry extends BaseEntity {
   }
 
   public double getQuantity() {
-    return quantity;
+    return quantity > 0 ? quantity : quantityProduced;
   }
 
   public void setQuantity(double quantity) {
     this.quantity = quantity;
+    if (this.quantityProduced == 0) {
+      this.quantityProduced = quantity;
+    }
+  }
+
+  public double getQuantityProduced() {
+    return quantityProduced > 0 ? quantityProduced : quantity;
+  }
+
+  public void setQuantityProduced(double quantityProduced) {
+    this.quantityProduced = quantityProduced;
+    if (this.quantity == 0) {
+      this.quantity = quantityProduced;
+    }
+  }
+
+  public double getQuantityDispatched() {
+    return quantityDispatched;
+  }
+
+  public void setQuantityDispatched(double quantityDispatched) {
+    this.quantityDispatched = quantityDispatched;
   }
 
   public String getSupervisorName() {
