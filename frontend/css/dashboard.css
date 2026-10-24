@@ -466,3 +466,20 @@ body{font-family:var(--font);background:var(--bg0);color:var(--text0);display:fl
 .tbl-btn.danger:hover{background:var(--red-d);border-color:var(--red)}
 .form-tile.active-filing{border-color:var(--amber);cursor:pointer}
 .form-tile.active-filing:hover{border-color:var(--border-active);transform:translateY(-2px)}
+
+/* ── PER MT ROYALTY BANNER & CALCULATOR ── */
+.royalty-kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+.rk-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:15px 18px;display:flex;flex-direction:column;gap:5px;position:relative}
+.rk-card.highlight{border-color:var(--amber);background:linear-gradient(180deg, rgba(240,165,0,.08) 0%, var(--bg2) 100%)}
+.rk-label{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--text2)}
+.rk-val{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--text0);line-height:1.2}
+.rk-val.amber{color:var(--amber)}
+.rk-sub{font-size:11px;color:var(--text2);margin-top:2px}
+.rate-pill{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-family:var(--mono);font-weight:600;background:rgba(240,165,0,.15);color:var(--amber);border:1px solid rgba(240,165,0,.3);white-space:nowrap}
+.rate-pill.green{background:rgba(0,210,132,.12);color:var(--green);border-color:rgba(0,210,132,.3)}
+.calc-quick-box{background:var(--bg-inp);border:1px solid var(--border);border-radius:var(--r-sm);padding:14px;margin-top:16px}
+.calc-quick-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.calc-quick-header h4{font-size:12px;font-weight:600;color:var(--text1);font-family:var(--mono);text-transform:uppercase;margin:0}
+.calc-quick-inputs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+@media(max-width:1100px){.royalty-kpi-row{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:640px){.royalty-kpi-row{grid-template-columns:1fr}}

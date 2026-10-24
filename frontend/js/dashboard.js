@@ -630,23 +630,28 @@ async function openMarkSubmitted(recordId) {
 
 // ═══════════════════════════════════════════════════════════
 // ROYALTY — read-only; derived from production entries, recalculated server-side
-// whenever production changes. There is no manual input or save action any more.
+// whenever production changes. Displays Base Royalty Rate per MT and statutory breakdowns.
 // ═══════════════════════════════════════════════════════════
+const STATUTORY_BASE_RATES = {
+  LIMESTONE: { rate: 80,  unit: 'MT', schedule: 'MMDR Schedule II (Item 33)' },
+  IRON_ORE:  { rate: 520, unit: 'MT', schedule: 'MMDR Schedule II (Item 23 — 15% ASP)' },
+  COAL:      { rate: 350, unit: 'MT', schedule: 'MMDR Schedule II (Item 10 — 14% ASP)' },
+  BAUXITE:   { rate: 180, unit: 'MT', schedule: 'MMDR Schedule II (Item 6)' },
+  MANGANESE: { rate: 420, unit: 'MT', schedule: 'MMDR Schedule II (Item 35)' },
+  CHROMITE:  { rate: 650, unit: 'MT', schedule: 'MMDR Schedule II (Item 14)' },
+  DOLOMITE:  { rate: 75,  unit: 'MT', schedule: 'MMDR Schedule II (Item 18)' },
+  GRANITE:   { rate: 120, unit: 'MT', schedule: 'State Minor Mineral Rules' },
+};
+
+function getBaseRoyaltyRate(mineral) {
+  const m = (mineral || 'LIMESTONE').toUpperCase();
+  return STATUTORY_BASE_RATES[m] || { rate: 80, unit: 'MT', schedule: 'MMDR Schedule II' };
+}
+
 function computeEstimatedRoyalty(mine, dispatchedQty) {
   if (!dispatchedQty || dispatchedQty <= 0) return null;
-  const mineral = mine?.mineral || 'LIMESTONE';
-  // Statutory royalty schedule rates (MMDR Act 2nd Schedule)
-  const rates = {
-    LIMESTONE: 80,
-    IRON_ORE: 520,
-    COAL: 350,
-    BAUXITE: 180,
-    MANGANESE: 420,
-    CHROMITE: 650,
-    DOLOMITE: 75,
-    GRANITE: 120,
-  };
-  const ratePerTonne = rates[mineral] || 80;
+  const rateInfo = getBaseRoyaltyRate(mine?.mineral);
+  const ratePerTonne = rateInfo.rate;
   const baseAmount = Math.round(dispatchedQty * ratePerTonne * 100); // in paise
   const dmfRate = (mine?.leaseStartOn && mine.leaseStartOn >= Date.parse('2015-01-12T00:00:00Z')) ? 0.10 : 0.30;
   const dmfAmount = Math.round(baseAmount * dmfRate);
@@ -658,6 +663,7 @@ function computeEstimatedRoyalty(mine, dispatchedQty) {
     month: monthName,
     year: now.getFullYear(),
     quantity: dispatchedQty,
+    ratePerTonne,
     baseAmount,
     dmfAmount,
     nmetAmount,
@@ -665,9 +671,37 @@ function computeEstimatedRoyalty(mine, dispatchedQty) {
   };
 }
 
+function runQuickRoyaltyCalc() {
+  const qty = parseFloat(document.getElementById('quick-calc-tonnage')?.value) || 0;
+  const rate = parseFloat(document.getElementById('quick-calc-rate')?.value) || 0;
+  const mine = STATE.mines.find(m => m.id === STATE.mineId);
+  const dmfRate = (mine?.leaseStartOn && mine.leaseStartOn >= Date.parse('2015-01-12T00:00:00Z')) ? 0.10 : 0.30;
+  const nmetRate = 0.02;
+  const baseTotal = qty * rate;
+  const dmfTotal = baseTotal * dmfRate;
+  const nmetTotal = baseTotal * nmetRate;
+  const grossTotal = baseTotal + dmfTotal + nmetTotal;
+  const grossPerMT = qty > 0 ? (grossTotal / qty) : (rate * (1 + dmfRate + nmetRate));
+
+  const elBase = document.getElementById('qc-base');
+  if (elBase) elBase.textContent = '₹' + fmtINR(baseTotal);
+
+  const elCess = document.getElementById('qc-cess');
+  if (elCess) elCess.textContent = `₹${fmtINR(dmfTotal + nmetTotal)} (DMF ${Math.round(dmfRate*100)}% + NMET 2%)`;
+
+  const elTotal = document.getElementById('qc-total');
+  if (elTotal) elTotal.textContent = '₹' + fmtINR(grossTotal);
+
+  const elRate = document.getElementById('qc-per-mt-rate');
+  if (elRate) elRate.textContent = '₹' + grossPerMT.toFixed(2);
+}
+
 async function loadRoyalty() {
   if (!STATE.mineId) return;
   const mine = STATE.mines.find(m => m.id === STATE.mineId);
+  const rateInfo = getBaseRoyaltyRate(mine?.mineral);
+  let defaultBaseRate = rateInfo.rate;
+
   let result = [];
   try {
     result = await apiFetch(`/mines/${STATE.mineId}/royalty`);
@@ -680,7 +714,6 @@ async function loadRoyalty() {
 
   // If server has no period with a calculated gross liability, compute from production/dispatch entries
   if (!periods.length || !periods[0]?.grossLiability) {
-    // If STATE.prodData has entries, calculate from production log
     if (STATE.prodData && STATE.prodData.length) {
       const monthGroups = {};
       STATE.prodData.forEach(e => {
@@ -698,31 +731,121 @@ async function loadRoyalty() {
   }
 
   const current = periods[0];
+  const dmfPct = (mine?.leaseStartOn && mine.leaseStartOn >= Date.parse('2015-01-12T00:00:00Z')) ? 0.10 : 0.30;
+  const nmetPct = 0.02;
 
-  if (current && current.grossLiability) {
-    const pct = (part) => current.baseAmount ? ' (' + Math.round(part / current.baseAmount * 100) + '%)' : '';
-    document.getElementById('cc-period').textContent   = `${current.month} ${current.year}`;
-    document.getElementById('co-dmf-label').textContent = 'DMF' + pct(current.dmfAmount);
-    document.getElementById('co-nmet-label').textContent= 'NMET' + pct(current.nmetAmount);
-    document.getElementById('co-base').textContent     = '₹' + fmtINR(current.baseAmount/100);
-    document.getElementById('co-dmf').textContent      = '₹' + fmtINR(current.dmfAmount/100);
-    document.getElementById('co-nmet').textContent     = '₹' + fmtINR(current.nmetAmount/100);
-    document.getElementById('co-gross').textContent    = '₹' + fmtINR(current.grossLiability/100);
-  } else {
-    document.getElementById('cc-period').textContent = '—';
-    ['co-base','co-dmf','co-nmet','co-gross'].forEach(id => document.getElementById(id).textContent = '₹—');
+  let currentBaseRate = defaultBaseRate;
+  if (current && current.quantity > 0 && current.baseAmount > 0) {
+    currentBaseRate = (current.baseAmount / 100) / current.quantity;
+  }
+  const currentDmfRate = currentBaseRate * dmfPct;
+  const currentNmetRate = currentBaseRate * nmetPct;
+  const currentGrossRate = currentBaseRate + currentDmfRate + currentNmetRate;
+
+  // Update top KPI cards
+  const elBaseRate = document.getElementById('rk-base-rate');
+  if (elBaseRate) elBaseRate.textContent = `₹${currentBaseRate.toFixed(2)} / MT`;
+
+  const elGrossRate = document.getElementById('rk-gross-rate');
+  if (elGrossRate) elGrossRate.textContent = `₹${currentGrossRate.toFixed(2)} / MT`;
+
+  const elMinSub = document.getElementById('rk-mineral-sub');
+  if (elMinSub) elMinSub.textContent = `${mine?.mineral || 'Limestone'} · ${rateInfo.schedule}`;
+
+  const elEffSub = document.getElementById('rk-eff-sub');
+  if (elEffSub) elEffSub.textContent = `Base (₹${currentBaseRate.toFixed(0)}) + DMF ${Math.round(dmfPct*100)}% + NMET 2%`;
+
+  const elDispQty = document.getElementById('rk-dispatched-qty');
+  if (elDispQty) elDispQty.textContent = current?.quantity ? `${Number(current.quantity).toLocaleString('en-IN', { maximumFractionDigits: 1 })} MT` : '0 MT';
+
+  const elGrossTotal = document.getElementById('rk-gross-total');
+  if (elGrossTotal) elGrossTotal.textContent = current?.grossLiability ? `₹${fmtINR(current.grossLiability / 100)}` : '₹0';
+
+  // Update Quick Estimator inputs
+  const qcRateInput = document.getElementById('quick-calc-rate');
+  if (qcRateInput && !qcRateInput.dataset.touched) {
+    qcRateInput.value = currentBaseRate.toFixed(2);
+  }
+  const qcTonnageInput = document.getElementById('quick-calc-tonnage');
+  if (qcTonnageInput && !qcTonnageInput.dataset.touched && current?.quantity) {
+    qcTonnageInput.value = Math.round(current.quantity);
+  }
+  const qcBadge = document.getElementById('calc-mineral-badge');
+  if (qcBadge) qcBadge.textContent = `${mine?.mineral || 'Limestone'} @ ₹${currentBaseRate.toFixed(0)}/MT`;
+  runQuickRoyaltyCalc();
+
+  // Also update production entry form rate hint
+  const dispHint = document.getElementById('pf-disp-rate-hint');
+  if (dispHint) {
+    dispHint.textContent = `Statutory Base Royalty: ₹${currentBaseRate.toFixed(2)} / MT (${mine?.mineral || 'Limestone'}) · Effective Total: ₹${currentGrossRate.toFixed(2)} / MT`;
   }
 
-  document.getElementById('royalty-history-tbody').innerHTML = (periods.length && periods[0]?.grossLiability)
-    ? periods.map(r => `
-        <tr>
-          <td>${r.month} ${r.year}</td>
-          <td class="num-col">₹${fmtINR(r.baseAmount/100)}</td>
-          <td class="num-col">₹${fmtINR(r.dmfAmount/100)}</td>
-          <td class="num-col">₹${fmtINR(r.nmetAmount/100)}</td>
-          <td class="num-col">₹${fmtINR(r.grossLiability/100)}</td>
-        </tr>`).join('')
-    : '<tr><td colspan="5" style="color:var(--text2);padding:20px;text-align:center">No royalty calculated yet — add a production entry with dispatch to calculate royalty.</td></tr>';
+  // Update Computation Card
+  if (current && current.grossLiability) {
+    const pct = (part) => current.baseAmount ? ' (' + Math.round(part / current.baseAmount * 100) + '%)' : '';
+    document.getElementById('cc-period').textContent = `${current.month} ${current.year}`;
+    const pill = document.getElementById('co-rate-pill');
+    if (pill) pill.textContent = `₹${currentBaseRate.toFixed(2)} / MT Base Rate`;
+
+    const ms = document.getElementById('co-mineral-schedule');
+    if (ms) ms.textContent = `${mine?.mineral || 'Limestone'} (${rateInfo.schedule})`;
+
+    const qty = document.getElementById('co-qty');
+    if (qty) qty.textContent = `${Number(current.quantity || 0).toLocaleString('en-IN', { maximumFractionDigits: 1 })} MT`;
+
+    const bd = document.getElementById('co-base-detail');
+    if (bd) bd.textContent = `Rate: ₹${currentBaseRate.toFixed(2)} / MT × ${Number(current.quantity || 0).toLocaleString('en-IN', { maximumFractionDigits: 1 })} MT`;
+
+    const dd = document.getElementById('co-dmf-detail');
+    if (dd) dd.textContent = `Rate: ₹${currentDmfRate.toFixed(2)} / MT (${Math.round(dmfPct*100)}% of Base)`;
+
+    const nd = document.getElementById('co-nmet-detail');
+    if (nd) nd.textContent = `Rate: ₹${currentNmetRate.toFixed(2)} / MT (2% of Base)`;
+
+    const gd = document.getElementById('co-gross-rate-detail');
+    if (gd) gd.textContent = `Total Effective Liability: ₹${currentGrossRate.toFixed(2)} / MT`;
+
+    document.getElementById('co-dmf-label').textContent = 'District Mineral Foundation (DMF)' + pct(current.dmfAmount);
+    document.getElementById('co-nmet-label').textContent = 'National Mineral Exploration Trust (NMET)' + pct(current.nmetAmount);
+    document.getElementById('co-base').textContent = '₹' + fmtINR(current.baseAmount/100);
+    document.getElementById('co-dmf').textContent = '₹' + fmtINR(current.dmfAmount/100);
+    document.getElementById('co-nmet').textContent = '₹' + fmtINR(current.nmetAmount/100);
+    document.getElementById('co-gross').textContent = '₹' + fmtINR(current.grossLiability/100);
+  } else {
+    document.getElementById('cc-period').textContent = '—';
+    const pill = document.getElementById('co-rate-pill');
+    if (pill) pill.textContent = `₹${currentBaseRate.toFixed(2)} / MT Base Rate`;
+    const ms = document.getElementById('co-mineral-schedule');
+    if (ms) ms.textContent = `${mine?.mineral || 'Limestone'} (${rateInfo.schedule})`;
+    const qty = document.getElementById('co-qty');
+    if (qty) qty.textContent = '0 MT';
+    ['co-base','co-dmf','co-nmet','co-gross'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = '₹0';
+    });
+  }
+
+  // Update History Table with per-MT rates
+  const histTbody = document.getElementById('royalty-history-tbody');
+  if (histTbody) {
+    histTbody.innerHTML = (periods.length && periods[0]?.grossLiability)
+      ? periods.map(r => {
+          const rowBaseRate = (r.quantity > 0 && r.baseAmount > 0) ? (r.baseAmount / 100 / r.quantity) : currentBaseRate;
+          const rowGrossRate = (r.quantity > 0 && r.grossLiability > 0) ? (r.grossLiability / 100 / r.quantity) : currentGrossRate;
+          return `
+          <tr>
+            <td><strong>${r.month} ${r.year}</strong></td>
+            <td class="num-col">${Number(r.quantity || 0).toLocaleString('en-IN', { maximumFractionDigits: 1 })} MT</td>
+            <td class="num-col"><span class="rate-pill">₹${rowBaseRate.toFixed(2)}/MT</span></td>
+            <td class="num-col">₹${fmtINR(r.baseAmount/100)}</td>
+            <td class="num-col">₹${fmtINR(r.dmfAmount/100)}</td>
+            <td class="num-col">₹${fmtINR(r.nmetAmount/100)}</td>
+            <td class="num-col"><span class="rate-pill green">₹${rowGrossRate.toFixed(2)}/MT</span></td>
+            <td class="num-col"><strong>₹${fmtINR(r.grossLiability/100)}</strong></td>
+          </tr>`;
+        }).join('')
+      : `<tr><td colspan="8" style="color:var(--text2);padding:20px;text-align:center">No royalty calculated yet — base rate is <strong>₹${currentBaseRate.toFixed(2)} / MT</strong>. Log a dispatch in Production to see calculations.</td></tr>`;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -733,6 +856,12 @@ function initProduction() {
   if (monthEl && !monthEl.value) monthEl.value = new Date().toISOString().slice(0,7);
   const dateEl = document.getElementById('pf-date');
   if (dateEl && !dateEl.value) dateEl.value = new Date().toISOString().slice(0,10);
+  const mine = STATE.mines.find(m => m.id === STATE.mineId);
+  const rateInfo = getBaseRoyaltyRate(mine?.mineral);
+  const hint = document.getElementById('pf-disp-rate-hint');
+  if (hint) {
+    hint.textContent = `Statutory Base Royalty: ₹${rateInfo.rate.toFixed(2)} / MT (${mine?.mineral || 'Limestone'})`;
+  }
   loadProduction();
 }
 
