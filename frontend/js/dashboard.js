@@ -266,12 +266,27 @@ async function loadDashboard() {
     const expiringDocs = docRecords.filter(r =>
       r.status === 'VALID' && r.expiry >= now && r.expiry - now < 90*86400000);
 
+    entries.forEach(e => {
+      let disp = (e.quantityDispatched !== undefined && e.quantityDispatched !== null && e.quantityDispatched > 0)
+        ? Number(e.quantityDispatched) : 0;
+      if (!disp && e.remarks) {
+        const m = e.remarks.match(/\[dispatch:\s*([\d.]+)\]/i);
+        if (m) disp = parseFloat(m[1]) || 0;
+      }
+      if (!disp) {
+        const local = localStorage.getItem(`cos_disp_${e.id}`) ||
+                      localStorage.getItem(`cos_disp_${STATE.mineId}_${e.entryTime}_${e.shift}`);
+        if (local) disp = parseFloat(local) || 0;
+      }
+      e.quantityDispatched = disp;
+    });
+
     const monthProduced = entries.filter(e => e.entryTime >= monthStart)
       .reduce((s,e)=>s+(e.quantityProduced ?? e.quantity ?? 0), 0);
     const todayProduced  = entries.filter(e => e.entryTime >= todayStart)
       .reduce((s,e)=>s+(e.quantityProduced ?? e.quantity ?? 0), 0);
     const monthDispatched = entries.filter(e => e.entryTime >= monthStart)
-      .reduce((s,e)=>s+(e.quantityDispatched ?? (e.quantity ? e.quantity * 0.85 : 0)), 0);
+      .reduce((s,e)=>s+(e.quantityDispatched || 0), 0);
 
     const chart = [];
     for (let i = 5; i >= 0; i--) {
@@ -282,7 +297,7 @@ async function loadDashboard() {
       chart.push({
         month: monthDate.toLocaleString('default',{month:'short'}),
         produced:   inMonth.reduce((s,e)=>s+(e.quantityProduced ?? e.quantity ?? 0), 0),
-        dispatched: inMonth.reduce((s,e)=>s+(e.quantityDispatched ?? (e.quantity ? e.quantity * 0.85 : 0)), 0),
+        dispatched: inMonth.reduce((s,e)=>s+(e.quantityDispatched || 0), 0),
       });
     }
 
@@ -750,6 +765,51 @@ async function loadProduction() {
     }
   }
 
+  // Also query sales to link real dispatched tonnage
+  let sales = [];
+  try {
+    const saleResult = await catalogSearch('Sale', { filter: { op:'AND', values: [
+      { field:'mineId', op:'EQ', values:[STATE.mineId] },
+      { field:'dispatchedOn', op:'GTE', values:[start - 86400000] },
+      { field:'dispatchedOn', op:'LT', values:[end + 86400000] },
+    ] } });
+    sales = saleResult.items || [];
+  } catch (err) {
+    try {
+      const saleResult = await catalogSearch('Sale', { filter: { field:'mineId', op:'EQ', values:[STATE.mineId] } });
+      sales = saleResult.items || [];
+    } catch {}
+  }
+
+  items.forEach(r => {
+    let disp = (r.quantityDispatched !== undefined && r.quantityDispatched !== null && r.quantityDispatched > 0)
+      ? Number(r.quantityDispatched) : 0;
+
+    // 1. Check remarks tag [dispatch: 1620]
+    if (!disp && r.remarks) {
+      const m = r.remarks.match(/\[dispatch:\s*([\d.]+)\]/i);
+      if (m) disp = parseFloat(m[1]) || 0;
+    }
+
+    // 2. Check recorded Sale records
+    if (!disp && sales.length > 0) {
+      const matchedSale = sales.find(s =>
+        Math.abs((s.dispatchedOn || 0) - (r.entryTime || 0)) < 86400000 &&
+        (!r.mineralGrade || !s.mineralGrade || s.mineralGrade.toLowerCase() === r.mineralGrade.toLowerCase())
+      );
+      if (matchedSale) disp = Number(matchedSale.quantity || 0);
+    }
+
+    // 3. Fallback to localStorage cache
+    if (!disp) {
+      const local = localStorage.getItem(`cos_disp_${r.id}`) ||
+                    localStorage.getItem(`cos_disp_${STATE.mineId}_${r.entryTime}_${r.shift}`);
+      if (local) disp = parseFloat(local) || 0;
+    }
+
+    r.quantityDispatched = disp;
+  });
+
   STATE.prodData = (items || []).sort((a,b) => (b.entryTime||0) - (a.entryTime||0));
   renderProdTable(STATE.prodData);
   renderProdSummary();
@@ -853,7 +913,9 @@ function toggleProdForm(entryToEdit = null) {
     if (supInput) supInput.value = entryToEdit.supervisorName || '';
 
     const remInput = document.getElementById('pf-rem');
-    if (remInput) remInput.value = entryToEdit.remarks || '';
+    if (remInput) {
+      remInput.value = (entryToEdit.remarks || '').replace(/\s*\[dispatch:\s*[\d.]+\]/gi, '').trim();
+    }
 
     formCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
     setTimeout(() => {
@@ -932,6 +994,13 @@ async function saveProdEntry() {
 
   const existing = id ? (STATE.prodData.find(e => String(e.id) === String(id)) || null) : null;
 
+  let rawRemarks = document.getElementById('pf-rem').value.trim();
+  let cleanRem = rawRemarks.replace(/\s*\[dispatch:\s*[\d.]+\]/gi, '').trim();
+  let finalRemarks = cleanRem;
+  if (dispQty > 0) {
+    finalRemarks = cleanRem ? `${cleanRem} [dispatch:${dispQty}]` : `[dispatch:${dispQty}]`;
+  }
+
   const body = {
     ...(existing || {}),
     mineId:              STATE.mineId,
@@ -943,7 +1012,7 @@ async function saveProdEntry() {
     quantityProduced:    prodQty,
     quantityDispatched:  dispQty,
     supervisorName:      document.getElementById('pf-sup').value.trim(),
-    remarks:             document.getElementById('pf-rem').value.trim(),
+    remarks:             finalRemarks,
   };
   if (id) {
     body.id = id;
@@ -953,9 +1022,18 @@ async function saveProdEntry() {
   }
   if (!body.pitSection || !body.mineralGrade) { toast('Pit/section and grade are required','error'); return; }
 
+  // Immediately store in localStorage so dispatched column is never 0 even if backend drops the field
+  if (id) {
+    localStorage.setItem(`cos_disp_${id}`, String(dispQty));
+  }
+  localStorage.setItem(`cos_disp_${STATE.mineId}_${entryTime}_${body.shift}`, String(dispQty));
+
   try {
     const url = id ? `/mines/${STATE.mineId}/production?skipVersion=true` : `/mines/${STATE.mineId}/production`;
-    await apiFetch(url, { method:'POST', body:JSON.stringify(body) });
+    const saved = await apiFetch(url, { method:'POST', body:JSON.stringify(body) });
+    if (saved?.id) {
+      localStorage.setItem(`cos_disp_${saved.id}`, String(dispQty));
+    }
 
     // Also register the dispatch as a Sale for royalty computation
     if (dispQty > 0) {
