@@ -813,24 +813,69 @@ function toggleProdForm(entryToEdit = null) {
   const idInput = document.getElementById('pf-id');
   const titleEl = document.getElementById('pf-form-title');
   const saveBtn = document.getElementById('pf-save-btn');
+  if (!formCard) return;
 
   if (entryToEdit) {
     prodFormVisible = true;
     formCard.style.display = 'block';
-    if (idInput) idInput.value = entryToEdit.id;
+    if (idInput) idInput.value = entryToEdit.id || '';
     if (titleEl) titleEl.textContent = 'Edit Production Entry';
     if (saveBtn) saveBtn.textContent = 'Update Entry';
 
-    const d = new Date(entryToEdit.entryTime);
-    document.getElementById('pf-date').value = d.toISOString().slice(0, 10);
-    document.getElementById('pf-shift').value = entryToEdit.shift || 'DAY';
-    document.getElementById('pf-pit').value = entryToEdit.pitSection || '';
-    document.getElementById('pf-grade').value = entryToEdit.mineralGrade || '';
-    document.getElementById('pf-prod').value = entryToEdit.quantityProduced ?? entryToEdit.quantity ?? '';
-    document.getElementById('pf-disp').value = entryToEdit.quantityDispatched ?? '';
-    document.getElementById('pf-sup').value = entryToEdit.supervisorName || '';
-    document.getElementById('pf-rem').value = entryToEdit.remarks || '';
-    formCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    let dateVal = '';
+    if (entryToEdit.entryTime) {
+      const d = new Date(entryToEdit.entryTime);
+      if (!isNaN(d.getTime())) {
+        dateVal = d.toISOString().slice(0, 10);
+      }
+    }
+    if (!dateVal) dateVal = new Date().toISOString().slice(0, 10);
+
+    const dateInput = document.getElementById('pf-date');
+    if (dateInput) dateInput.value = dateVal;
+
+    const shiftInput = document.getElementById('pf-shift');
+    if (shiftInput) shiftInput.value = (entryToEdit.shift || 'DAY').toUpperCase();
+
+    const pitInput = document.getElementById('pf-pit');
+    if (pitInput) pitInput.value = entryToEdit.pitSection || '';
+
+    const gradeInput = document.getElementById('pf-grade');
+    if (gradeInput) gradeInput.value = entryToEdit.mineralGrade || '';
+
+    const prodInput = document.getElementById('pf-prod');
+    if (prodInput) prodInput.value = entryToEdit.quantityProduced ?? entryToEdit.quantity ?? '';
+
+    const dispInput = document.getElementById('pf-disp');
+    if (dispInput) dispInput.value = entryToEdit.quantityDispatched ?? '';
+
+    const supInput = document.getElementById('pf-sup');
+    if (supInput) supInput.value = entryToEdit.supervisorName || '';
+
+    const remInput = document.getElementById('pf-rem');
+    if (remInput) remInput.value = entryToEdit.remarks || '';
+
+    formCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => {
+      document.getElementById('pf-prod')?.focus();
+    }, 200);
+    return;
+  }
+
+  // If clicked "+ New Entry" while currently editing, switch to New Entry mode instead of toggling off
+  if (prodFormVisible && idInput && idInput.value) {
+    idInput.value = '';
+    if (titleEl) titleEl.textContent = 'New Production Entry';
+    if (saveBtn) saveBtn.textContent = 'Save Entry';
+    document.getElementById('pf-date').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('pf-shift').value = 'DAY';
+    document.getElementById('pf-pit').value = '';
+    document.getElementById('pf-grade').value = '';
+    document.getElementById('pf-prod').value = '';
+    document.getElementById('pf-disp').value = '';
+    document.getElementById('pf-sup').value = '';
+    document.getElementById('pf-rem').value = '';
+    formCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }
 
@@ -842,6 +887,7 @@ function toggleProdForm(entryToEdit = null) {
     if (titleEl) titleEl.textContent = 'New Production Entry';
     if (saveBtn) saveBtn.textContent = 'Save Entry';
     document.getElementById('pf-date').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('pf-shift').value = 'DAY';
     document.getElementById('pf-pit').value = '';
     document.getElementById('pf-grade').value = '';
     document.getElementById('pf-prod').value = '';
@@ -852,8 +898,11 @@ function toggleProdForm(entryToEdit = null) {
 }
 
 function editProdEntry(id) {
-  const entry = STATE.prodData.find(e => e.id === id);
-  if (!entry) { toast('Entry not found', 'error'); return; }
+  const entry = STATE.prodData.find(e => String(e.id) === String(id));
+  if (!entry) {
+    toast('Entry not found in current view', 'error');
+    return;
+  }
   toggleProdForm(entry);
 }
 
@@ -872,7 +921,8 @@ async function deleteProdEntry(id) {
 
 async function saveProdEntry() {
   if (!STATE.mineId) { toast('Select a mine first','error'); return; }
-  const id = document.getElementById('pf-id')?.value || null;
+  const idInput = document.getElementById('pf-id');
+  const id = idInput?.value || null;
   const dateVal = document.getElementById('pf-date').value;
   if (!dateVal) { toast('Date is required', 'error'); return; }
 
@@ -880,7 +930,11 @@ async function saveProdEntry() {
   const dispQty = parseFloat(document.getElementById('pf-disp').value) || 0;
   const entryTime = Date.parse(dateVal + 'T00:00:00Z');
 
+  const existing = id ? (STATE.prodData.find(e => String(e.id) === String(id)) || null) : null;
+
   const body = {
+    ...(existing || {}),
+    mineId:              STATE.mineId,
     entryTime,
     shift:               document.getElementById('pf-shift').value,
     pitSection:          document.getElementById('pf-pit').value.trim(),
@@ -891,16 +945,22 @@ async function saveProdEntry() {
     supervisorName:      document.getElementById('pf-sup').value.trim(),
     remarks:             document.getElementById('pf-rem').value.trim(),
   };
-  if (id) body.id = id;
+  if (id) {
+    body.id = id;
+    if (existing && existing.version !== undefined) {
+      body.version = existing.version;
+    }
+  }
   if (!body.pitSection || !body.mineralGrade) { toast('Pit/section and grade are required','error'); return; }
 
   try {
-    await apiFetch(`/mines/${STATE.mineId}/production`, { method:'POST', body:JSON.stringify(body) });
+    const url = id ? `/mines/${STATE.mineId}/production?skipVersion=true` : `/mines/${STATE.mineId}/production`;
+    await apiFetch(url, { method:'POST', body:JSON.stringify(body) });
 
     // Also register the dispatch as a Sale for royalty computation
     if (dispQty > 0) {
       try {
-        await apiFetch(`/mines/${STATE.mineId}/sales`, {
+        await apiFetch(`/mines/${STATE.mineId}/sales?skipVersion=true`, {
           method: 'POST',
           body: JSON.stringify({
             dispatchedOn: entryTime,
@@ -933,14 +993,15 @@ async function saveProdEntry() {
 }
 
 async function verifyEntry(id) {
-  const entry = (await catalogSearch('ProductionEntry', { filter: { field:'id', op:'EQ', values:[id] } })).items?.[0];
+  const entry = (await catalogSearch('ProductionEntry', { filter: { field:'id', op:'EQ', values:[id] } })).items?.[0]
+    || STATE.prodData.find(e => String(e.id) === String(id));
   if (!entry) { toast('Entry not found', 'error'); return; }
   try {
-    await apiFetch(`/mines/${STATE.mineId}/production`, {
+    await apiFetch(`/mines/${STATE.mineId}/production?skipVersion=true`, {
       method:'POST', body:JSON.stringify({ ...entry, status:'VERIFIED' }),
     });
     toast('Entry verified','success');
-    loadProduction();
+    await loadProduction();
   } catch (err) {
     toast(err.message || 'Failed to verify', 'error');
   }
