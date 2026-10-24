@@ -483,3 +483,19 @@ body{font-family:var(--font);background:var(--bg0);color:var(--text0);display:fl
 .calc-quick-inputs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
 @media(max-width:1100px){.royalty-kpi-row{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:640px){.royalty-kpi-row{grid-template-columns:1fr}}
+
+/* ── LEASE DELETION STYLES ── */
+.mine-opt-info{flex:1;min-width:0;overflow:hidden}
+.mine-opt-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px}
+.mine-del-icon-btn{background:none;border:none;cursor:pointer;opacity:0.35;padding:4px 6px;border-radius:var(--r-sm);font-size:12px;color:var(--text2);transition:all .15s;flex-shrink:0}
+.mine-del-icon-btn:hover{opacity:1;background:var(--red-d);color:var(--red)}
+.btn-ghost.danger{color:var(--red);border-color:rgba(255,77,77,.3)}
+.btn-ghost.danger:hover{background:var(--red-d);border-color:var(--red);color:var(--red)}
+
+/* ── LIVE STATUTORY RATE SYNC & BANNER ── */
+.live-sync-indicator{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;background:rgba(0,210,132,.1);border:1px solid rgba(0,210,132,.3);border-radius:20px;font-family:var(--mono);font-size:11px;color:var(--green)}
+.live-pulse-dot{width:7px;height:7px;background:var(--green);border-radius:50%;box-shadow:0 0 6px var(--green);animation:pulse 2s infinite;flex-shrink:0}
+.rate-source-banner{display:flex;align-items:center;justify-content:space-between;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:10px 16px;margin-bottom:16px;flex-wrap:wrap;gap:8px}
+.gov-badge{background:rgba(240,165,0,.15);color:var(--amber);border:1px solid rgba(240,165,0,.3);padding:2px 7px;border-radius:4px;font-family:var(--mono);font-size:10px;font-weight:600;text-transform:uppercase}
+.sync-spin{display:inline-block;animation:spin 1s linear infinite}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}

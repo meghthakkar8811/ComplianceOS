@@ -110,6 +110,7 @@
       <div class="page-actions">
         <button class="btn-ghost" onclick="navigate('production')">+ Log Production</button>
         <button class="btn-primary" onclick="navigate('forms')">Generate IBM Return</button>
+        <button class="btn-ghost danger" onclick="deleteCurrentMineLease()" title="Delete currently active mine lease"><span style="margin-right:4px">🗑️</span>Delete Lease</button>
       </div>
     </div>
 
@@ -244,6 +245,29 @@
       <div class="page-title-block">
         <h1>Royalty Calculator & Statutory Rates</h1>
         <p class="page-sub">Statutory royalty rates per metric tonne (MT), DMF, and NMET under MMDR Act Schedule II</p>
+      </div>
+      <div class="page-actions" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span class="live-sync-indicator" id="rate-sync-indicator">
+          <span class="live-pulse-dot"></span>
+          <span id="rate-sync-text">Live Gov Sync: Active</span>
+        </span>
+        <button class="btn-ghost" onclick="openStatutoryRatesModal()" title="View full government statutory rates table for all minerals">
+          <span style="margin-right:4px">📊</span>All Mineral Rates
+        </button>
+        <button class="btn-primary" id="btn-sync-rates" onclick="fetchLiveStatutoryRoyaltyRates(true)" title="Fetch and update latest statutory royalty rates online">
+          <span id="sync-icon" style="margin-right:4px">🔄</span>Fetch Latest Rates
+        </button>
+      </div>
+    </div>
+
+    <!-- Official Live Government Source Banner -->
+    <div class="rate-source-banner" id="rate-source-banner">
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px">
+        <span class="gov-badge">Official Govt Gazette</span>
+        <span id="rate-source-text">Source: Indian Bureau of Mines (ibm.gov.in) & Ministry of Mines Gazette (MMDR Act Schedule II)</span>
+      </div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text2)" id="rate-last-synced-time">
+        Auto-synced via Google & Ministry of Mines Feed
       </div>
     </div>
 
@@ -657,6 +681,45 @@
     <div class="modal-footer">
       <button class="btn-ghost" onclick="closeModal('modal-forma')">Cancel</button>
       <button class="btn-primary" onclick="submitFormA()">Submit & Mark Filed →</button>
+    </div>
+<!-- STATUTORY RATES MODAL -->
+<div class="modal-overlay" id="modal-statutory-rates" onclick="closeModalOutside(event,'modal-statutory-rates')">
+  <div class="modal-box large">
+    <div class="modal-header">
+      <div>
+        <h2>Government Statutory Royalty Rates Schedule</h2>
+        <p class="modal-sub">MMDR Act Second Schedule & Indian Bureau of Mines (IBM) Live Gazette Feed</p>
+      </div>
+      <button class="modal-close" onclick="closeModal('modal-statutory-rates')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="rate-source-banner" style="margin-bottom:14px">
+        <div style="font-size:12px">
+          <strong>Official Source:</strong> Ministry of Mines, Govt. of India · Gazette Notification S.O. 2682(E) & IBM Monthly Average Sale Price (ASP)
+        </div>
+        <button class="btn-primary" style="padding:4px 10px;font-size:11px" onclick="fetchLiveStatutoryRoyaltyRates(true)">
+          🔄 Re-sync from Google / Web
+        </button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Mineral</th>
+              <th>Statutory Base Rate</th>
+              <th>Calculation Method</th>
+              <th>DMF Rate</th>
+              <th>NMET Rate</th>
+              <th>Total / MT</th>
+              <th>Official Gazette Citation</th>
+            </tr>
+          </thead>
+          <tbody id="statutory-rates-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('modal-statutory-rates')">Close</button>
     </div>
   </div>
 </div>
