@@ -355,8 +355,36 @@ async function loadDashboard() {
     const docsScore = docRecords.length === 0 ? 100 : Math.max(0, Math.round((1 - expiredDocs.length / docRecords.length) * 100));
     const overall   = Math.round((ibmScore + dgmsScore + docsScore) / 3);
 
-    const royaltyCurrent = (royalties.items || []).slice()
+    const rateInfo = getBaseRoyaltyRate(mine?.mineral);
+    const defaultBaseRate = rateInfo.rate;
+    const dmfPct = (mine?.leaseStartOn && mine.leaseStartOn >= Date.parse('2015-01-12T00:00:00Z')) ? 0.10 : 0.30;
+    const nmetPct = 0.02;
+
+    const royaltyList = Array.isArray(royalties) ? royalties : (royalties?.items || []);
+    let royaltyCurrent = royaltyList.slice()
       .sort((a,b) => (b.year*12+MONTH_INDEX[b.month]) - (a.year*12+MONTH_INDEX[a.month]))[0] || null;
+
+    const monthDispatchedFromSales = sales.filter(s => s.dispatchedOn >= monthStart).reduce((s, sale) => s + (sale.quantity || 0), 0);
+    const monthDispatchedFromEntries = entries.filter(e => e.entryTime >= monthStart).reduce((s, e) => s + (e.quantityDispatched || 0), 0);
+    const totalMonthDispatched = Math.max(monthDispatchedFromSales, monthDispatchedFromEntries);
+
+    if ((!royaltyCurrent || !royaltyCurrent.grossLiability) && totalMonthDispatched > 0) {
+      const baseAmount = Math.round(totalMonthDispatched * defaultBaseRate * 100);
+      const dmfAmount = Math.round(baseAmount * dmfPct);
+      const nmetAmount = Math.round(baseAmount * nmetPct);
+      const grossLiability = baseAmount + dmfAmount + nmetAmount;
+      const monthNames = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+      const curMonthName = monthNames[new Date().getMonth()];
+      royaltyCurrent = {
+        month: curMonthName,
+        year: new Date().getFullYear(),
+        quantity: totalMonthDispatched,
+        baseAmount,
+        dmfAmount,
+        nmetAmount,
+        grossLiability,
+      };
+    }
 
     const deadlines = pendingFilings.slice().sort((a,b) => a.expiry - b.expiry).map(r => ({
       title: r.title, authority: r.authority, due_date: new Date(r.expiry).toISOString(),
@@ -854,11 +882,52 @@ async function loadRoyalty() {
   } catch (err) {
     console.warn('Royalty endpoint call failed, will use production log fallback:', err);
   }
-  const periods = (result.items || []).slice()
+  const royaltyList = Array.isArray(result) ? result : (result?.items || []);
+  let periods = royaltyList.slice()
     .sort((a,b) => (b.year*12+MONTH_INDEX[b.month]) - (a.year*12+MONTH_INDEX[a.month]));
-  const current = periods[0];
+  let current = periods[0];
   const dmfPct = (mine?.leaseStartOn && mine.leaseStartOn >= Date.parse('2015-01-12T00:00:00Z')) ? 0.10 : 0.30;
   const nmetPct = 0.02;
+
+  // Fallback calculation if current period royalty is missing or zero
+  if (!current || !current.grossLiability) {
+    let sales = STATE.saleData || [];
+    let prods = STATE.prodData || [];
+    if (!sales.length && !prods.length) {
+      try {
+        const [sr, pr] = await Promise.all([
+          catalogSearch('Sale', { filter: { op:'EQ', values:[{ field:'mineId', op:'EQ', values:[STATE.mineId] }] } }),
+          catalogSearch('ProductionEntry', { filter: { op:'EQ', values:[{ field:'mineId', op:'EQ', values:[STATE.mineId] }] } })
+        ]);
+        sales = sr.items || [];
+        prods = pr.items || [];
+      } catch (e) {
+        console.warn('Fallback sales search note:', e);
+      }
+    }
+    const totalSalesQty = (sales || []).reduce((s, x) => s + (x.quantity || 0), 0);
+    const totalProdDisp = (prods || []).reduce((s, x) => s + (x.quantityDispatched || 0), 0);
+    const dispQty = Math.max(totalSalesQty, totalProdDisp);
+
+    if (dispQty > 0) {
+      const baseAmt = Math.round(dispQty * defaultBaseRate * 100);
+      const dmfAmt = Math.round(baseAmt * dmfPct);
+      const nmetAmt = Math.round(baseAmt * nmetPct);
+      const gross = baseAmt + dmfAmt + nmetAmt;
+      const monthNames = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+      const curMonthName = monthNames[new Date().getMonth()];
+      current = {
+        month: curMonthName,
+        year: new Date().getFullYear(),
+        quantity: dispQty,
+        baseAmount: baseAmt,
+        dmfAmount: dmfAmt,
+        nmetAmount: nmetAmt,
+        grossLiability: gross,
+      };
+      periods = [current, ...periods.filter(p => !(p.month === curMonthName && p.year === new Date().getFullYear()))];
+    }
+  }
 
   let currentBaseRate = defaultBaseRate;
   if (current && current.quantity > 0 && current.baseAmount > 0) {
