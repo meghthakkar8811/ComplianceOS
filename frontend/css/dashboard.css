@@ -194,7 +194,7 @@ body{font-family:var(--font);background:var(--bg0);color:var(--text0);display:fl
 .action-card-placeholder{color:var(--text2);font-size:12px;font-family:var(--mono)}
 
 /* ── KPI GRID ── */
-.kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
 .kpi-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px;display:flex;align-items:flex-start;gap:12px;cursor:pointer;transition:all .15s}
 .kpi-card:hover{border-color:var(--border-active);transform:translateY(-1px)}
 .kpi-icon-wrap{width:34px;height:34px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;flex-shrink:0}

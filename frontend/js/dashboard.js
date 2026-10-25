@@ -444,7 +444,8 @@ async function loadDashboard() {
   document.getElementById('kpi-filings').textContent    = d.kpis.pending_filings;
   document.getElementById('kpi-filings-sub').textContent= `${d.kpis.overdue_filings} overdue`;
   document.getElementById('kpi-filings-sub').className  = 'kpi-change ' + (d.kpis.overdue_filings > 0 ? 'down' : 'neutral');
-  document.getElementById('kpi-docs').textContent       = d.kpis.expiring_documents;
+  const kpiDocs = document.getElementById('kpi-docs');
+  if (kpiDocs) kpiDocs.textContent = d.kpis.expiring_documents;
 
   // Alert badge
   refreshAlertBadge(d.kpis.overdue_filings + d.kpis.expired_documents + (d.dgms.overall_score < 60 ? 1 : 0));
