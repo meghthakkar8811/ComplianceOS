@@ -441,4 +441,61 @@ body{font-family:var(--font);background:var(--bg0);color:var(--text0);display:fl
 @media(max-width:1280px){.kpi-grid{grid-template-columns:repeat(3,1fr)}.forms-grid{grid-template-columns:repeat(2,1fr)}.dashboard-grid{grid-template-columns:repeat(2,1fr)}.span-2{grid-column:span 2}}
 @media(max-width:1024px){.royalty-layout,.dgms-layout{grid-template-columns:1fr}.doc-grid{grid-template-columns:repeat(2,1fr)}.pfc-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:900px){.sidebar{transform:translateX(-100%)}.sidebar.open{transform:translateX(0);box-shadow:10px 0 30px rgba(0,0,0,.5)}.main{margin-left:0}.hamburger{display:flex}.health-hero{grid-template-columns:1fr}.dashboard-grid{grid-template-columns:1fr}.span-2{grid-column:span 1}.kpi-grid{grid-template-columns:repeat(2,1fr)}.forms-grid{grid-template-columns:1fr}}
-@media(max-width:600px){.page{padding:14px}.page-header{flex-direction:column}.kpi-grid{grid-template-columns:1fr 1fr}.doc-grid{grid-template-columns:1fr}.pfc-grid{grid-template-columns:1fr}.health-left{flex-direction:column}.fs-grid{grid-template-columns:1fr}.cal-item{grid-template-columns:50px 1fr}.auth-chip,.days-chip{display:none}}
+/* ── DOCUMENT ACTIONS & SEARCH ── */
+.doc-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.doc-search-wrap{position:relative;flex:1;max-width:280px}
+.doc-search-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text2);pointer-events:none}
+.doc-search-wrap input{width:100%;padding:7px 12px 7px 30px;background:var(--bg-inp);border:1px solid var(--border);color:var(--text0);border-radius:var(--r-sm);font-family:var(--mono);font-size:12px;outline:none;transition:border-color .15s}
+.doc-search-wrap input:focus{border-color:var(--amber)}
+.doc-card{display:flex;flex-direction:column;justify-content:space-between;position:relative}
+.doc-card-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px}
+.doc-actions-bar{display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}
+.doc-action-btn{background:var(--bg-inp);border:1px solid var(--border);color:var(--text1);padding:4px 8px;border-radius:var(--r-sm);font-family:var(--mono);font-size:11px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;transition:all .15s ease}
+.doc-action-btn:hover{background:var(--bg3);color:var(--text0);border-color:var(--border-active)}
+.doc-action-btn.view{color:var(--blue)}
+.doc-action-btn.edit{color:var(--amber)}
+.doc-action-btn.danger{color:var(--red)}
+.doc-action-btn.danger:hover{background:var(--red-d);border-color:var(--red)}
+
+/* ── PRODUCTION TABLE ACTIONS ── */
+.table-action-group{display:flex;align-items:center;gap:5px}
+.tbl-btn{background:var(--bg-inp);border:1px solid var(--border);color:var(--text1);padding:3px 7px;border-radius:var(--r-sm);font-family:var(--mono);font-size:10.5px;cursor:pointer;transition:all .15s ease}
+.tbl-btn:hover{background:var(--bg3);color:var(--text0);border-color:var(--border-active)}
+.tbl-btn.verify{color:var(--amber);border-color:var(--amber)}
+.tbl-btn.danger{color:var(--red)}
+.tbl-btn.danger:hover{background:var(--red-d);border-color:var(--red)}
+.form-tile.active-filing{border-color:var(--amber);cursor:pointer}
+.form-tile.active-filing:hover{border-color:var(--border-active);transform:translateY(-2px)}
+
+/* ── PER MT ROYALTY BANNER & CALCULATOR ── */
+.royalty-kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+.rk-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:15px 18px;display:flex;flex-direction:column;gap:5px;position:relative}
+.rk-card.highlight{border-color:var(--amber);background:linear-gradient(180deg, rgba(240,165,0,.08) 0%, var(--bg2) 100%)}
+.rk-label{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--text2)}
+.rk-val{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--text0);line-height:1.2}
+.rk-val.amber{color:var(--amber)}
+.rk-sub{font-size:11px;color:var(--text2);margin-top:2px}
+.rate-pill{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-family:var(--mono);font-weight:600;background:rgba(240,165,0,.15);color:var(--amber);border:1px solid rgba(240,165,0,.3);white-space:nowrap}
+.rate-pill.green{background:rgba(0,210,132,.12);color:var(--green);border-color:rgba(0,210,132,.3)}
+.calc-quick-box{background:var(--bg-inp);border:1px solid var(--border);border-radius:var(--r-sm);padding:14px;margin-top:16px}
+.calc-quick-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.calc-quick-header h4{font-size:12px;font-weight:600;color:var(--text1);font-family:var(--mono);text-transform:uppercase;margin:0}
+.calc-quick-inputs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+@media(max-width:1100px){.royalty-kpi-row{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:640px){.royalty-kpi-row{grid-template-columns:1fr}}
+
+/* ── LEASE DELETION STYLES ── */
+.mine-opt-info{flex:1;min-width:0;overflow:hidden}
+.mine-opt-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px}
+.mine-del-icon-btn{background:none;border:none;cursor:pointer;opacity:0.35;padding:4px 6px;border-radius:var(--r-sm);font-size:12px;color:var(--text2);transition:all .15s;flex-shrink:0}
+.mine-del-icon-btn:hover{opacity:1;background:var(--red-d);color:var(--red)}
+.btn-ghost.danger{color:var(--red);border-color:rgba(255,77,77,.3)}
+.btn-ghost.danger:hover{background:var(--red-d);border-color:var(--red);color:var(--red)}
+
+/* ── LIVE STATUTORY RATE SYNC & BANNER ── */
+.live-sync-indicator{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;background:rgba(0,210,132,.1);border:1px solid rgba(0,210,132,.3);border-radius:20px;font-family:var(--mono);font-size:11px;color:var(--green)}
+.live-pulse-dot{width:7px;height:7px;background:var(--green);border-radius:50%;box-shadow:0 0 6px var(--green);animation:pulse 2s infinite;flex-shrink:0}
+.rate-source-banner{display:flex;align-items:center;justify-content:space-between;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:10px 16px;margin-bottom:16px;flex-wrap:wrap;gap:8px}
+.gov-badge{background:rgba(240,165,0,.15);color:var(--amber);border:1px solid rgba(240,165,0,.3);padding:2px 7px;border-radius:4px;font-family:var(--mono);font-size:10px;font-weight:600;text-transform:uppercase}
+.sync-spin{display:inline-block;animation:spin 1s linear infinite}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}

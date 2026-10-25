@@ -140,6 +140,14 @@ public class MiningRestAPI {
     return service.saveComplianceRecord(record, skipVersion);
   }
 
+  @DELETE
+  @Path("/{mineId}/compliance-records/{recordId}")
+  @Operation(summary = "Delete a compliance record")
+  public void deleteComplianceRecord(
+      @PathParam("mineId") final String mineId, @PathParam("recordId") final String recordId) {
+    service.deleteComplianceRecord(recordId);
+  }
+
   // ── DGMS ───────────────────────────────────────────────────────────────
 
   @GET

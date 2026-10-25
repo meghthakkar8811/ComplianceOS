@@ -74,6 +74,8 @@ public interface MiningService {
 
   ComplianceRecord saveComplianceRecord(ComplianceRecord record, boolean skipVersion);
 
+  void deleteComplianceRecord(String id);
+
   Map<String, ComplianceRecord> getComplianceRecords(List<String> ids);
 
   /**

@@ -331,6 +331,16 @@ public class MiningServiceImpl implements MiningService {
   }
 
   @Override
+  public void deleteComplianceRecord(final String id) {
+    final ComplianceRecord record = complianceRecordRepository.findById(id);
+    if (record == null) {
+      return;
+    }
+    requireMineEdit(record.getMineId());
+    complianceRecordRepository.deleteByIdIgnoringVersion(id);
+  }
+
+  @Override
   public Map<String, ComplianceRecord> getComplianceRecords(final List<String> ids) {
     if (CollectionUtils.isEmpty(ids)) {
       return Map.of();

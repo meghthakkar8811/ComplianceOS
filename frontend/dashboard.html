@@ -110,6 +110,7 @@
       <div class="page-actions">
         <button class="btn-ghost" onclick="navigate('production')">+ Log Production</button>
         <button class="btn-primary" onclick="navigate('forms')">Generate IBM Return</button>
+        <button class="btn-ghost danger" onclick="deleteCurrentMineLease()" title="Delete currently active mine lease"><span style="margin-right:4px">🗑️</span>Delete Lease</button>
       </div>
     </div>
 
@@ -204,42 +205,206 @@
     </div>
     <div class="forms-grid">
       <div class="form-tile ready" onclick="openFormB()">
-        <div class="ft-badge ready">READY TO FILE</div>
+        <div class="ft-badge ready" id="badge-formb">READY TO FILE</div>
         <div class="ft-letter">F</div>
         <div class="ft-name">IBM Monthly Return</div>
         <div class="ft-desc">F-series return under MCDR 2017. Auto-filled from your production data.</div>
         <div class="ft-meta"><span id="formb-due">Due: Loading…</span><span class="ft-autofill">Auto-filled ✓</span></div>
         <button class="btn-primary full-w">Auto-Fill & Preview →</button>
       </div>
-      <div class="form-tile"><div class="ft-badge">QUARTERLY</div><div class="ft-letter">C</div><div class="ft-name">IBM Form C</div><div class="ft-desc">Quarterly Return of Labour Employed</div><div class="ft-meta"><span>V2</span></div><button class="btn-ghost full-w" disabled>Coming in V2</button></div>
-      <div class="form-tile"><div class="ft-badge">ANNUAL</div><div class="ft-letter">J</div><div class="ft-name">IBM Form J</div><div class="ft-desc">Annual Return — Production, Employment & Wages</div><div class="ft-meta"><span>V2</span></div><button class="btn-ghost full-w" disabled>Coming in V2</button></div>
-      <div class="form-tile"><div class="ft-badge">ANNUAL</div><div class="ft-letter">A</div><div class="ft-name">IBM Form A</div><div class="ft-desc">Annual Return — Mineral Production Statistics</div><div class="ft-meta"><span>V2</span></div><button class="btn-ghost full-w" disabled>Coming in V2</button></div>
+      <div class="form-tile ready" onclick="openFormC()">
+        <div class="ft-badge ready" id="badge-formc">READY TO FILE</div>
+        <div class="ft-letter">C</div>
+        <div class="ft-name">IBM Form C</div>
+        <div class="ft-desc">Quarterly Return of Labour Employed under MCDR 2017. Auto-filled from shift logs.</div>
+        <div class="ft-meta"><span id="formc-due">Due: End of Quarter</span><span class="ft-autofill">Auto-filled ✓</span></div>
+        <button class="btn-primary full-w">Auto-Fill & Preview →</button>
+      </div>
+      <div class="form-tile ready" onclick="openFormJ()">
+        <div class="ft-badge ready" id="badge-formj">READY TO FILE</div>
+        <div class="ft-letter">J</div>
+        <div class="ft-name">IBM Form J</div>
+        <div class="ft-desc">Annual Return — Production, Employment & Wages. Auto-calculated across FY.</div>
+        <div class="ft-meta"><span id="formj-due">Due: 1st July</span><span class="ft-autofill">Auto-filled ✓</span></div>
+        <button class="btn-primary full-w">Auto-Fill & Preview →</button>
+      </div>
+      <div class="form-tile ready" onclick="openFormA()">
+        <div class="ft-badge ready" id="badge-forma">READY TO FILE</div>
+        <div class="ft-letter">A</div>
+        <div class="ft-name">IBM Form A</div>
+        <div class="ft-desc">Annual Return — Mineral Production Statistics, reserves, and machinery usage.</div>
+        <div class="ft-meta"><span id="forma-due">Due: 1st July</span><span class="ft-autofill">Auto-filled ✓</span></div>
+        <button class="btn-primary full-w">Auto-Fill & Preview →</button>
+      </div>
     </div>
   </section>
 
   <!-- ═══ ROYALTY CALCULATOR ═══ -->
   <section class="page" id="page-royalty">
     <div class="page-header">
-      <div class="page-title-block"><h1>Royalty</h1><p class="page-sub">Auto-calculated from production entries and the applicable DMF/NMET rates — recalculated whenever production changes</p></div>
+      <div class="page-title-block">
+        <h1>Royalty Calculator & Statutory Rates</h1>
+        <p class="page-sub">Statutory royalty rates per metric tonne (MT), DMF, and NMET under MMDR Act Schedule II</p>
+      </div>
+      <div class="page-actions" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span class="live-sync-indicator" id="rate-sync-indicator">
+          <span class="live-pulse-dot"></span>
+          <span id="rate-sync-text">Live Gov Sync: Active</span>
+        </span>
+        <button class="btn-ghost" onclick="openStatutoryRatesModal()" title="View full government statutory rates table for all minerals">
+          <span style="margin-right:4px">📊</span>All Mineral Rates
+        </button>
+        <button class="btn-primary" id="btn-sync-rates" onclick="fetchLiveStatutoryRoyaltyRates(true)" title="Fetch and update latest statutory royalty rates online">
+          <span id="sync-icon" style="margin-right:4px">🔄</span>Fetch Latest Rates
+        </button>
+      </div>
     </div>
+
+    <!-- Official Live Government Source Banner -->
+    <div class="rate-source-banner" id="rate-source-banner">
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px">
+        <span class="gov-badge">Official Govt Gazette</span>
+        <span id="rate-source-text">Source: Indian Bureau of Mines (ibm.gov.in) & Ministry of Mines Gazette (MMDR Act Schedule II)</span>
+      </div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text2)" id="rate-last-synced-time">
+        Auto-synced via Google & Ministry of Mines Feed
+      </div>
+    </div>
+
+    <!-- Per-MT Statutory Rate Metric Cards -->
+    <div class="royalty-kpi-row">
+      <div class="rk-card highlight">
+        <span class="rk-label">Base Royalty Rate (per MT)</span>
+        <span class="rk-val amber" id="rk-base-rate">₹— / MT</span>
+        <span class="rk-sub" id="rk-mineral-sub">MMDR Act Schedule II</span>
+      </div>
+      <div class="rk-card">
+        <span class="rk-label">Effective Total per MT</span>
+        <span class="rk-val" id="rk-gross-rate">₹— / MT</span>
+        <span class="rk-sub" id="rk-eff-sub">Base + DMF (10-30%) + NMET (2%)</span>
+      </div>
+      <div class="rk-card">
+        <span class="rk-label">Current Period Dispatched</span>
+        <span class="rk-val" id="rk-dispatched-qty">— MT</span>
+        <span class="rk-sub" id="rk-period-sub">Monthly dispatch tonnage</span>
+      </div>
+      <div class="rk-card">
+        <span class="rk-label">Current Month Gross Liability</span>
+        <span class="rk-val amber" id="rk-gross-total">₹—</span>
+        <span class="rk-sub">Total statutory payable</span>
+      </div>
+    </div>
+
     <div class="royalty-layout">
-      <div class="royalty-output" style="grid-column:1/-1">
+      <!-- Left: Current Period Breakdown & Per MT Quick Calculator -->
+      <div class="royalty-output">
         <div class="computation-card">
-          <div class="cc-header"><h3>Current Period</h3><span class="cc-period" id="cc-period"></span></div>
+          <div class="cc-header">
+            <div>
+              <h3>Current Period Liability</h3>
+              <span class="cc-period" id="cc-period">—</span>
+            </div>
+            <span class="rate-pill" id="co-rate-pill">₹— / MT Base</span>
+          </div>
+
           <div class="comp-rows" id="comp-rows">
-            <div class="cr subtotal"><span>Base Royalty</span><span class="mono" id="co-base">–</span></div>
-            <div class="cr"><span id="co-dmf-label">DMF</span><span class="mono" id="co-dmf">–</span></div>
-            <div class="cr"><span id="co-nmet-label">NMET</span><span class="mono" id="co-nmet">–</span></div>
-            <div class="cr-divider"></div>
-            <div class="cr gross"><span>Gross Liability</span><span class="mono" id="co-gross">–</span></div>
+            <div class="cr">
+              <span>Mineral & Schedule</span>
+              <span class="mono" id="co-mineral-schedule">—</span>
+            </div>
+            <div class="cr">
+              <span>Dispatched Quantity</span>
+              <span class="mono" id="co-qty">— MT</span>
+            </div>
+            <div class="cr subtotal">
+              <div>
+                <span>Base Royalty</span>
+                <small style="display:block;font-size:10.5px;color:var(--text2)" id="co-base-detail">Rate: ₹— / MT</small>
+              </div>
+              <span class="mono" id="co-base">–</span>
+            </div>
+            <div class="cr">
+              <div>
+                <span id="co-dmf-label">District Mineral Foundation (DMF)</span>
+                <small style="display:block;font-size:10.5px;color:var(--text2)" id="co-dmf-detail">Rate: ₹— / MT</small>
+              </div>
+              <span class="mono" id="co-dmf">–</span>
+            </div>
+            <div class="cr">
+              <div>
+                <span id="co-nmet-label">National Mineral Exploration Trust (NMET)</span>
+                <small style="display:block;font-size:10.5px;color:var(--text2)" id="co-nmet-detail">Rate: ₹— / MT (2% of Base)</small>
+              </div>
+              <span class="mono" id="co-nmet">–</span>
+            </div>
+            <div class="cr-divider amber"></div>
+            <div class="cr gross">
+              <div>
+                <span>Gross Statutory Liability</span>
+                <small style="display:block;font-size:11px;color:var(--amber)" id="co-gross-rate-detail">Total: ₹— / MT</small>
+              </div>
+              <span class="mono amber-text" style="font-size:17px;font-weight:700" id="co-gross">–</span>
+            </div>
+          </div>
+
+          <!-- Interactive Quick Per-MT Estimator -->
+          <div class="calc-quick-box">
+            <div class="calc-quick-header">
+              <h4>Quick Per-MT Royalty Estimator</h4>
+              <span class="rate-pill green" id="calc-mineral-badge">Live Calculator</span>
+            </div>
+            <div class="calc-quick-inputs">
+              <div class="fg" style="margin-bottom:0">
+                <label>Tonnage (MT)</label>
+                <input type="number" id="quick-calc-tonnage" value="1000" min="1" step="10" oninput="runQuickRoyaltyCalc()">
+              </div>
+              <div class="fg" style="margin-bottom:0">
+                <label>Base Rate (₹/MT)</label>
+                <input type="number" id="quick-calc-rate" value="80" min="0" step="1" oninput="runQuickRoyaltyCalc()">
+              </div>
+            </div>
+            <div class="cr" style="border:none;padding:5px 0;font-size:12px">
+              <span>Estimated Base Royalty:</span>
+              <span class="mono" id="qc-base">₹80,000</span>
+            </div>
+            <div class="cr" style="border:none;padding:5px 0;font-size:12px">
+              <span>Estimated DMF + NMET:</span>
+              <span class="mono" id="qc-cess">₹25,600</span>
+            </div>
+            <div class="cr" style="border-top:1px dashed var(--border);padding:8px 0 0 0;font-weight:600">
+              <span style="color:var(--text0)">Total Liability (@ <span id="qc-per-mt-rate">₹105.60</span>/MT):</span>
+              <span class="mono green" id="qc-total">₹1,05,600</span>
+            </div>
           </div>
         </div>
+      </div>
+
+      <!-- Right: Royalty History Table with Per MT Breakdown -->
+      <div class="royalty-output">
         <div class="history-card">
-          <h3>Royalty History</h3>
-          <div class="table-wrap"><table class="data-table">
-            <thead><tr><th>Period</th><th class="num-col">Base</th><th class="num-col">DMF</th><th class="num-col">NMET</th><th class="num-col">Gross</th></tr></thead>
-            <tbody id="royalty-history-tbody"></tbody>
-          </table></div>
+          <div class="cc-header">
+            <div>
+              <h3>Royalty History & Monthly Rates</h3>
+              <span class="cc-period">Tonnage & per-MT Rates</span>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Period</th>
+                  <th class="num-col">Dispatched</th>
+                  <th class="num-col">Base Rate</th>
+                  <th class="num-col">Base Royalty</th>
+                  <th class="num-col">DMF</th>
+                  <th class="num-col">NMET</th>
+                  <th class="num-col">Total / MT</th>
+                  <th class="num-col">Gross</th>
+                </tr>
+              </thead>
+              <tbody id="royalty-history-tbody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
@@ -255,17 +420,23 @@
       </div>
     </div>
     <div class="prod-form-card" id="prod-form-card" style="display:none">
-      <div class="pfc-header"><h3>New Production Entry</h3><button class="icon-close" onclick="toggleProdForm()">✕</button></div>
+      <div class="pfc-header"><h3 id="pf-form-title">New Production Entry</h3><button class="icon-close" onclick="toggleProdForm()">✕</button></div>
+      <input type="hidden" id="pf-id">
       <div class="pfc-grid">
         <div class="fg"><label>Date</label><input type="date" id="pf-date"></div>
         <div class="fg"><label>Shift</label><select id="pf-shift"><option value="DAY">Day (6AM–6PM)</option><option value="NIGHT">Night (6PM–6AM)</option><option value="GENERAL">General</option></select></div>
         <div class="fg"><label>Pit / Section</label><input id="pf-pit" placeholder="e.g. Pit A (North)"></div>
         <div class="fg"><label>Grade</label><input id="pf-grade" placeholder="e.g. Grade A"></div>
         <div class="fg"><label>Produced (MT)</label><input type="number" id="pf-prod" placeholder="1850"></div>
+        <div class="fg">
+          <label>Dispatched (MT)</label>
+          <input type="number" id="pf-disp" placeholder="1620">
+          <small id="pf-disp-rate-hint" style="color:var(--amber);font-family:var(--mono);font-size:10.5px;display:block;margin-top:3px"></small>
+        </div>
         <div class="fg"><label>Supervisor</label><input id="pf-sup" placeholder="Supervisor name"></div>
         <div class="fg"><label>Remarks</label><input id="pf-rem" placeholder="Optional"></div>
       </div>
-      <div class="pfc-actions"><button class="btn-ghost" onclick="toggleProdForm()">Cancel</button><button class="btn-primary" onclick="saveProdEntry()">Save Entry</button></div>
+      <div class="pfc-actions"><button class="btn-ghost" onclick="toggleProdForm()">Cancel</button><button class="btn-primary" id="pf-save-btn" onclick="saveProdEntry()">Save Entry</button></div>
     </div>
     <div class="prod-summary-row" id="prod-summary"></div>
     <div class="table-card">
@@ -314,13 +485,19 @@
       <div class="page-title-block"><h1>Document Repository</h1><p class="page-sub">Lease, clearances, certificates — expiry tracked</p></div>
       <div class="page-actions"><button class="btn-primary" onclick="openAddDocModal()">+ Upload Document</button></div>
     </div>
-    <div class="doc-filter-row">
-      <button class="filter-btn active" onclick="filterDocs(this,'')">All</button>
-      <button class="filter-btn" onclick="filterDocs(this,'STATE_GOVT')">Mining Lease</button>
-      <button class="filter-btn" onclick="filterDocs(this,'MOEFCC')">Environmental</button>
-      <button class="filter-btn" onclick="filterDocs(this,'DGMS')">DGMS</button>
-      <button class="filter-btn" onclick="filterDocs(this,'IBM')">IBM</button>
-      <button class="filter-btn" onclick="filterDocs(this,'SPCB')">SPCB</button>
+    <div class="doc-toolbar">
+      <div class="doc-filter-row" style="margin-bottom:0">
+        <button class="filter-btn active" data-auth="" onclick="filterDocs(this,'')">All</button>
+        <button class="filter-btn" data-auth="STATE_GOVT" onclick="filterDocs(this,'STATE_GOVT')">Mining Lease</button>
+        <button class="filter-btn" data-auth="MOEFCC" onclick="filterDocs(this,'MOEFCC')">Environmental</button>
+        <button class="filter-btn" data-auth="DGMS" onclick="filterDocs(this,'DGMS')">DGMS</button>
+        <button class="filter-btn" data-auth="IBM" onclick="filterDocs(this,'IBM')">IBM</button>
+        <button class="filter-btn" data-auth="SPCB" onclick="filterDocs(this,'SPCB')">SPCB</button>
+      </div>
+      <div class="doc-search-wrap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="doc-search" placeholder="Search documents…" oninput="filterDocCards()">
+      </div>
     </div>
     <div class="doc-grid" id="doc-grid"></div>
   </section>
@@ -450,6 +627,130 @@
     <div class="modal-footer">
       <button class="btn-ghost" onclick="closeModal('modal-add-doc')">Cancel</button>
       <button class="btn-primary" onclick="addDocument()">Save Document</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT DOCUMENT MODAL -->
+<div class="modal-overlay" id="modal-edit-doc" onclick="closeModalOutside(event,'modal-edit-doc')">
+  <div class="modal-box medium">
+    <div class="modal-header">
+      <div><h2>Edit Document</h2><p class="modal-sub">Update metadata or replace file attachment</p></div>
+      <button class="modal-close" onclick="closeModal('modal-edit-doc')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-doc-id">
+      <div class="fg"><label>Document Title *</label><input id="edit-doc-name" placeholder="e.g. Consent to Operate (CTO)"></div>
+      <div class="form-row-2">
+        <div class="fg"><label>Authority *</label>
+          <select id="edit-doc-authority"><option value="STATE_GOVT">State Govt (Lease)</option><option value="MOEFCC">MoEFCC (Environmental)</option><option value="DGMS">DGMS</option><option value="IBM">IBM</option><option value="SPCB">SPCB</option></select>
+        </div>
+        <div class="fg"><label>Record Type *</label>
+          <select id="edit-doc-record-type"><option value="CLEARANCE">Clearance / Certificate</option><option value="STATUTORY_PLAN">Statutory Plan</option><option value="NOTICE">Notice</option></select>
+        </div>
+      </div>
+      <div class="form-row-2">
+        <div class="fg"><label>Issued Date</label><input type="date" id="edit-doc-issued"></div>
+        <div class="fg"><label>Expiry Date</label><input type="date" id="edit-doc-expiry"></div>
+      </div>
+      <div class="fg" style="margin-top:8px">
+        <label>Current Attachment</label>
+        <div id="edit-doc-current-file" style="font-family:var(--mono);font-size:12px;color:var(--text2);margin-bottom:8px">None</div>
+        <label>Replace Attachment (Optional)</label>
+        <div style="background:var(--bg-inp);border:2px dashed var(--border);border-radius:var(--r);padding:20px;text-align:center;color:var(--text2);font-size:13px;position:relative;">
+          📎 Drag & drop file here or click to upload<br><small style="color:var(--text3)">PDF, JPG, PNG up to 10MB</small>
+          <input type="file" id="edit-doc-file" accept=".pdf,.jpg,.jpeg,.png" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;" onchange="document.getElementById('edit-file-name-display').innerText = this.files[0] ? this.files[0].name : ''" />
+          <div id="edit-file-name-display" style="margin-top:8px; font-weight:600; color:var(--text1)"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('modal-edit-doc')">Cancel</button>
+      <button class="btn-primary" onclick="saveEditDocument()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- FORM C MODAL -->
+<div class="modal-overlay" id="modal-formc" onclick="closeModalOutside(event,'modal-formc')">
+  <div class="modal-box large">
+    <div class="modal-header"><div><h2>IBM Form C — Quarterly Return of Labour Employed</h2><p class="modal-sub" id="formc-period">Loading…</p></div><button class="modal-close" onclick="closeModal('modal-formc')">✕</button></div>
+    <div class="modal-body" id="formc-body">
+      <div class="autofill-banner"><span class="afb-icon">✓</span><span>96% auto-filled from your shift & production logs</span><span class="afb-pct">96% complete</span></div>
+      <div id="formc-content"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('modal-formc')">Cancel</button>
+      <button class="btn-primary" onclick="submitFormC()">Submit & Mark Filed →</button>
+    </div>
+  </div>
+</div>
+
+<!-- FORM J MODAL -->
+<div class="modal-overlay" id="modal-formj" onclick="closeModalOutside(event,'modal-formj')">
+  <div class="modal-box large">
+    <div class="modal-header"><div><h2>IBM Form J — Annual Return (Production, Employment & Wages)</h2><p class="modal-sub" id="formj-period">Loading…</p></div><button class="modal-close" onclick="closeModal('modal-formj')">✕</button></div>
+    <div class="modal-body" id="formj-body">
+      <div class="autofill-banner"><span class="afb-icon">✓</span><span>95% auto-calculated from fiscal year production entries</span><span class="afb-pct">95% complete</span></div>
+      <div id="formj-content"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('modal-formj')">Cancel</button>
+      <button class="btn-primary" onclick="submitFormJ()">Submit & Mark Filed →</button>
+    </div>
+  </div>
+</div>
+
+<!-- FORM A MODAL -->
+<div class="modal-overlay" id="modal-forma" onclick="closeModalOutside(event,'modal-forma')">
+  <div class="modal-box large">
+    <div class="modal-header"><div><h2>IBM Form A — Annual Mineral Production & Statistics</h2><p class="modal-sub" id="forma-period">Loading…</p></div><button class="modal-close" onclick="closeModal('modal-forma')">✕</button></div>
+    <div class="modal-body" id="forma-body">
+      <div class="autofill-banner"><span class="afb-icon">✓</span><span>92% auto-filled from geological & mining logs</span><span class="afb-pct">92% complete</span></div>
+      <div id="forma-content"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('modal-forma')">Cancel</button>
+      <button class="btn-primary" onclick="submitFormA()">Submit & Mark Filed →</button>
+    </div>
+<!-- STATUTORY RATES MODAL -->
+<div class="modal-overlay" id="modal-statutory-rates" onclick="closeModalOutside(event,'modal-statutory-rates')">
+  <div class="modal-box large">
+    <div class="modal-header">
+      <div>
+        <h2>Government Statutory Royalty Rates Schedule</h2>
+        <p class="modal-sub">MMDR Act Second Schedule & Indian Bureau of Mines (IBM) Live Gazette Feed</p>
+      </div>
+      <button class="modal-close" onclick="closeModal('modal-statutory-rates')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="rate-source-banner" style="margin-bottom:14px">
+        <div style="font-size:12px">
+          <strong>Official Source:</strong> Ministry of Mines, Govt. of India · Gazette Notification S.O. 2682(E) & IBM Monthly Average Sale Price (ASP)
+        </div>
+        <button class="btn-primary" style="padding:4px 10px;font-size:11px" onclick="fetchLiveStatutoryRoyaltyRates(true)">
+          🔄 Re-sync from Google / Web
+        </button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Mineral</th>
+              <th>Statutory Base Rate</th>
+              <th>Calculation Method</th>
+              <th>DMF Rate</th>
+              <th>NMET Rate</th>
+              <th>Total / MT</th>
+              <th>Official Gazette Citation</th>
+            </tr>
+          </thead>
+          <tbody id="statutory-rates-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('modal-statutory-rates')">Close</button>
     </div>
   </div>
 </div>
