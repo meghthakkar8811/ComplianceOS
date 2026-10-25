@@ -1117,7 +1117,9 @@ async function loadSales() {
 }
 
 function renderSaleTable(rows) {
-  document.getElementById('sale-tbody').innerHTML = rows.map(r => `
+  const tbody = document.getElementById('sale-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = rows.map(r => `
     <tr>
       <td>${new Date(r.dispatchedOn).toLocaleDateString('en-IN')}</td>
       <td>${r.mineralGrade}</td>
@@ -1130,9 +1132,11 @@ function renderSaleTable(rows) {
 }
 
 function renderSaleSummary() {
+  const el = document.getElementById('sale-summary');
+  if (!el) return;
   const totalQty   = STATE.saleData.reduce((s,r) => s + (r.quantity||0), 0);
   const totalValue = STATE.saleData.reduce((s,r) => s + (r.saleValue||0), 0);
-  document.getElementById('sale-summary').innerHTML = `
+  el.innerHTML = `
     <div class="psr-card"><span class="psr-label">Total Dispatched</span><span class="psr-val">${totalQty.toLocaleString('en-IN',{maximumFractionDigits:1})} MT</span></div>
     <div class="psr-card"><span class="psr-label">Total Sale Value</span><span class="psr-val">₹${fmtINR(totalValue/100)}</span></div>
     <div class="psr-card"><span class="psr-label">Dispatches</span><span class="psr-val">${STATE.saleData.length}</span></div>`;
