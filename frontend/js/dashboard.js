@@ -1382,8 +1382,8 @@ async function verifyEntry(id) {
 
 function exportProdCSV() {
   const month = document.getElementById('prod-month')?.value || new Date().toISOString().slice(0,7);
-  const rows  = [['Date','Shift','Pit','Grade','Produced (MT)','Supervisor','Status'],
-    ...STATE.prodData.map(r=>[new Date(r.entryTime).toLocaleDateString('en-IN'),r.shift,r.pitSection,r.mineralGrade,r.quantity,r.supervisorName||'',r.status])];
+  const rows  = [['Date','Shift','Pit','Grade','Produced (MT)','Dispatched (MT)','Supervisor','Status'],
+    ...STATE.prodData.map(r=>[new Date(r.entryTime).toLocaleDateString('en-IN'),r.shift,r.pitSection,r.mineralGrade,r.quantity,r.quantityDispatched||0,r.supervisorName||'',r.status])];
   const csv  = rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
   const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
   const url  = URL.createObjectURL(blob);
