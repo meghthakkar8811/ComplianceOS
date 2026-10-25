@@ -113,27 +113,61 @@
       </div>
     </div>
 
-    <!-- HEALTH HERO -->
+    <!-- COMPLIANCE ACTIVITIES HERO -->
     <div class="health-hero">
-      <div class="health-left">
-        <div class="health-score-wrap">
-          <svg class="health-ring" viewBox="0 0 120 120">
-            <circle class="ring-bg" cx="60" cy="60" r="52"/>
-            <circle class="ring-fill" cx="60" cy="60" r="52" id="ring-fill"
-              stroke-dasharray="326.73" stroke-dashoffset="326.73"/>
-          </svg>
-          <div class="health-score-inner">
-            <span class="hs-num" id="hs-num">–</span>
-            <span class="hs-label">/100</span>
+      <div class="compliance-hero-left">
+        <div class="ch-top-row">
+          <div class="ch-headline-block">
+            <div class="ch-eyebrow">COMPLIANCE ACTIVITIES STATUS</div>
+            <div class="ch-main-ratio">
+              <span class="ch-num-completed" id="ch-num-completed">–</span>
+              <span class="ch-num-divider">/</span>
+              <span class="ch-num-total" id="ch-num-total">–</span>
+              <span class="ch-num-caption">Activities Completed</span>
+            </div>
           </div>
+          <div class="ch-status-pill" id="hb-status">Checking compliance records…</div>
         </div>
-        <div class="health-breakdown">
-          <div class="hb-label">COMPLIANCE HEALTH SCORE</div>
-          <div class="hb-status" id="hb-status">Loading…</div>
-          <div class="hb-bars">
-            <div class="hb-row"><span class="hb-cat">Filing Compliance</span><div class="hb-track"><div class="hb-fill green" id="hb-ibm" style="width:0%"></div></div><span class="hb-val green" id="hb-ibm-val">–</span></div>
-            <div class="hb-row"><span class="hb-cat">DGMS Registers</span><div class="hb-track"><div class="hb-fill amber" id="hb-dgms" style="width:0%"></div></div><span class="hb-val amber" id="hb-dgms-val">–</span></div>
-            <div class="hb-row"><span class="hb-cat">Document Validity</span><div class="hb-track"><div class="hb-fill blue" id="hb-docs" style="width:0%"></div></div><span class="hb-val blue" id="hb-docs-val">–</span></div>
+
+        <div class="compliance-cards-grid">
+          <!-- Completed (Blue) -->
+          <div class="ch-stat-card card-completed" onclick="navigate('calendar')" title="View completed activities">
+            <div class="ch-card-header">
+              <span class="ch-card-label">Completed</span>
+              <div class="ch-card-icon blue">✓</div>
+            </div>
+            <div class="ch-card-number blue" id="cm-completed-val">0</div>
+            <div class="ch-card-sub">Activities completed</div>
+          </div>
+
+          <!-- Pending (Orange) -->
+          <div class="ch-stat-card card-pending" onclick="navigate('calendar')" title="View pending activities">
+            <div class="ch-card-header">
+              <span class="ch-card-label">Pending</span>
+              <div class="ch-card-icon orange">⏳</div>
+            </div>
+            <div class="ch-card-number orange" id="cm-pending-val">0</div>
+            <div class="ch-card-sub">Activities remaining</div>
+          </div>
+
+          <!-- Expired (Red) -->
+          <div class="ch-stat-card card-expired" onclick="navigate('calendar')" title="View expired / overdue activities">
+            <div class="ch-card-header">
+              <span class="ch-card-label">Expired</span>
+              <div class="ch-card-icon red">⚠</div>
+            </div>
+            <div class="ch-card-number red" id="cm-expired-val">0</div>
+            <div class="ch-card-sub">Expired / Overdue</div>
+          </div>
+
+          <!-- Total (Neutral / Dark) -->
+          <div class="ch-stat-card card-total" onclick="navigate('calendar')" title="View all activities">
+            <div class="ch-card-header">
+              <span class="ch-card-label">Total</span>
+              <div class="ch-card-icon neutral">📋</div>
+            </div>
+            <div class="ch-card-number neutral" id="cm-total-val">0</div>
+            <div class="ch-card-sub">Expected activities</div>
           </div>
         </div>
       </div>

@@ -355,6 +355,24 @@ async function loadDashboard() {
     const docsScore = docRecords.length === 0 ? 100 : Math.max(0, Math.round((1 - expiredDocs.length / docRecords.length) * 100));
     const overall   = Math.round((ibmScore + dgmsScore + docsScore) / 3);
 
+    // Dynamic compliance activity metrics (forms, rent payments, registers, clearances)
+    let completedCount = 0;
+    let pendingCount = 0;
+    let expiredCount = 0;
+
+    records.forEach(r => {
+      const isExpired = r.status === 'EXPIRED' || (r.expiry && r.expiry < now && r.status !== 'SUBMITTED');
+      const isCompleted = !isExpired && (r.status === 'SUBMITTED' || (r.status === 'VALID' && (!r.expiry || r.expiry >= now)));
+      if (isExpired) {
+        expiredCount++;
+      } else if (isCompleted) {
+        completedCount++;
+      } else {
+        pendingCount++;
+      }
+    });
+    const totalActivities = records.length;
+
     const rateInfo = getBaseRoyaltyRate(mine?.mineral);
     const defaultBaseRate = rateInfo.rate;
     const dmfPct = (mine?.leaseStartOn && mine.leaseStartOn >= Date.parse('2015-01-12T00:00:00Z')) ? 0.10 : 0.30;
@@ -393,7 +411,16 @@ async function loadDashboard() {
 
     d = {
       mine,
-      health: { overall, ibm: ibmScore, dgms: dgmsScore, docs: docsScore },
+      health: {
+        overall,
+        ibm: ibmScore,
+        dgms: dgmsScore,
+        docs: docsScore,
+        completed: completedCount,
+        pending: pendingCount,
+        expired: expiredCount,
+        total: totalActivities,
+      },
       kpis: {
         month_produced_mt: monthProduced, today_produced_mt: todayProduced,
         pending_filings: pendingFilings.length, overdue_filings: overdueFilings.length,
@@ -419,24 +446,53 @@ async function loadDashboard() {
   document.getElementById('dash-greeting').textContent = `${greet}, ${STATE.user?.username || 'there'}`;
   document.getElementById('dash-sub').textContent = `${d.mine.name} · ${formatState(d.mine.state)} · ${new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})}`;
 
-  // Health score
-  const score = d.health.overall;
-  document.getElementById('hs-num').textContent = score;
-  document.getElementById('hp-score').textContent = score;
-  document.getElementById('hp-bar').style.width = score + '%';
-  const ring = document.getElementById('ring-fill');
-  const circ = 326.73;
-  setTimeout(() => { ring.style.strokeDashoffset = circ - (score / 100) * circ; }, 150);
+  // Compliance activities metrics
+  const compCount = d.health.completed ?? 0;
+  const pendCount = d.health.pending ?? 0;
+  const expCount = d.health.expired ?? 0;
+  const totCount = d.health.total ?? 0;
 
-  document.getElementById('hb-status').textContent =
-    score >= 80 ? '✓ Compliant — No immediate action required' :
-    score >= 60 ? '⚠ Needs Attention — Some items require action' :
-                  '✕ Critical — Immediate action required';
-  document.getElementById('hb-status').style.color = score >= 80 ? 'var(--green)' : score >= 60 ? 'var(--warn)' : 'var(--red)';
+  // Prominent X / Y format
+  const elCompRatio = document.getElementById('ch-num-completed');
+  if (elCompRatio) elCompRatio.textContent = compCount;
+  const elTotalRatio = document.getElementById('ch-num-total');
+  if (elTotalRatio) elTotalRatio.textContent = totCount;
 
-  animateBar('hb-ibm',  d.health.ibm,  'hb-ibm-val');
-  animateBar('hb-dgms', d.health.dgms, 'hb-dgms-val');
-  animateBar('hb-docs', d.health.docs, 'hb-docs-val');
+  // 4 metric cards
+  animateCounter('cm-completed-val', compCount);
+  animateCounter('cm-pending-val', pendCount);
+  animateCounter('cm-expired-val', expCount);
+  animateCounter('cm-total-val', totCount);
+
+  // Status pill
+  const statusEl = document.getElementById('hb-status');
+  if (statusEl) {
+    if (expCount > 0) {
+      statusEl.innerHTML = `<span style="color:var(--red);font-weight:700">✕</span> ${expCount} Expired / Overdue Activity${expCount > 1 ? 'ies' : ''}`;
+      statusEl.style.borderColor = 'rgba(231,76,60,.35)';
+      statusEl.style.background = 'var(--red-d)';
+      statusEl.style.color = 'var(--red)';
+    } else if (pendCount > 0) {
+      statusEl.innerHTML = `<span style="color:var(--amber);font-weight:700">⚠</span> ${pendCount} Activity${pendCount > 1 ? 'ies' : ''} Pending Action`;
+      statusEl.style.borderColor = 'rgba(240,165,0,.35)';
+      statusEl.style.background = 'var(--warn-d)';
+      statusEl.style.color = 'var(--amber)';
+    } else if (totCount > 0) {
+      statusEl.innerHTML = `<span style="color:var(--green);font-weight:700">✓</span> Fully Compliant — All ${totCount} Activities Completed`;
+      statusEl.style.borderColor = 'rgba(46,204,113,.35)';
+      statusEl.style.background = 'var(--green-d)';
+      statusEl.style.color = 'var(--green)';
+    } else {
+      statusEl.textContent = 'No compliance obligations scheduled';
+      statusEl.style.color = 'var(--text2)';
+    }
+  }
+
+  // Topbar health indicator (X / Y format)
+  const hpScore = document.getElementById('hp-score');
+  if (hpScore) hpScore.textContent = `${compCount}/${totCount}`;
+  const hpBar = document.getElementById('hp-bar');
+  if (hpBar) hpBar.style.width = (totCount > 0 ? Math.round((compCount / totCount) * 100) : 0) + '%';
 
   // DGMS nav pill
   document.getElementById('dgms-nav-pill').textContent = d.dgms.overall_score;

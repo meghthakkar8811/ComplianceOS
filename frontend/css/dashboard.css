@@ -157,27 +157,43 @@ body{font-family:var(--font);background:var(--bg0);color:var(--text0);display:fl
 .full-w{width:100%}
 .mt-12{margin-top:12px}
 
-/* ── HEALTH HERO ── */
+/* ── HEALTH / COMPLIANCE HERO ── */
 .health-hero{display:grid;grid-template-columns:1fr 340px;gap:20px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:22px;margin-bottom:18px}
-.health-left{display:flex;gap:24px;align-items:flex-start}
-.health-score-wrap{position:relative;width:130px;height:130px;flex-shrink:0}
-.health-ring{width:130px;height:130px}
-.ring-bg{fill:none;stroke:var(--bg3);stroke-width:9}
-.ring-fill{fill:none;stroke:var(--amber);stroke-width:9;stroke-linecap:round;transform-origin:center;transform:rotate(-90deg);transition:stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1)}
-.health-score-inner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
-.hs-num{display:block;font-family:var(--mono);font-size:32px;font-weight:600;color:var(--amber);line-height:1}
-.hs-label{font-family:var(--mono);font-size:10px;color:var(--text2)}
-.health-breakdown{flex:1}
-.hb-label{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--text2);margin-bottom:6px}
-.hb-status{font-size:12.5px;font-weight:500;margin-bottom:14px;color:var(--warn)}
-.hb-bars{display:flex;flex-direction:column;gap:9px}
-.hb-row{display:grid;grid-template-columns:120px 1fr 28px;align-items:center;gap:8px;cursor:pointer}
-.hb-cat{font-size:12px;color:var(--text1)}
-.hb-track{height:5px;background:var(--bg3);border-radius:3px;overflow:hidden}
-.hb-fill{height:100%;border-radius:3px;transition:width 1s cubic-bezier(.4,0,.2,1)}
-.hb-fill.green{background:var(--green)} .hb-fill.amber{background:var(--amber)} .hb-fill.red{background:var(--red)} .hb-fill.blue{background:var(--blue)}
-.hb-val{font-family:var(--mono);font-size:11px;font-weight:600;text-align:right}
-.hb-val.green{color:var(--green)} .hb-val.amber{color:var(--amber)} .hb-val.red{color:var(--red)} .hb-val.blue{color:var(--blue)}
+.compliance-hero-left{display:flex;flex-direction:column;gap:18px;justify-content:space-between}
+.ch-top-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.ch-headline-block{display:flex;flex-direction:column;gap:6px}
+.ch-eyebrow{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--text2);font-weight:600}
+.ch-main-ratio{display:flex;align-items:baseline;gap:6px}
+.ch-num-completed{font-family:var(--mono);font-size:36px;font-weight:700;color:var(--blue);line-height:1}
+.ch-num-divider{font-family:var(--mono);font-size:24px;font-weight:400;color:var(--text3)}
+.ch-num-total{font-family:var(--mono);font-size:30px;font-weight:700;color:var(--text0);line-height:1}
+.ch-num-caption{font-size:13px;font-weight:500;color:var(--text1);margin-left:6px}
+.ch-status-pill{font-family:var(--mono);font-size:11px;font-weight:500;padding:6px 14px;border-radius:20px;background:var(--bg3);border:1px solid var(--border);color:var(--text1);display:inline-flex;align-items:center;gap:6px;transition:all .2s ease}
+
+/* 4-Box Compliance Metric Cards */
+.compliance-cards-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.ch-stat-card{background:var(--bg-inp);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;display:flex;flex-direction:column;gap:4px;cursor:pointer;transition:all .18s ease;position:relative}
+.ch-stat-card:hover{transform:translateY(-2px);border-color:var(--border-active);box-shadow:0 4px 18px rgba(0,0,0,.15)}
+.ch-card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px}
+.ch-card-label{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--text2);font-weight:600}
+.ch-card-icon{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px}
+.ch-card-icon.blue{background:var(--blue-d);color:var(--blue)}
+.ch-card-icon.orange{background:var(--amber-g);color:var(--amber)}
+.ch-card-icon.red{background:var(--red-d);color:var(--red)}
+.ch-card-icon.neutral{background:var(--bg3);color:var(--text1)}
+
+/* Prominent color-coded numbers */
+.ch-card-number{font-family:var(--mono);font-size:28px;font-weight:700;line-height:1.1}
+.ch-card-number.blue{color:var(--blue)}
+.ch-card-number.orange{color:var(--amber)}
+.ch-card-number.red{color:var(--red)}
+.ch-card-number.neutral{color:var(--text0)}
+.ch-card-sub{font-size:11px;color:var(--text2);margin-top:2px}
+
+.ch-stat-card.card-completed{border-left:3px solid var(--blue)}
+.ch-stat-card.card-pending{border-left:3px solid var(--amber)}
+.ch-stat-card.card-expired{border-left:3px solid var(--red)}
+.ch-stat-card.card-total{border-left:3px solid var(--text2)}
 .health-actions{display:flex;flex-direction:column}
 .ha-title{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--text2);margin-bottom:10px}
 .action-card{padding:12px 14px;border-radius:var(--r);cursor:pointer;border:1px solid;transition:all .15s;margin-bottom:8px}
@@ -440,7 +456,7 @@ body{font-family:var(--font);background:var(--bg0);color:var(--text0);display:fl
 /* ── RESPONSIVE ── */
 @media(max-width:1280px){.kpi-grid{grid-template-columns:repeat(3,1fr)}.forms-grid{grid-template-columns:repeat(2,1fr)}.dashboard-grid{grid-template-columns:repeat(2,1fr)}.span-2{grid-column:span 2}}
 @media(max-width:1024px){.royalty-layout,.dgms-layout{grid-template-columns:1fr}.doc-grid{grid-template-columns:repeat(2,1fr)}.pfc-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:900px){.sidebar{transform:translateX(-100%)}.sidebar.open{transform:translateX(0);box-shadow:10px 0 30px rgba(0,0,0,.5)}.main{margin-left:0}.hamburger{display:flex}.health-hero{grid-template-columns:1fr}.dashboard-grid{grid-template-columns:1fr}.span-2{grid-column:span 1}.kpi-grid{grid-template-columns:repeat(2,1fr)}.forms-grid{grid-template-columns:1fr}}
+@media(max-width:900px){.sidebar{transform:translateX(-100%)}.sidebar.open{transform:translateX(0);box-shadow:10px 0 30px rgba(0,0,0,.5)}.main{margin-left:0}.hamburger{display:flex}.health-hero{grid-template-columns:1fr}.compliance-cards-grid{grid-template-columns:repeat(2,1fr)}.dashboard-grid{grid-template-columns:1fr}.span-2{grid-column:span 1}.kpi-grid{grid-template-columns:repeat(2,1fr)}.forms-grid{grid-template-columns:1fr}}
 /* ── DOCUMENT ACTIONS & SEARCH ── */
 .doc-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap}
 .doc-search-wrap{position:relative;flex:1;max-width:280px}
