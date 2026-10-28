@@ -559,6 +559,7 @@ async function loadDashboard() {
     if (elM) elM.textContent = pMonth;
   }
   drawProductionChart();
+  requestAnimationFrame(() => drawProductionChart());
 
   // Deadlines feed
   const feed = document.getElementById('deadline-feed');
@@ -674,10 +675,13 @@ function drawProductionChart() {
   const area = canvas.parentElement;
 
   const dpr = window.devicePixelRatio || 1;
-  const cssWidth = area.offsetWidth || 600;
+  const rect = canvas.getBoundingClientRect();
+  const cssWidth = Math.max(280, Math.floor(rect.width || (area ? area.clientWidth : 0) || 480));
   const cssHeight = 170;
   canvas.width = Math.round(cssWidth * dpr);
   canvas.height = Math.round(cssHeight * dpr);
+  canvas.style.width = cssWidth + 'px';
+  canvas.style.height = cssHeight + 'px';
   if (ctx.resetTransform) ctx.resetTransform();
   ctx.scale(dpr, dpr);
 
@@ -705,7 +709,7 @@ function drawProductionChart() {
   else mult = 12;
   const max = Math.max(mult * niceFactor, 10);
 
-  const pad = { t: 28, r: 24, b: 28, l: 48 };
+  const pad = { t: 28, r: 36, b: 28, l: 44 };
   const cW = cssWidth - pad.l - pad.r;
   const cH = cssHeight - pad.t - pad.b;
 
@@ -1062,6 +1066,15 @@ function drawProductionChart() {
   };
 
   animate();
+
+  if (!window._chartResizeObs && typeof ResizeObserver !== 'undefined' && area) {
+    window._chartResizeObs = new ResizeObserver(() => {
+      if (STATE.chartData && STATE.chartData.length) {
+        drawProductionChart();
+      }
+    });
+    window._chartResizeObs.observe(area);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2785,4 +2798,5 @@ document.addEventListener('keydown', e => {
 window.addEventListener('resize', () => {
   if (window.innerWidth >= 900) document.getElementById('sidebar').classList.remove('open');
   drawProductionChart();
+  requestAnimationFrame(() => drawProductionChart());
 });
