@@ -489,12 +489,6 @@ async function loadDashboard() {
     }
   }
 
-  // Topbar health indicator (X / Y format)
-  const hpScore = document.getElementById('hp-score');
-  if (hpScore) hpScore.textContent = `${compCount}/${totCount}`;
-  const hpBar = document.getElementById('hp-bar');
-  if (hpBar) hpBar.style.width = (totCount > 0 ? Math.round((compCount / totCount) * 100) : 0) + '%';
-
   // DGMS nav pill
   document.getElementById('dgms-nav-pill').textContent = d.dgms.overall_score;
 

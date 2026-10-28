@@ -122,12 +122,6 @@ body{font-family:var(--font);background:var(--bg0);color:var(--text0);display:fl
 .breadcrumb-trail{font-family:var(--mono);font-size:11px;color:var(--text2);display:flex;align-items:center;gap:8px}
 .bc-sep{color:var(--text3)}
 #bc-current{color:var(--text1)}
-.health-pill{display:flex;align-items:center;gap:8px;padding:5px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:20px;cursor:pointer;transition:border-color .15s}
-.health-pill:hover{border-color:var(--amber-d)}
-.hp-label{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--text2)}
-.hp-bar-wrap{width:60px;height:4px;background:var(--bg3);border-radius:2px;overflow:hidden}
-.hp-bar{height:100%;background:var(--amber);border-radius:2px;transition:width .6s ease}
-.hp-score{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--amber)}
 .topbar-icon-btn{position:relative;background:none;border:1px solid var(--border);color:var(--text1);padding:7px;border-radius:var(--r);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
 .topbar-icon-btn:hover{border-color:var(--border-active);color:var(--text0)}
 .topbar-badge{position:absolute;top:-5px;right:-5px;background:var(--red);color:#fff;font-family:var(--mono);font-size:8px;font-weight:600;padding:1px 4px;border-radius:8px;min-width:16px;text-align:center}
