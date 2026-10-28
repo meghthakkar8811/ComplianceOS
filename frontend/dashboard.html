@@ -194,10 +194,10 @@
           <h3>Production & Dispatch — Last 6 Months</h3>
           <div class="chart-head-right">
             <div class="chart-legend">
-              <span class="legend-item" onclick="switchChart(document.getElementById('cb-produced'),'produced')">
+              <span class="legend-item" id="leg-prod" onclick="switchChart(document.getElementById('cb-produced'),'produced')" onmouseenter="highlightSeries('produced')" onmouseleave="highlightSeries(null)" title="Highlight Production">
                 <span class="legend-line production"></span> Production
               </span>
-              <span class="legend-item" onclick="switchChart(document.getElementById('cb-dispatched'),'dispatched')">
+              <span class="legend-item" id="leg-disp" onclick="switchChart(document.getElementById('cb-dispatched'),'dispatched')" onmouseenter="highlightSeries('dispatched')" onmouseleave="highlightSeries(null)" title="Highlight Dispatch">
                 <span class="legend-line dispatch"></span> Dispatch
               </span>
             </div>
@@ -208,7 +208,28 @@
             </div>
           </div>
         </div>
-        <div class="chart-area"><canvas id="prod-chart" height="160"></canvas></div>
+        <div class="chart-area">
+          <canvas id="prod-chart" height="170"></canvas>
+          <div id="chart-tooltip" class="chart-tooltip hidden"></div>
+        </div>
+        <div class="chart-stats-strip">
+          <div class="cs-item" id="cs-prod-item" onclick="switchChart(document.getElementById('cb-produced'),'produced')" onmouseenter="highlightSeries('produced')" onmouseleave="highlightSeries(null)" title="Filter Production only">
+            <span class="cs-label"><span class="legend-line production mini"></span> 6M Production</span>
+            <span class="cs-val" id="cs-prod-val">0 MT</span>
+          </div>
+          <div class="cs-item" id="cs-disp-item" onclick="switchChart(document.getElementById('cb-dispatched'),'dispatched')" onmouseenter="highlightSeries('dispatched')" onmouseleave="highlightSeries(null)" title="Filter Dispatch only">
+            <span class="cs-label"><span class="legend-line dispatch mini"></span> 6M Dispatched</span>
+            <span class="cs-val" id="cs-disp-val">0 MT</span>
+          </div>
+          <div class="cs-item" id="cs-rate-item" onclick="switchChart(document.getElementById('cb-both'),'both')" title="View comparison">
+            <span class="cs-label">Dispatch Ratio</span>
+            <span class="cs-val" id="cs-rate-val">0%</span>
+          </div>
+          <div class="cs-item" id="cs-peak-item" onclick="navigate('production')" title="Open Production log">
+            <span class="cs-label">Peak Output</span>
+            <span class="cs-val" id="cs-peak-val">—</span>
+          </div>
+        </div>
       </div>
 
       <div class="dash-card">

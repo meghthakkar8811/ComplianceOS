@@ -535,8 +535,29 @@ async function loadDashboard() {
   // Alert badge
   refreshAlertBadge(d.kpis.overdue_filings + d.kpis.expired_documents + (d.dgms.overall_score < 60 ? 1 : 0));
 
-  // Production chart
+  // Production chart & mini stats strip
   STATE.chartData = d.production_chart;
+  if (Array.isArray(d.production_chart) && d.production_chart.length) {
+    const totalP = d.production_chart.reduce((s, m) => s + (Number(m.produced) || 0), 0);
+    const totalD = d.production_chart.reduce((s, m) => s + (Number(m.dispatched) || 0), 0);
+    const rPct   = totalP > 0 ? ((totalD / totalP) * 100).toFixed(1) + '%' : (totalD > 0 ? '100%' : '0%');
+    let pMonth = '—', pVal = 0;
+    d.production_chart.forEach(m => {
+      const p = Number(m.produced) || 0;
+      if (p > pVal) {
+        pVal = p;
+        pMonth = `${m.label || m.month} (${pVal >= 1000 ? (pVal/1000).toLocaleString('en-IN',{maximumFractionDigits:1})+'k' : pVal} MT)`;
+      }
+    });
+    const elP = document.getElementById('cs-prod-val');
+    const elD = document.getElementById('cs-disp-val');
+    const elR = document.getElementById('cs-rate-val');
+    const elM = document.getElementById('cs-peak-val');
+    if (elP) elP.textContent = fmtINR(Math.round(totalP)) + ' MT';
+    if (elD) elD.textContent = fmtINR(Math.round(totalD)) + ' MT';
+    if (elR) elR.textContent = rPct;
+    if (elM) elM.textContent = pMonth;
+  }
   drawProductionChart();
 
   // Deadlines feed
@@ -595,8 +616,41 @@ function animateCounter(elId, target, prefix='', suffix='') {
 }
 
 // ═══════════════════════════════════════════════════════════
-// PRODUCTION & DISPATCH CHART (Canvas — dual-line graph)
+// PRODUCTION & DISPATCH CHART (Canvas — interactive dual-line graph)
 // ═══════════════════════════════════════════════════════════
+window.chartHighlightSeries = null;
+
+function highlightSeries(type) {
+  window.chartHighlightSeries = type;
+  const legProd = document.getElementById('leg-prod');
+  const legDisp = document.getElementById('leg-disp');
+  const csProd  = document.getElementById('cs-prod-item');
+  const csDisp  = document.getElementById('cs-disp-item');
+
+  if (type === 'produced') {
+    if (legDisp) legDisp.classList.add('dimmed');
+    if (csDisp) csDisp.classList.add('dimmed');
+    if (legProd) legProd.classList.remove('dimmed');
+    if (csProd) csProd.classList.remove('dimmed');
+  } else if (type === 'dispatched') {
+    if (legProd) legProd.classList.add('dimmed');
+    if (csProd) csProd.classList.add('dimmed');
+    if (legDisp) legDisp.classList.remove('dimmed');
+    if (csDisp) csDisp.classList.remove('dimmed');
+  } else {
+    if (legProd) legProd.classList.remove('dimmed');
+    if (legDisp) legDisp.classList.remove('dimmed');
+    if (csProd) csProd.classList.remove('dimmed');
+    if (csDisp) csDisp.classList.remove('dimmed');
+  }
+
+  if (window._renderProductionChartStatic) {
+    window._renderProductionChartStatic(1);
+  } else {
+    drawProductionChart();
+  }
+}
+
 function switchChart(btn, type) {
   document.querySelectorAll('.ct-btn').forEach(b => b.classList.remove('active'));
   if (btn) {
@@ -621,7 +675,7 @@ function drawProductionChart() {
 
   const dpr = window.devicePixelRatio || 1;
   const cssWidth = area.offsetWidth || 600;
-  const cssHeight = 160;
+  const cssHeight = 170;
   canvas.width = Math.round(cssWidth * dpr);
   canvas.height = Math.round(cssHeight * dpr);
   if (ctx.resetTransform) ctx.resetTransform();
@@ -651,7 +705,7 @@ function drawProductionChart() {
   else mult = 12;
   const max = Math.max(mult * niceFactor, 10);
 
-  const pad = { t: 26, r: 24, b: 26, l: 48 };
+  const pad = { t: 28, r: 24, b: 28, l: 48 };
   const cW = cssWidth - pad.l - pad.r;
   const cH = cssHeight - pad.t - pad.b;
 
@@ -660,23 +714,86 @@ function drawProductionChart() {
   const textMuted  = isLight ? '#64748b' : 'rgba(142,168,204,0.7)';
   const cardBg     = isLight ? '#ffffff' : '#0f172a';
 
+  function updateTooltip(idx, hX) {
+    const tt = document.getElementById('chart-tooltip');
+    if (!tt) return;
+    if (idx === null || !STATE.chartData[idx]) {
+      tt.classList.add('hidden');
+      return;
+    }
+    const mData = STATE.chartData[idx];
+    const pVal = Number(mData.produced) || 0;
+    const dVal = Number(mData.dispatched) || 0;
+    const monthName = mData.label || mData.month;
+    const year = mData.year || new Date().getFullYear();
+    const netStock = pVal - dVal;
+    const ratePct = pVal > 0 ? Math.round((dVal / pVal) * 100) : (dVal > 0 ? 100 : 0);
+
+    const surplusBadge = netStock >= 0
+      ? `<span class="tt-gap surplus">+${fmtINR(netStock)} MT stock</span>`
+      : `<span class="tt-gap deficit">${fmtINR(netStock)} MT stock</span>`;
+
+    tt.innerHTML = `
+      <div class="tt-header">
+        <span class="tt-month">${monthName} ${year}</span>
+        <span class="tt-badge">${ratePct}% dispatched</span>
+      </div>
+      ${showProd ? `
+      <div class="tt-row">
+        <span class="tt-dot prod"></span>
+        <span class="tt-label">Production</span>
+        <span class="tt-val">${fmtINR(pVal)} MT</span>
+      </div>` : ''}
+      ${showDisp ? `
+      <div class="tt-row">
+        <span class="tt-dot disp"></span>
+        <span class="tt-label">Dispatched</span>
+        <span class="tt-val">${fmtINR(dVal)} MT</span>
+      </div>` : ''}
+      ${showProd && showDisp ? `
+      <div class="tt-divider"></div>
+      <div class="tt-footer">
+        <span>Balance:</span>
+        ${surplusBadge}
+      </div>` : ''}
+    `;
+
+    const areaW = area.offsetWidth || 600;
+    const clampedLeft = Math.max(95, Math.min(areaW - 95, hX));
+    tt.style.left = `${clampedLeft}px`;
+    tt.classList.remove('hidden');
+  }
+
   if (!chartHoverAttached) {
     chartHoverAttached = true;
     canvas.addEventListener('mousemove', (e) => {
       const rect = canvas.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
-      if (mouseX < pad.l || mouseX > pad.l + cW) {
+      if (mouseX < pad.l - 15 || mouseX > pad.l + cW + 15) {
         chartHoverIndex = null;
+        updateTooltip(null);
       } else {
-        const step = cW / (n - 1);
+        const step = n > 1 ? cW / (n - 1) : cW;
         const idx = Math.round((mouseX - pad.l) / step);
         chartHoverIndex = Math.max(0, Math.min(n - 1, idx));
+        const hX = pad.l + (n > 1 ? (chartHoverIndex / (n - 1)) * cW : cW / 2);
+        updateTooltip(chartHoverIndex, hX);
       }
       renderChartStatic(1);
     });
+
     canvas.addEventListener('mouseleave', () => {
       chartHoverIndex = null;
+      updateTooltip(null);
       renderChartStatic(1);
+    });
+
+    canvas.addEventListener('click', () => {
+      if (chartHoverIndex !== null && STATE.chartData && STATE.chartData[chartHoverIndex]) {
+        const mData = STATE.chartData[chartHoverIndex];
+        toast(`Viewing production log for ${mData.label || mData.month}`, 'info');
+        navigate('production');
+      }
     });
   }
 
@@ -707,13 +824,32 @@ function drawProductionChart() {
       ctx.fillText(labelStr, pad.l - 6, y);
     }
 
-    // 2. Month labels
+    // 2. Hover column highlight backdrop band
+    if (chartHoverIndex !== null && chartHoverIndex >= 0 && chartHoverIndex < n) {
+      const step = n > 1 ? cW / (n - 1) : cW;
+      const bandW = Math.min(step * 0.76, 56);
+      const hX = pad.l + (n > 1 ? (chartHoverIndex / (n - 1)) * cW : cW / 2);
+
+      ctx.save();
+      ctx.fillStyle = isLight ? 'rgba(0,0,0,0.038)' : 'rgba(255,255,255,0.045)';
+      if (ctx.roundRect) {
+        ctx.beginPath();
+        ctx.roundRect(hX - bandW / 2, pad.t, bandW, cH, 6);
+        ctx.fill();
+      } else {
+        ctx.fillRect(hX - bandW / 2, pad.t, bandW, cH);
+      }
+      ctx.restore();
+    }
+
+    // 3. Month labels
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     for (let i = 0; i < n; i++) {
       const x = pad.l + (n > 1 ? (i / (n - 1)) * cW : cW / 2);
-      ctx.fillStyle = (chartHoverIndex === i) ? (isLight ? '#0f172a' : '#ffffff') : textMuted;
-      ctx.font = (chartHoverIndex === i ? 'bold ' : '') + '9.5px IBM Plex Mono, monospace';
+      const isHov = chartHoverIndex === i;
+      ctx.fillStyle = isHov ? (isLight ? '#0f172a' : '#ffffff') : textMuted;
+      ctx.font = (isHov ? 'bold ' : '') + '9.5px IBM Plex Mono, monospace';
       ctx.fillText(labels[i], x, cssHeight - 16);
     }
 
@@ -727,11 +863,16 @@ function drawProductionChart() {
       return { x, y, val };
     });
 
-    const drawLineAndArea = (pts, strokeColor, fillColor, shadowColor) => {
+    const drawLineAndArea = (pts, strokeColor, fillColor, shadowColor, isHighlighted, isDimmed) => {
       if (!pts || !pts.length) return;
+
+      const alphaMult = isDimmed ? 0.2 : 1;
+      const lineWidth = isHighlighted ? 3.4 : (isDimmed ? 1.4 : 2.5);
+      const shadowB   = isHighlighted ? 12 : (isDimmed ? 0 : 6);
 
       // Fill Gradient Area
       ctx.save();
+      ctx.globalAlpha = alphaMult;
       ctx.beginPath();
       ctx.moveTo(pts[0].x, pad.t + cH);
       ctx.lineTo(pts[0].x, pts[0].y);
@@ -751,6 +892,7 @@ function drawProductionChart() {
 
       // Stroke Line
       ctx.save();
+      ctx.globalAlpha = alphaMult;
       ctx.beginPath();
       ctx.moveTo(pts[0].x, pts[0].y);
       for (let i = 0; i < pts.length - 1; i++) {
@@ -762,14 +904,21 @@ function drawProductionChart() {
       }
       ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
       ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = lineWidth;
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
       ctx.shadowColor = shadowColor || strokeColor;
-      ctx.shadowBlur = 6;
+      ctx.shadowBlur = shadowB;
       ctx.stroke();
       ctx.restore();
     };
+
+    // Series highlight state
+    const hl = window.chartHighlightSeries;
+    const isProdHl = hl === 'produced';
+    const isDispHl = hl === 'dispatched';
+    const isProdDim = isDispHl;
+    const isDispDim = isProdHl;
 
     // Draw Dispatch line (Cyan #00b4d8)
     let dispPts = [];
@@ -778,7 +927,7 @@ function drawProductionChart() {
       gradDisp.addColorStop(0, 'rgba(0, 180, 216, 0.22)');
       gradDisp.addColorStop(1, 'rgba(0, 180, 216, 0.00)');
       dispPts = getPoints(dispData);
-      drawLineAndArea(dispPts, '#00b4d8', gradDisp, 'rgba(0, 180, 216, 0.4)');
+      drawLineAndArea(dispPts, '#00b4d8', gradDisp, 'rgba(0, 180, 216, 0.4)', isDispHl, isDispDim);
     }
 
     // Draw Production line (Amber #f0a500)
@@ -788,14 +937,17 @@ function drawProductionChart() {
       gradProd.addColorStop(0, 'rgba(240, 165, 0, 0.25)');
       gradProd.addColorStop(1, 'rgba(240, 165, 0, 0.00)');
       prodPts = getPoints(prodData);
-      drawLineAndArea(prodPts, '#f0a500', gradProd, 'rgba(240, 165, 0, 0.4)');
+      drawLineAndArea(prodPts, '#f0a500', gradProd, 'rgba(240, 165, 0, 0.4)', isProdHl, isProdDim);
     }
 
     // Draw Markers and Value Labels
-    const drawPointsAndLabels = (pts, color, isProd) => {
+    const drawPointsAndLabels = (pts, color, isProd, isDimmed) => {
       pts.forEach((pt, i) => {
         const isHovered = chartHoverIndex === i;
         const dotRadius = isHovered ? 5.5 : 3.5;
+
+        ctx.save();
+        ctx.globalAlpha = isDimmed ? 0.25 : 1;
 
         // Outer dot
         ctx.beginPath();
@@ -812,11 +964,9 @@ function drawProductionChart() {
         // Display value tags when animation finishes or on hover
         if (progress > 0.85 && (i === pts.length - 1 || pt.val > 0 || isHovered)) {
           const formatted = pt.val >= 1000 ? (pt.val / 1000).toLocaleString('en-IN', { maximumFractionDigits: 1 }) + 'k' : String(Math.round(pt.val));
-          ctx.save();
           ctx.font = (isHovered || i === pts.length - 1 ? 'bold ' : '') + '9.5px IBM Plex Mono, monospace';
           ctx.textAlign = 'center';
 
-          // Offset production label above and dispatch label below to prevent collision
           const bothActive = showProd && showDisp;
           let yOffset = -9;
           if (bothActive && !isProd) {
@@ -825,28 +975,82 @@ function drawProductionChart() {
 
           ctx.fillStyle = color;
           ctx.fillText(formatted, pt.x, pt.y + yOffset);
-          ctx.restore();
         }
+        ctx.restore();
       });
     };
 
-    if (showDisp) drawPointsAndLabels(dispPts, '#00b4d8', false);
-    if (showProd) drawPointsAndLabels(prodPts, '#f0a500', true);
+    if (showDisp) drawPointsAndLabels(dispPts, '#00b4d8', false, isDispDim);
+    if (showProd) drawPointsAndLabels(prodPts, '#f0a500', true, isProdDim);
 
-    // Hover vertical indicator line
+    // Hover indicators: dashed crosshair, horizontal guides, and glowing concentric rings
     if (chartHoverIndex !== null && chartHoverIndex >= 0 && chartHoverIndex < n) {
       const hX = pad.l + (n > 1 ? (chartHoverIndex / (n - 1)) * cW : cW / 2);
+
+      // Vertical dashed guide line
       ctx.save();
       ctx.beginPath();
       ctx.setLineDash([3, 3]);
-      ctx.strokeStyle = isLight ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.25)';
+      ctx.strokeStyle = isLight ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.32)';
       ctx.lineWidth = 1;
       ctx.moveTo(hX, pad.t);
       ctx.lineTo(hX, pad.t + cH);
       ctx.stroke();
       ctx.restore();
+
+      // Horizontal dashed reference line to Y-axis
+      const drawHGuide = (y, color) => {
+        ctx.save();
+        ctx.beginPath();
+        ctx.setLineDash([2, 3]);
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = 0.35;
+        ctx.lineWidth = 1;
+        ctx.moveTo(pad.l, y);
+        ctx.lineTo(hX, y);
+        ctx.stroke();
+        ctx.restore();
+      };
+
+      // Glowing concentric halo rings on active points
+      const drawHoverHalo = (pt, color) => {
+        ctx.save();
+        // Pulsing / glowing outer halo
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 11, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 0.22;
+        ctx.fill();
+
+        // Inner solid ring
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 6, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 1;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 8;
+        ctx.fill();
+
+        // Center dot
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 2.8, 0, Math.PI * 2);
+        ctx.fillStyle = cardBg;
+        ctx.fill();
+        ctx.restore();
+      };
+
+      if (showDisp && dispPts[chartHoverIndex]) {
+        drawHGuide(dispPts[chartHoverIndex].y, '#00b4d8');
+        drawHoverHalo(dispPts[chartHoverIndex], '#00b4d8');
+      }
+      if (showProd && prodPts[chartHoverIndex]) {
+        drawHGuide(prodPts[chartHoverIndex].y, '#f0a500');
+        drawHoverHalo(prodPts[chartHoverIndex], '#f0a500');
+      }
     }
   }
+
+  window._renderProductionChartStatic = renderChartStatic;
 
   const animate = () => {
     const progress = Math.min(frame / totalFrames, 1);
