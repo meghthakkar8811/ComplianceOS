@@ -190,13 +190,25 @@
     <!-- LOWER GRID -->
     <div class="dashboard-grid">
       <div class="dash-card span-2">
-        <div class="card-head"><h3>Production — Last 6 Months</h3>
-          <div class="chart-toggle">
-            <button class="ct-btn active" onclick="switchChart(this,'produced')">Production</button>
-            <button class="ct-btn" onclick="switchChart(this,'dispatched')">Dispatch</button>
+        <div class="card-head">
+          <h3>Production & Dispatch — Last 6 Months</h3>
+          <div class="chart-head-right">
+            <div class="chart-legend">
+              <span class="legend-item" onclick="switchChart(document.getElementById('cb-produced'),'produced')">
+                <span class="legend-line production"></span> Production
+              </span>
+              <span class="legend-item" onclick="switchChart(document.getElementById('cb-dispatched'),'dispatched')">
+                <span class="legend-line dispatch"></span> Dispatch
+              </span>
+            </div>
+            <div class="chart-toggle">
+              <button class="ct-btn active" id="cb-both" onclick="switchChart(this,'both')">Both</button>
+              <button class="ct-btn" id="cb-produced" onclick="switchChart(this,'produced')">Production</button>
+              <button class="ct-btn" id="cb-dispatched" onclick="switchChart(this,'dispatched')">Dispatch</button>
+            </div>
           </div>
         </div>
-        <div class="chart-area"><canvas id="prod-chart" height="150"></canvas></div>
+        <div class="chart-area"><canvas id="prod-chart" height="160"></canvas></div>
       </div>
 
       <div class="dash-card">

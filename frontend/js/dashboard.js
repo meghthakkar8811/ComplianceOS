@@ -11,7 +11,7 @@ let STATE = {
   dashData: null,
   prodData: [],
   saleData: [],
-  chartType:'produced',
+  chartType:'both',
   chartData: [],
 };
 
@@ -342,11 +342,12 @@ async function loadDashboard() {
       const start = monthDate.getTime();
       const end   = new Date(monthDate.getFullYear(), monthDate.getMonth()+1, 1).getTime();
       const inMonth = entries.filter(e => e.entryTime >= start && e.entryTime < end);
-      const dispatchedInMonth = sales.filter(s => s.dispatchedOn >= start && s.dispatchedOn < end);
+      const dispatchedInMonthSales = sales.filter(s => s.dispatchedOn >= start && s.dispatchedOn < end).reduce((s,sale)=>s+(sale.quantity||0),0);
+      const dispatchedInMonthEntries = inMonth.reduce((s,e)=>s+(e.quantityDispatched||0),0);
       chart.push({
         month: monthDate.toLocaleString('default',{month:'short'}),
         produced:   inMonth.reduce((s,e)=>s+(e.quantity||0),0),
-        dispatched: dispatchedInMonth.reduce((s,sale)=>s+(sale.quantity||0),0),
+        dispatched: Math.max(dispatchedInMonthSales, dispatchedInMonthEntries),
       });
     }
 
@@ -594,95 +595,269 @@ function animateCounter(elId, target, prefix='', suffix='') {
 }
 
 // ═══════════════════════════════════════════════════════════
-// PRODUCTION CHART (canvas — no external library)
+// PRODUCTION & DISPATCH CHART (Canvas — dual-line graph)
 // ═══════════════════════════════════════════════════════════
 function switchChart(btn, type) {
   document.querySelectorAll('.ct-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
+  if (btn) {
+    btn.classList.add('active');
+  } else {
+    const idMap = { both: 'cb-both', produced: 'cb-produced', dispatched: 'cb-dispatched' };
+    const el = document.getElementById(idMap[type]);
+    if (el) el.classList.add('active');
+  }
   STATE.chartType = type;
   drawProductionChart();
 }
 
+let chartHoverIndex = null;
+let chartHoverAttached = false;
+
 function drawProductionChart() {
   const canvas = document.getElementById('prod-chart');
-  if (!canvas || !STATE.chartData.length) return;
+  if (!canvas || !STATE.chartData || !STATE.chartData.length) return;
   const ctx = canvas.getContext('2d');
   const area = canvas.parentElement;
-  canvas.width  = area.offsetWidth || 600;
-  canvas.height = 150;
 
-  const data   = STATE.chartData.map(m => m[STATE.chartType] || 0);
-  const labels = STATE.chartData.map(m => m.label || m.month);
-  const W = canvas.width, H = canvas.height;
-  const pad = { t:20, r:14, b:28, l:52 };
-  const cW = W - pad.l - pad.r, cH = H - pad.t - pad.b;
-  const max = Math.max(...data, 1) * 1.1;
+  const dpr = window.devicePixelRatio || 1;
+  const cssWidth = area.offsetWidth || 600;
+  const cssHeight = 160;
+  canvas.width = Math.round(cssWidth * dpr);
+  canvas.height = Math.round(cssHeight * dpr);
+  if (ctx.resetTransform) ctx.resetTransform();
+  ctx.scale(dpr, dpr);
 
-  ctx.clearRect(0, 0, W, H);
+  const prodData = STATE.chartData.map(m => Number(m.produced) || 0);
+  const dispData = STATE.chartData.map(m => Number(m.dispatched) || 0);
+  const labels   = STATE.chartData.map(m => m.label || m.month);
+  const n = labels.length;
 
-  // Grid
-  for (let i = 0; i <= 4; i++) {
-    const y = pad.t + cH * (1 - i/4);
-    ctx.beginPath(); ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1;
-    ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
-    ctx.fillStyle = 'rgba(142,168,204,0.7)'; ctx.font = '9px IBM Plex Mono,monospace'; ctx.textAlign = 'right';
-    const val = Math.round(max * i / 4);
-    ctx.fillText(val >= 1000 ? (val/1000).toFixed(0)+'k' : val, pad.l-5, y+3);
+  const showProd = STATE.chartType === 'both' || STATE.chartType === 'produced';
+  const showDisp = STATE.chartType === 'both' || STATE.chartType === 'dispatched';
+
+  let activeData = [];
+  if (showProd) activeData.push(...prodData);
+  if (showDisp) activeData.push(...dispData);
+  const rawMax = Math.max(...activeData, 0);
+
+  // Determine nice scale
+  const baseMax = rawMax > 0 ? rawMax : 100;
+  const niceFactor = Math.pow(10, Math.floor(Math.log10(baseMax)));
+  const norm = baseMax / niceFactor;
+  let mult = 2;
+  if (norm <= 1) mult = 1.25;
+  else if (norm <= 2) mult = 2.5;
+  else if (norm <= 5) mult = 6;
+  else mult = 12;
+  const max = Math.max(mult * niceFactor, 10);
+
+  const pad = { t: 26, r: 24, b: 26, l: 48 };
+  const cW = cssWidth - pad.l - pad.r;
+  const cH = cssHeight - pad.t - pad.b;
+
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  const gridStroke = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)';
+  const textMuted  = isLight ? '#64748b' : 'rgba(142,168,204,0.7)';
+  const cardBg     = isLight ? '#ffffff' : '#0f172a';
+
+  if (!chartHoverAttached) {
+    chartHoverAttached = true;
+    canvas.addEventListener('mousemove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      if (mouseX < pad.l || mouseX > pad.l + cW) {
+        chartHoverIndex = null;
+      } else {
+        const step = cW / (n - 1);
+        const idx = Math.round((mouseX - pad.l) / step);
+        chartHoverIndex = Math.max(0, Math.min(n - 1, idx));
+      }
+      renderChartStatic(1);
+    });
+    canvas.addEventListener('mouseleave', () => {
+      chartHoverIndex = null;
+      renderChartStatic(1);
+    });
   }
 
-  const barW = (cW / labels.length) * 0.52;
-  const barGap = cW / labels.length;
   let frame = 0;
-  const totalFrames = 32;
-  const isLast = (i) => i === data.length - 1;
+  const totalFrames = 26;
+  if (window._chartAnimId) cancelAnimationFrame(window._chartAnimId);
 
-  const animate = () => {
-    ctx.clearRect(0, 0, W, H);
+  function renderChartStatic(progress) {
+    ctx.clearRect(0, 0, cssWidth, cssHeight);
+
+    // 1. Grid lines and Y labels
+    ctx.strokeStyle = gridStroke;
+    ctx.lineWidth = 1;
+    ctx.fillStyle = textMuted;
+    ctx.font = '9px IBM Plex Mono, monospace';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+
     for (let i = 0; i <= 4; i++) {
-      const y = pad.t + cH * (1 - i/4);
-      ctx.beginPath(); ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1;
-      ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
-      ctx.fillStyle = 'rgba(142,168,204,0.7)'; ctx.font = '9px IBM Plex Mono,monospace'; ctx.textAlign = 'right';
-      const val = Math.round(max * i / 4);
-      ctx.fillText(val >= 1000 ? (val/1000).toFixed(0)+'k' : val, pad.l-5, y+3);
+      const y = pad.t + cH * (1 - i / 4);
+      ctx.beginPath();
+      ctx.moveTo(pad.l, y);
+      ctx.lineTo(pad.l + cW, y);
+      ctx.stroke();
+
+      const val = Math.round((max * i) / 4);
+      const labelStr = val >= 1000 ? (val / 1000).toLocaleString('en-IN', { maximumFractionDigits: 1 }) + 'k' : String(val);
+      ctx.fillText(labelStr, pad.l - 6, y);
     }
 
-    const progress = Math.min(frame / totalFrames, 1);
+    // 2. Month labels
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    for (let i = 0; i < n; i++) {
+      const x = pad.l + (n > 1 ? (i / (n - 1)) * cW : cW / 2);
+      ctx.fillStyle = (chartHoverIndex === i) ? (isLight ? '#0f172a' : '#ffffff') : textMuted;
+      ctx.font = (chartHoverIndex === i ? 'bold ' : '') + '9.5px IBM Plex Mono, monospace';
+      ctx.fillText(labels[i], x, cssHeight - 16);
+    }
+
     const ease = 1 - Math.pow(1 - progress, 3);
 
-    data.forEach((val, i) => {
-      const bH = (val / max) * cH * ease;
-      const x = pad.l + i * barGap + (barGap - barW) / 2;
-      const y = pad.t + cH - bH;
-      const grad = ctx.createLinearGradient(0, y, 0, y + bH);
-      if (isLast(i)) {
-        grad.addColorStop(0, 'rgba(232,160,32,0.9)');
-        grad.addColorStop(1, 'rgba(232,160,32,0.3)');
-      } else {
-        grad.addColorStop(0, 'rgba(74,158,255,0.5)');
-        grad.addColorStop(1, 'rgba(74,158,255,0.1)');
-      }
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      if (ctx.roundRect) ctx.roundRect(x, y, barW, bH, 3);
-      else ctx.rect(x, y, barW, bH);
-      ctx.fill();
-
-      if (progress > 0.9) {
-        ctx.fillStyle = isLast(i) ? 'rgba(232,160,32,0.9)' : 'rgba(142,168,204,0.7)';
-        ctx.font = (isLast(i)?'bold ':'') + '9px IBM Plex Mono,monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText(val >= 1000 ? (val/1000).toFixed(0)+'k' : val, x + barW/2, y - 4);
-      }
-
-      ctx.fillStyle = 'rgba(142,168,204,0.7)'; ctx.font = '9.5px IBM Plex Mono,monospace'; ctx.textAlign = 'center';
-      ctx.fillText(labels[i], x + barW/2, H - 6);
+    const getPoints = (dataArr) => dataArr.map((val, i) => {
+      const x = pad.l + (n > 1 ? (i / (n - 1)) * cW : cW / 2);
+      const targetY = pad.t + cH * (1 - (val / max));
+      const baselineY = pad.t + cH;
+      const y = baselineY - (baselineY - targetY) * ease;
+      return { x, y, val };
     });
 
+    const drawLineAndArea = (pts, strokeColor, fillColor, shadowColor) => {
+      if (!pts || !pts.length) return;
+
+      // Fill Gradient Area
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pad.t + cH);
+      ctx.lineTo(pts[0].x, pts[0].y);
+      for (let i = 0; i < pts.length - 1; i++) {
+        const p0 = pts[i];
+        const p1 = pts[i + 1];
+        const xc = (p0.x + p1.x) / 2;
+        const yc = (p0.y + p1.y) / 2;
+        ctx.quadraticCurveTo(p0.x, p0.y, xc, yc);
+      }
+      ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+      ctx.lineTo(pts[pts.length - 1].x, pad.t + cH);
+      ctx.closePath();
+      ctx.fillStyle = fillColor;
+      ctx.fill();
+      ctx.restore();
+
+      // Stroke Line
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 0; i < pts.length - 1; i++) {
+        const p0 = pts[i];
+        const p1 = pts[i + 1];
+        const xc = (p0.x + p1.x) / 2;
+        const yc = (p0.y + p1.y) / 2;
+        ctx.quadraticCurveTo(p0.x, p0.y, xc, yc);
+      }
+      ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 2.5;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.shadowColor = shadowColor || strokeColor;
+      ctx.shadowBlur = 6;
+      ctx.stroke();
+      ctx.restore();
+    };
+
+    // Draw Dispatch line (Cyan #00b4d8)
+    let dispPts = [];
+    if (showDisp) {
+      const gradDisp = ctx.createLinearGradient(0, pad.t, 0, pad.t + cH);
+      gradDisp.addColorStop(0, 'rgba(0, 180, 216, 0.22)');
+      gradDisp.addColorStop(1, 'rgba(0, 180, 216, 0.00)');
+      dispPts = getPoints(dispData);
+      drawLineAndArea(dispPts, '#00b4d8', gradDisp, 'rgba(0, 180, 216, 0.4)');
+    }
+
+    // Draw Production line (Amber #f0a500)
+    let prodPts = [];
+    if (showProd) {
+      const gradProd = ctx.createLinearGradient(0, pad.t, 0, pad.t + cH);
+      gradProd.addColorStop(0, 'rgba(240, 165, 0, 0.25)');
+      gradProd.addColorStop(1, 'rgba(240, 165, 0, 0.00)');
+      prodPts = getPoints(prodData);
+      drawLineAndArea(prodPts, '#f0a500', gradProd, 'rgba(240, 165, 0, 0.4)');
+    }
+
+    // Draw Markers and Value Labels
+    const drawPointsAndLabels = (pts, color, isProd) => {
+      pts.forEach((pt, i) => {
+        const isHovered = chartHoverIndex === i;
+        const dotRadius = isHovered ? 5.5 : 3.5;
+
+        // Outer dot
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, dotRadius, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+
+        // Inner center
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, Math.max(1, dotRadius - 1.8), 0, Math.PI * 2);
+        ctx.fillStyle = cardBg;
+        ctx.fill();
+
+        // Display value tags when animation finishes or on hover
+        if (progress > 0.85 && (i === pts.length - 1 || pt.val > 0 || isHovered)) {
+          const formatted = pt.val >= 1000 ? (pt.val / 1000).toLocaleString('en-IN', { maximumFractionDigits: 1 }) + 'k' : String(Math.round(pt.val));
+          ctx.save();
+          ctx.font = (isHovered || i === pts.length - 1 ? 'bold ' : '') + '9.5px IBM Plex Mono, monospace';
+          ctx.textAlign = 'center';
+
+          // Offset production label above and dispatch label below to prevent collision
+          const bothActive = showProd && showDisp;
+          let yOffset = -9;
+          if (bothActive && !isProd) {
+            yOffset = 15;
+          }
+
+          ctx.fillStyle = color;
+          ctx.fillText(formatted, pt.x, pt.y + yOffset);
+          ctx.restore();
+        }
+      });
+    };
+
+    if (showDisp) drawPointsAndLabels(dispPts, '#00b4d8', false);
+    if (showProd) drawPointsAndLabels(prodPts, '#f0a500', true);
+
+    // Hover vertical indicator line
+    if (chartHoverIndex !== null && chartHoverIndex >= 0 && chartHoverIndex < n) {
+      const hX = pad.l + (n > 1 ? (chartHoverIndex / (n - 1)) * cW : cW / 2);
+      ctx.save();
+      ctx.beginPath();
+      ctx.setLineDash([3, 3]);
+      ctx.strokeStyle = isLight ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.25)';
+      ctx.lineWidth = 1;
+      ctx.moveTo(hX, pad.t);
+      ctx.lineTo(hX, pad.t + cH);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  const animate = () => {
+    const progress = Math.min(frame / totalFrames, 1);
+    renderChartStatic(progress);
     frame++;
-    if (frame <= totalFrames) requestAnimationFrame(animate);
+    if (frame <= totalFrames) {
+      window._chartAnimId = requestAnimationFrame(animate);
+    }
   };
-  requestAnimationFrame(animate);
+
+  animate();
 }
 
 // ═══════════════════════════════════════════════════════════
