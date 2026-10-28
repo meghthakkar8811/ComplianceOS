@@ -362,6 +362,22 @@ async function loadDashboard() {
     let expiredCount = 0;
 
     records.forEach(r => {
+      // Statutory Registers rely on lastUpdatedAt vs maxDaysAllowed
+      if (r.recordType === 'REGISTER') {
+        const lastUpdated = r.lastUpdatedAt || 0;
+        const maxDays = r.maxDaysAllowed || 30;
+        const daysSince = lastUpdated > 0 ? Math.max(0, Math.floor((now - lastUpdated) / 86400000)) : 999;
+        if (daysSince > maxDays) {
+          expiredCount++;
+        } else if (lastUpdated > 0) {
+          completedCount++;
+        } else {
+          pendingCount++;
+        }
+        return;
+      }
+
+      // Filings, Clearances, Statutory Plans, Rent Payments
       const isExpired = r.status === 'EXPIRED' || (r.expiry && r.expiry < now && r.status !== 'SUBMITTED');
       const isCompleted = !isExpired && (r.status === 'SUBMITTED' || (r.status === 'VALID' && (!r.expiry || r.expiry >= now)));
       if (isExpired) {
@@ -2153,8 +2169,30 @@ async function addDocument() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// DGMS
+// DGMS INSPECTION READINESS
 // ═══════════════════════════════════════════════════════════
+const DGMS_WEIGHTS = {
+  ACCIDENT_REGISTER: 1.5,
+  WEIGHBRIDGE_REGISTER: 1.0,
+  EXPLOSIVE_CONSUMPTION: 1.0,
+  SAFETY_COMMITTEE: 1.0,
+  MACHINERY_REGISTER: 1.0,
+  EMPLOYMENT_REGISTER: 0.9,
+  FIRST_AID: 0.8,
+  SHOTFIRER_COMPETENCY: 0.8,
+};
+
+const DGMS_MAX_DAYS = {
+  ACCIDENT_REGISTER: 1,
+  WEIGHBRIDGE_REGISTER: 1,
+  EXPLOSIVE_CONSUMPTION: 7,
+  FIRST_AID: 14,
+  SAFETY_COMMITTEE: 30,
+  MACHINERY_REGISTER: 30,
+  EMPLOYMENT_REGISTER: 30,
+  SHOTFIRER_COMPETENCY: 90,
+};
+
 async function loadDgms() {
   if (!STATE.mineId) return;
   let d;
@@ -2165,42 +2203,123 @@ async function loadDgms() {
     return;
   }
 
-  const score = d.overallScore;
-  document.getElementById('dgms-score-num').textContent = score;
-  document.getElementById('dsp-verdict').textContent = d.verdict.replace('_',' ');
-  document.getElementById('dsp-verdict').style.color = score>=80?'var(--green)':score>=50?'var(--warn)':'var(--red)';
-  document.getElementById('dsp-note').textContent = score>=80
-    ? 'Your mine is well-prepared for a DGMS inspection. Maintain current register update frequency.'
-    : score>=50 ? 'A DGMS inspection today may result in 2-3 observations. Fix the items below.'
-    : 'CRITICAL: A DGMS inspection today would result in multiple violations. Update overdue registers immediately.';
+  const now = Date.now();
+  let weightedSum = 0;
+  let totalWeight = 0;
+
+  // Process and verify each register's calculation against live time
+  const processedScores = (d.scores || []).map(r => {
+    const reg = r.register || {};
+    const code = reg.registerCode || '';
+    const maxDays = reg.maxDaysAllowed || DGMS_MAX_DAYS[code] || 30;
+    const lastUpdated = reg.lastUpdatedAt || 0;
+    const daysSince = lastUpdated > 0 ? Math.max(0, Math.floor((now - lastUpdated) / 86400000)) : (r.daysSinceUpdate ?? 999);
+
+    // Exact statutory score decay formula: Math.max(0, 100 - (100 * daysSince / maxDays))
+    let calcScore;
+    if (lastUpdated > 0) {
+      calcScore = Math.max(0, Math.min(100, Math.round(100 - (100.0 * daysSince / maxDays))));
+    } else {
+      calcScore = typeof r.score === 'number' ? r.score : 0;
+    }
+
+    const status = calcScore >= 80 ? 'GREEN' : calcScore >= 50 ? 'AMBER' : 'RED';
+    const weight = DGMS_WEIGHTS[code] || 1.0;
+    weightedSum += calcScore * weight;
+    totalWeight += weight;
+
+    return {
+      ...r,
+      register: reg,
+      score: calcScore,
+      daysSinceUpdate: daysSince,
+      status,
+      maxDays,
+    };
+  });
+
+  const finalScore = totalWeight > 0 ? Math.round(weightedSum / totalWeight) : (d.overallScore ?? 0);
+  const verdict = finalScore >= 80 ? 'GOOD' : finalScore >= 50 ? 'NEEDS ATTENTION' : 'CRITICAL';
+  const scoreColor = finalScore >= 80 ? 'var(--green)' : finalScore >= 50 ? 'var(--warn)' : 'var(--red)';
+  const ringStroke = finalScore >= 80 ? '#10b981' : finalScore >= 50 ? '#f0a500' : '#ef4444';
+
+  const scoreNumEl = document.getElementById('dgms-score-num');
+  if (scoreNumEl) {
+    scoreNumEl.textContent = finalScore;
+    scoreNumEl.style.color = scoreColor;
+  }
+
+  const verdictEl = document.getElementById('dsp-verdict');
+  if (verdictEl) {
+    verdictEl.textContent = verdict;
+    verdictEl.style.color = scoreColor;
+  }
+
+  const noteEl = document.getElementById('dsp-note');
+  if (noteEl) {
+    noteEl.textContent = finalScore >= 80
+      ? 'Your mine is well-prepared for a DGMS inspection. Maintain current register update frequency.'
+      : finalScore >= 50
+      ? 'A DGMS inspection today may result in 2-3 observations. Update overdue registers below.'
+      : 'CRITICAL: A DGMS inspection today would result in statutory violations. Update overdue registers immediately.';
+  }
 
   const ring = document.getElementById('dgms-ring-fill');
   const circ = 427.08;
-  setTimeout(() => { ring.style.strokeDashoffset = circ - (score/100)*circ; ring.style.transition='stroke-dashoffset 1s ease'; }, 100);
+  if (ring) {
+    ring.style.stroke = ringStroke;
+    setTimeout(() => {
+      ring.style.strokeDashoffset = circ - (finalScore / 100) * circ;
+      ring.style.transition = 'stroke-dashoffset 1s ease, stroke 0.4s ease';
+    }, 100);
+  }
 
-  const colorFor = status => status==='GREEN'?'var(--green)':status==='AMBER'?'var(--amber)':'var(--red)';
+  // Sync sidebar navigation pill
+  const navPill = document.getElementById('dgms-nav-pill');
+  if (navPill) navPill.textContent = finalScore;
 
-  // Category bars
-  const cats = {ACCIDENT_REGISTER:'Accident Register',SAFETY_COMMITTEE:'Safety Meetings',EXPLOSIVE_CONSUMPTION:'Explosives',SHOTFIRER_COMPETENCY:'Certifications',FIRST_AID:'First Aid',MACHINERY_REGISTER:'Machinery',WEIGHBRIDGE_REGISTER:'Weighbridge',EMPLOYMENT_REGISTER:'Employment'};
-  document.getElementById('dsp-cats').innerHTML = (d.scores||[]).map(r => {
+  const colorFor = status => status === 'GREEN' ? 'var(--green)' : status === 'AMBER' ? 'var(--warn)' : 'var(--red)';
+
+  // Category breakdown bars
+  const cats = {
+    ACCIDENT_REGISTER: 'Accident Register',
+    SAFETY_COMMITTEE: 'Safety Meetings',
+    EXPLOSIVE_CONSUMPTION: 'Explosives',
+    SHOTFIRER_COMPETENCY: 'Certifications',
+    FIRST_AID: 'First Aid',
+    MACHINERY_REGISTER: 'Machinery',
+    WEIGHBRIDGE_REGISTER: 'Weighbridge',
+    EMPLOYMENT_REGISTER: 'Employment',
+  };
+
+  document.getElementById('dsp-cats').innerHTML = processedScores.map(r => {
     const col = colorFor(r.status);
-    return `<div class="dsp-cat">
-      <span>${cats[r.register.registerCode]||r.register.registerCode}</span>
+    const code = r.register.registerCode || '';
+    const name = cats[code] || r.register.title || code;
+    return `<div class="dsp-cat" title="${r.daysSinceUpdate} days elapsed (Max ${r.maxDays}d)">
+      <span>${name}</span>
       <div class="dsp-bar-wrap"><div class="dsp-bar" style="width:${r.score}%;background:${col}"></div></div>
       <span class="dsp-score" style="color:${col}">${r.score}</span>
     </div>`;
   }).join('');
 
-  document.getElementById('registers-list').innerHTML = (d.scores||[]).map(r => {
+  // Statutory Registers List with live update interval
+  document.getElementById('registers-list').innerHTML = processedScores.map(r => {
     const dotColor = colorFor(r.status);
+    const reg = r.register || {};
+    const lastDateStr = reg.lastUpdatedAt ? new Date(reg.lastUpdatedAt).toLocaleDateString('en-IN') : '—';
+    const noteText = r.status === 'GREEN'
+      ? (r.daysSinceUpdate === 0 ? 'Updated today (Compliant)' : `${r.daysSinceUpdate}d ago · Due in ${Math.max(0, r.maxDays - r.daysSinceUpdate)}d`)
+      : (reg.lastUpdatedAt ? `${r.daysSinceUpdate - r.maxDays}d overdue (${r.daysSinceUpdate}d since last update)` : 'Overdue · Never updated');
+
     return `<div class="reg-item">
       <div>
-        <div class="reg-name">${r.register.title}</div>
-        <div class="reg-reg">${r.register.notes||'DGMS'}</div>
-        <div class="reg-note" style="color:${dotColor}">${r.status==='GREEN'?'Up to date':r.daysSinceUpdate+' days since last update'}</div>
+        <div class="reg-name">${reg.title || 'Statutory Register'}</div>
+        <div class="reg-reg">${reg.notes || 'DGMS statutory requirement'} · Due every ${r.maxDays}d</div>
+        <div class="reg-note" style="color:${dotColor}">${noteText}</div>
       </div>
-      <div class="reg-last">Last: ${r.register.lastUpdatedAt ? new Date(r.register.lastUpdatedAt).toLocaleDateString('en-IN') : '—'}</div>
-      <button class="reg-btn" onclick="markRegister('${r.register.id}')">Mark Updated</button>
+      <div class="reg-last">Last: ${lastDateStr}</div>
+      <button class="reg-btn" onclick="markRegister('${reg.id}')">Mark Updated</button>
       <div class="reg-dot" style="background:${dotColor};box-shadow:0 0 6px ${dotColor}"></div>
     </div>`;
   }).join('');
