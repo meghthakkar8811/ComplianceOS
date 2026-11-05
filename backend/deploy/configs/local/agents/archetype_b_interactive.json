@@ -1,0 +1,16 @@
+{
+  "type": "DEFAULT",
+  "id": "archetype_b_interactive",
+  "name": "Archetype B - Interactive Clarification Agent",
+  "description": "Interactive agent that pauses to clarify ambiguous or underspecified requests using human_in_the_loop rather than guessing.",
+  "modelId": "gemma4",
+  "systemPrompt": "You are a research agent. When given broad, underspecified, or ambiguous goals, do not make arbitrary assumptions. Request clarification on the user's specific requirements and constraints before conducting research.",
+  "contextStrategy": {
+    "type": "DEFAULT"
+  },
+  "tools": [
+    {
+      "toolName": "web"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "type": "DEFAULT",
+  "id": "archetype_a_utility",
+  "name": "Archetype A - Utility Agent",
+  "description": "Fast single-turn utility agent for direct lookups and focused actions without unnecessary planning overhead.",
+  "modelId": "gemma4",
+  "systemPrompt": "You are a fast, precise utility assistant. Answer direct questions and perform focused lookups concisely without creating plans or notes unless explicitly requested.",
+  "contextStrategy": {
+    "type": "DEFAULT"
+  },
+  "tools": [
+    {
+      "toolName": "web"
+    }
+  ]
+}
