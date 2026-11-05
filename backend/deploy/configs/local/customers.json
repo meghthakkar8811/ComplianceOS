@@ -4,12 +4,13 @@
     "name": "local",
     "domain": "localhost",
     "defaultModels": {
-      "fastModelId": "gemma4",
-      "compactionModelId": "gemma4",
-      "evaluatorModelId": "gemma4",
-      "embeddingModelId": "nomic-embed-text",
-      "chatModelId": "gemma4",
-      "visionModelId": "gemma4"
+      "smartModelId": "gemma4",
+      "visionModelId": "gemma4",
+      "fastModelId": "zai-glm-4-5-flash",
+      "modalityVsEmbeddingModelId": {
+        "TEXT": "nomic-embed-text",
+        "IMAGE": "arcface-image-embed"
+      }
     },
     "user": {
       "id": "1",
