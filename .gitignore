@@ -22,5 +22,9 @@ __pycache__/
 *.pyc
 uv.lock
 
+# Node
+node_modules/
+frontend_react/node_modules/
+
 # Local dev overrides
 frontend/js/env.local.js

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Verify Email — ComplianceOS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Serif:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/auth.css">
+<script src="js/theme.js"></script>
+</head>
+<body>
+<button class="theme-toggle-btn" onclick="toggleTheme()" title="Toggle Dark/Light Mode"></button>
+<div class="auth-bg"><div class="auth-bg-grid"></div><div class="auth-bg-glow"></div></div>
+
+<div class="auth-center">
+  <div class="auth-card verify-card">
+    <div class="verify-icon">✉</div>
+    <h2>Check your email</h2>
+    <p class="verify-sub">We sent a 6-digit verification code to<br><strong id="email-display">your email</strong></p>
+
+    <div class="msg-box error"   id="error-box"   style="display:none"></div>
+    <div class="msg-box success" id="success-box" style="display:none"></div>
+
+    <!-- OTP INPUT BOXES -->
+    <div class="otp-wrap" id="otp-wrap">
+      <input class="otp-input" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" id="otp-0" onkeyup="otpMove(this,0)">
+      <input class="otp-input" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" id="otp-1" onkeyup="otpMove(this,1)">
+      <input class="otp-input" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" id="otp-2" onkeyup="otpMove(this,2)">
+      <div class="otp-dash">—</div>
+      <input class="otp-input" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" id="otp-3" onkeyup="otpMove(this,3)">
+      <input class="otp-input" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" id="otp-4" onkeyup="otpMove(this,4)">
+      <input class="otp-input" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" id="otp-5" onkeyup="otpMove(this,5)">
+    </div>
+
+    <button class="btn-primary full-w" id="verify-btn" onclick="submitVerification()">
+      <span id="verify-btn-text">Verify Email</span>
+      <span id="verify-spinner" class="spinner" style="display:none"></span>
+    </button>
+
+    <div class="resend-row">
+      Didn't receive it?
+      <button class="resend-btn" id="resend-btn" onclick="resendCode()">Resend code</button>
+      <span id="resend-timer" style="display:none;color:var(--text2);font-family:var(--mono);font-size:12px"></span>
+    </div>
+
+    <div class="auth-footer" style="margin-top:20px">
+      <a href="login.html">← Back to Sign In</a>
+    </div>
+  </div>
+</div>
+
+<script>
+const API   = '../backend/auth';
+const urlParams = new URLSearchParams(window.location.search);
+const email = urlParams.get('email')
+           || localStorage.getItem('cos_pending_email') || '';
+
+document.getElementById('email-display').textContent = email || 'your email address';
+
+if (window.location.protocol === 'file:') {
+  showError('⚠️ Warning: You opened this page via <code>file://</code>. Please access it via <a href="http://localhost/complianceos/frontend/verify.html" style="color:var(--amber-bright);text-decoration:underline;font-weight:600;">http://localhost/complianceos/frontend/verify.html</a>');
+}
+
+const initialCode = urlParams.get('code') || localStorage.getItem('cos_pending_code');
+if (initialCode && initialCode.length === 6) {
+  for (let i = 0; i < 6; i++) {
+    const el = document.getElementById('otp-' + i);
+    if (el) el.value = initialCode[i];
+  }
+} else {
+  document.getElementById('otp-0').focus();
+}
+
+// OTP input — auto-advance between boxes, handle backspace
+function otpMove(inp, idx) {
+  const val = inp.value.replace(/\D/g, '');
+  inp.value = val;
+
+  // Handle paste of full code
+  if (val.length === 6) {
+    for (let i = 0; i < 6; i++) {
+      const el = document.getElementById('otp-' + i);
+      if (el) el.value = val[i];
+    }
+    submitVerification();
+    return;
+  }
+
+  if (val && idx < 5) {
+    const next = document.getElementById('otp-' + (idx + 1));
+    if (next) next.focus();
+  }
+
+  // Auto-submit when all 6 digits filled
+  const code = getCode();
+  if (code.length === 6) submitVerification();
+}
+
+// Handle backspace navigation
+document.getElementById('otp-wrap').addEventListener('keydown', (e) => {
+  if (e.key === 'Backspace') {
+    const idx = parseInt(e.target.id.split('-')[1]);
+    if (!e.target.value && idx > 0) {
+      const prev = document.getElementById('otp-' + (idx - 1));
+      if (prev) { prev.value = ''; prev.focus(); }
+    }
+  }
+});
+
+// Handle paste anywhere in the OTP box
+document.getElementById('otp-wrap').addEventListener('paste', (e) => {
+  e.preventDefault();
+  const pasted = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '').slice(0, 6);
+  for (let i = 0; i < 6; i++) {
+    const el = document.getElementById('otp-' + i);
+    if (el) el.value = pasted[i] || '';
+  }
+  if (pasted.length === 6) submitVerification();
+});
+
+function getCode() {
+  return Array.from({length: 6}, (_, i) => document.getElementById('otp-' + i)?.value || '').join('');
+}
+
+async function submitVerification() {
+  const code = getCode();
+  if (code.length !== 6) { showError('Please enter all 6 digits'); return; }
+  if (!email)            { showError('Email not found. Please go back and sign up again.'); return; }
+
+  setLoading(true); clearMessages();
+
+  try {
+    const res  = await fetch(`${API}/verify_email.php`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, code }),
+    });
+    let data;
+    try {
+      data = await res.json();
+    } catch (parseErr) {
+      throw new Error(`Server returned status ${res.status}. Check XAMPP Apache and PHP logs.`);
+    }
+
+    if (data.success) {
+      showSuccess('✓ Email verified! Redirecting to sign in…');
+      localStorage.removeItem('cos_pending_email');
+      localStorage.removeItem('cos_pending_code');
+      // Highlight all OTP inputs green
+      document.querySelectorAll('.otp-input').forEach(el => el.classList.add('otp-success'));
+      setTimeout(() => window.location.href = 'login.html?verified=1', 1500);
+    } else {
+      showError(data.error || 'Invalid code. Please try again.');
+      // Shake the OTP inputs
+      document.getElementById('otp-wrap').classList.add('otp-shake');
+      setTimeout(() => document.getElementById('otp-wrap').classList.remove('otp-shake'), 500);
+      // Clear inputs
+      for (let i = 0; i < 6; i++) {
+        const el = document.getElementById('otp-' + i);
+        if (el) el.value = '';
+      }
+      document.getElementById('otp-0').focus();
+      setLoading(false);
+    }
+  } catch (err) {
+    if (window.location.protocol === 'file:') {
+      showError('Please open this page via <a href="http://localhost/complianceos/frontend/verify.html" style="color:var(--amber-bright);text-decoration:underline;">http://localhost/complianceos/frontend/verify.html</a> (not file://).');
+    } else {
+      showError(err.message && !err.message.includes('fetch') ? err.message : 'Connection failed. Please ensure Apache and MySQL are running in XAMPP.');
+    }
+    setLoading(false);
+  }
+}
+
+// Resend code with 60-second cooldown
+let resendCooldown = 0;
+async function resendCode() {
+  if (resendCooldown > 0) return;
+  if (!email) { showError('Email not found'); return; }
+
+  try {
+    const res  = await fetch(`${API}/resend_code.php`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (data.debug_code) {
+        showSuccess('New code generated: <strong>' + data.debug_code + '</strong> (Dev mode)');
+        for (let i = 0; i < 6; i++) {
+          const el = document.getElementById('otp-' + i);
+          if (el) el.value = data.debug_code[i];
+        }
+      } else {
+        showSuccess('New code sent! Check your email.');
+      }
+      startResendTimer(60);
+    } else {
+      showError(data.error || 'Failed to resend. Please try again.');
+    }
+  } catch (err) {
+    showError('Failed to resend code. Please check that your server is running.');
+  }
+}
+
+function startResendTimer(seconds) {
+  resendCooldown = seconds;
+  const btn   = document.getElementById('resend-btn');
+  const timer = document.getElementById('resend-timer');
+  btn.style.display   = 'none';
+  timer.style.display = 'inline';
+
+  const interval = setInterval(() => {
+    resendCooldown--;
+    timer.textContent = `Resend in ${resendCooldown}s`;
+    if (resendCooldown <= 0) {
+      clearInterval(interval);
+      btn.style.display   = 'inline';
+      timer.style.display = 'none';
+    }
+  }, 1000);
+}
+
+function setLoading(on) {
+  document.getElementById('verify-btn').disabled = on;
+  document.getElementById('verify-btn-text').style.display   = on ? 'none'         : 'inline';
+  document.getElementById('verify-spinner').style.display    = on ? 'inline-block' : 'none';
+}
+function showError(msg)   { const b = document.getElementById('error-box');   b.innerHTML = msg; b.style.display = 'flex'; }
+function showSuccess(msg) { const b = document.getElementById('success-box'); b.innerHTML = msg; b.style.display = 'flex'; }
+function clearMessages()  { document.getElementById('error-box').style.display='none'; document.getElementById('success-box').style.display='none'; }
+
+// Start resend timer on load (assume code was just sent)
+startResendTimer(60);
+</script>
+</body>
+</html>
