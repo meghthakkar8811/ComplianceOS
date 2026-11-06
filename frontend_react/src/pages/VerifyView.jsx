@@ -135,3 +135,4 @@ export default function VerifyView({ email: propEmail, onNavigateToLogin }) {
     </div>
   );
 }
+

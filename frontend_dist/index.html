@@ -6,11 +6,106 @@
   <title>ComplianceOS — Statutory Mining Command Center</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,600&display=swap" rel="stylesheet">
-  <script type="module" crossorigin src="./assets/index-_dOT9Tgs.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #050810;
+      color: #ffffff;
+      font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+      overflow-x: hidden;
+    }
+    .boot-loader-wrap {
+      position: fixed;
+      inset: 0;
+      z-index: 99999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(ellipse at 50% 30%, #0c1628 0%, #050810 70%, #020408 100%);
+    }
+    .boot-card {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 36px 44px;
+      border-radius: 20px;
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(232, 160, 32, 0.25);
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7), 0 0 40px rgba(232, 160, 32, 0.12);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      max-width: 460px;
+      width: 90%;
+      box-sizing: border-box;
+    }
+    @keyframes spinClockwise {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes spinCounter {
+      from { transform: rotate(360deg); }
+      to { transform: rotate(0deg); }
+    }
+    @keyframes hexPulse {
+      0% { transform: scale(0.92); opacity: 0.85; filter: drop-shadow(0 0 10px rgba(232,160,32,0.6)); }
+      100% { transform: scale(1.08); opacity: 1; filter: drop-shadow(0 0 25px rgba(232,160,32,0.95)); }
+    }
+    @keyframes pulseLive {
+      0% { opacity: 0.4; }
+      50% { opacity: 1; }
+      100% { opacity: 0.4; }
+    }
+  </style>
+  <script type="module" crossorigin src="./assets/index-Ba9Dsdgx.js"></script>
   <link rel="stylesheet" crossorigin href="./assets/index-CG8DePJK.css">
 </head>
 <body>
-  <div id="root"></div>
+  <div id="root">
+    <div class="boot-loader-wrap">
+      <div class="boot-card">
+        <div style="position: relative; width: 110px; height: 110px; margin-bottom: 24px;">
+          <svg style="position: absolute; inset: 0; width: 100%; height: 100%; animation: spinClockwise 12s linear infinite;" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="46" fill="none" stroke="rgba(232, 160, 32, 0.4)" stroke-width="1.5" stroke-dasharray="6 4" />
+          </svg>
+          <svg style="position: absolute; inset: 0; width: 100%; height: 100%; animation: spinCounter 7s linear infinite;" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="38" fill="none" stroke="rgba(0, 180, 216, 0.6)" stroke-width="1.5" stroke-dasharray="14 12" />
+          </svg>
+          <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 44px; color: #e8a020; animation: hexPulse 1.8s ease-in-out infinite alternate;">
+            ⬡
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+          <span style="font-size: 20px; font-weight: 700; letter-spacing: 0.04em;">
+            Compliance<span style="color: #e8a020;">OS</span>
+          </span>
+          <span style="font-size: 9.5px; font-family: 'IBM Plex Mono', monospace; font-weight: 600; padding: 2px 7px; border-radius: 12px; background: rgba(232, 160, 32, 0.15); border: 1px solid rgba(232, 160, 32, 0.4); color: #e8a020;">
+            v2.4
+          </span>
+        </div>
+        <div style="font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: #64748b; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 28px;">
+          Statutory Mining Platform
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 14px; background: rgba(5, 8, 16, 0.65); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; margin-bottom: 18px; box-sizing: border-box;">
+          <span style="width: 7px; height: 7px; border-radius: 50%; background: #2ecc71; box-shadow: 0 0 8px #2ecc71; animation: pulseLive 1.2s infinite; flex-shrink: 0;"></span>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: #94a3b8;">
+            INITIALIZING STATUTORY ENCLAVE...
+          </span>
+        </div>
+        <div style="width: 100%; margin-bottom: 8px;">
+          <div style="width: 100%; height: 5px; background: rgba(255, 255, 255, 0.08); border-radius: 4px; overflow: hidden;">
+            <div style="width: 65%; height: 100%; background: linear-gradient(90deg, #e8a020 0%, #00b4d8 100%); border-radius: 4px; box-shadow: 0 0 14px rgba(232, 160, 32, 0.8);"></div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: #64748b;">
+          <span>SYS_BOOT_SEQUENCE</span>
+          <span style="color: #e8a020; font-weight: 600;">CONNECTING...</span>
+        </div>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
-

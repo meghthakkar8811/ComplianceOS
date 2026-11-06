@@ -27,6 +27,7 @@ import FormJModal from './components/modals/FormJModal';
 import FormAModal from './components/modals/FormAModal';
 import AddDocModal from './components/modals/AddDocModal';
 import StatutoryRatesModal from './components/modals/StatutoryRatesModal';
+import ComplianceLoader from './components/layout/ComplianceLoader';
 
 import './styles/dashboard.css';
 
@@ -247,12 +248,7 @@ export default function App() {
   const healthScore = dashboardData?.dgms?.overallScore ?? 84;
 
   if (!authChecked) {
-    return (
-      <div className="page-loader" style={{ display: 'flex' }}>
-        <div className="loader-ring" />
-        <div className="loader-text">Loading ComplianceOS…</div>
-      </div>
-    );
+    return <ComplianceLoader />;
   }
 
   if (!user) {
