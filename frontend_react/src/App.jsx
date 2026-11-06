@@ -15,6 +15,9 @@ import DocumentsView from './views/DocumentsView';
 import DgmsView from './views/DgmsView';
 import AlertsView from './views/AlertsView';
 import LoginView from './pages/LoginView';
+import SignupView from './pages/SignupView';
+import ForgotView from './pages/ForgotView';
+import VerifyView from './pages/VerifyView';
 
 // Modals
 import AddMineModal from './components/modals/AddMineModal';
@@ -30,6 +33,8 @@ import './styles/dashboard.css';
 export default function App() {
   const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [authPage, setAuthPage] = useState('login'); // 'login' | 'signup' | 'forgot' | 'verify'
+  const [pendingEmail, setPendingEmail] = useState('');
   const [activePage, setActivePage] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [mines, setMines] = useState([]);
@@ -254,7 +259,28 @@ export default function App() {
     return (
       <ThemeProvider>
         <ToastProvider>
-          <LoginView onLoginSuccess={checkAuth} />
+          {authPage === 'signup' ? (
+            <SignupView
+              onNavigateToLogin={() => setAuthPage('login')}
+              onNavigateToVerify={(em) => {
+                setPendingEmail(em);
+                setAuthPage('verify');
+              }}
+            />
+          ) : authPage === 'forgot' ? (
+            <ForgotView onNavigateToLogin={() => setAuthPage('login')} />
+          ) : authPage === 'verify' ? (
+            <VerifyView
+              email={pendingEmail}
+              onNavigateToLogin={() => setAuthPage('login')}
+            />
+          ) : (
+            <LoginView
+              onLoginSuccess={checkAuth}
+              onNavigateToSignup={() => setAuthPage('signup')}
+              onNavigateToForgot={() => setAuthPage('forgot')}
+            />
+          )}
         </ToastProvider>
       </ThemeProvider>
     );

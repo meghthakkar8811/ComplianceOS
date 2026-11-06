@@ -3,7 +3,7 @@ import { apiFetch } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 import '../styles/auth.css';
 
-export default function LoginView({ onLoginSuccess }) {
+export default function LoginView({ onLoginSuccess, onNavigateToSignup, onNavigateToForgot }) {
   const { theme, toggleTheme } = useTheme();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -141,7 +141,7 @@ export default function LoginView({ onLoginSuccess }) {
               <div className="form-group">
                 <div className="label-row" style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <label>Password</label>
-                  <a className="forgot-link" href="#forgot">Forgot password?</a>
+                  <a className="forgot-link" href="javascript:void(0)" onClick={onNavigateToForgot}>Forgot password?</a>
                 </div>
                 <div className="input-wrap">
                   <span className="input-icon">🔒</span>
@@ -181,7 +181,10 @@ export default function LoginView({ onLoginSuccess }) {
             </form>
 
             <div className="auth-footer" style={{ marginTop: '20px', textAlign: 'center', fontSize: '13px' }}>
-              Don't have an account? <span style={{ color: 'var(--accent)' }}>Create one free →</span>
+              Don't have an account?{' '}
+              <a href="javascript:void(0)" onClick={onNavigateToSignup} style={{ color: 'var(--amber)', textDecoration: 'none', fontWeight: 500 }}>
+                Create one free →
+              </a>
             </div>
           </div>
         </div>
