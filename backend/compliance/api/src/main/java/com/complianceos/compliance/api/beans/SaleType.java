@@ -4,10 +4,10 @@ import java.util.Locale;
 
 /** How a {@link Sale} left the mine, per IBM's monthly-return categories. */
 public enum SaleType {
-  DOMESTIC_SALE,
+  DOMESTIC,
   EXPORT,
-  DOMESTIC_TRANSFER,
-  CAPTIVE_CONSUMPTION,
+  TRANSFER,
+  CONSUMPTION,
   UNKNOWN;
 
   public static SaleType valueOfOrDefault(final String value) {

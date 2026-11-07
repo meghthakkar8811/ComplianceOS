@@ -1,24 +1,19 @@
 package com.complianceos.compliance.api.beans;
 
-/**
- * Asset-type identifiers. {@code MINE} is also the one {@code @Permissioned} asset class this
- * service declares; the others are plain type keys for the resource-catalog handler framework —
- * {@code ProductionEntry}, {@code Royalty}, {@code ComplianceRecord}, {@code MineRent}, {@code
- * MinePayment}, {@code Stoppage}, {@code LaborDay}, {@code MineLabor}, {@code Sale},
- * {@code StockBaseline}, and {@code ExMinePriceOverride} are not independently permissioned (see
- * their beans), so these names carry no grant/role meaning of their own.
- */
 public interface AssetClass {
   String MINE = "Mine";
+  String BUYER = "Buyer";
   String PRODUCTION_ENTRY = "ProductionEntry";
   String ROYALTY_RATE = "RoyaltyRate";
+  String GST_RATE = "GstRate";
   String COMPLIANCE_RECORD = "ComplianceRecord";
   String MINE_RENT = "MineRent";
   String MINE_PAYMENT = "MinePayment";
-  String STOPPAGE = "Stoppage";
+  String MINE_STOPPAGE = "MineStoppage";
   String LABOR_DAY = "LaborDay";
-  String MINE_LABOR = "MineLabor";
+  String LABOR_PAYROLL = "LaborPayroll";
   String SALE = "Sale";
-  String STOCK_BASELINE = "StockBaseline";
-  String EX_MINE_PRICE_OVERRIDE = "ExMinePriceOverride";
+  String MINERAL = "Mineral";
+  String MINERAL_GRADE = "MineralGrade";
+  String INVOICE = "Invoice";
 }

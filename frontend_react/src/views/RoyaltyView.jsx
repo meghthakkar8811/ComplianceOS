@@ -1,32 +1,18 @@
 import React, { useState, useEffect, memo } from 'react';
-import { apiFetch } from '../services/api';
+import { apiFetch, catalogSearch } from '../services/api';
 
-const STATUTORY_BASE_RATES = {
-  LIMESTONE: { rate: 80, unit: 'MT', method: 'Specific Flat Rate', asp: 720, schedule: 'MMDR Schedule II (Item 33)', citation: 'Govt. Gazette S.O. 2682(E) — ₹80/tonne' },
-  IRON_ORE: { rate: 540, unit: 'MT', method: '15% of IBM ASP', asp: 3600, schedule: 'MMDR Schedule II (Item 23)', citation: 'IBM Monthly ASP Gazette (15% of ASP)' },
-  COAL: { rate: 350, unit: 'MT', method: '14% ad valorem', asp: 2500, schedule: 'MMDR Schedule II (Item 10)', citation: 'Ministry of Coal / MMDR Sched II' },
-  BAUXITE: { rate: 180, unit: 'MT', method: '7.5% of ASP', asp: 2400, schedule: 'MMDR Schedule II (Item 6)', citation: 'IBM Monthly ASP Gazette' },
-  MANGANESE: { rate: 420, unit: 'MT', method: '5% of IBM ASP', asp: 8400, schedule: 'MMDR Schedule II (Item 35)', citation: 'IBM Mineral Statistics Bulletin' },
-  CHROMITE: { rate: 645, unit: 'MT', method: '15% of IBM ASP', asp: 4300, schedule: 'MMDR Schedule II (Item 14)', citation: 'IBM Monthly ASP Bulletin' },
-  DOLOMITE: { rate: 75, unit: 'MT', method: 'Specific Flat Rate', asp: 640, schedule: 'MMDR Schedule II (Item 18)', citation: 'MMDR Schedule II Gazette S.O. 2682(E)' },
-  GRANITE: { rate: 120, unit: 'MT', method: 'State Schedule Rate', asp: 1200, schedule: 'State Minor Mineral Rules', citation: 'State Minor Mineral Concession Rules' },
+const MONTH_INDEX = {
+  JANUARY: 0, FEBRUARY: 1, MARCH: 2, APRIL: 3, MAY: 4, JUNE: 5,
+  JULY: 6, AUGUST: 7, SEPTEMBER: 8, OCTOBER: 9, NOVEMBER: 10, DECEMBER: 11,
 };
 
 const RoyaltyView = memo(function RoyaltyView({ activeMine, onOpenStatutoryRates }) {
-  const mineralKey = (activeMine?.mineral || 'LIMESTONE').toUpperCase();
-  const mineralRateInfo = STATUTORY_BASE_RATES[mineralKey] || STATUTORY_BASE_RATES.LIMESTONE;
-
   const [tonnage, setTonnage] = useState(1000);
-  const [baseRate, setBaseRate] = useState(mineralRateInfo.rate);
-  const [dispatchedQty, setDispatchedQty] = useState(1620);
+  const [baseRate, setBaseRate] = useState(0);
+  const [current, setCurrent] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (mineralRateInfo) {
-      setBaseRate(mineralRateInfo.rate);
-    }
-  }, [mineralKey]);
+  const [royaltyRatesById, setRoyaltyRatesById] = useState({});
 
   useEffect(() => {
     if (activeMine) {
@@ -34,14 +20,70 @@ const RoyaltyView = memo(function RoyaltyView({ activeMine, onOpenStatutoryRates
     }
   }, [activeMine]);
 
+  // The statutory RoyaltyRate catalog is global reference data, not scoped to any one mine — load
+  // it once so the current period's royaltyRateIds can be resolved to a mineral + source citation.
+  useEffect(() => {
+    catalogSearch('RoyaltyRate', {})
+      .then((res) => {
+        const byId = {};
+        for (const rate of res.items || []) {
+          byId[rate.id] = rate;
+        }
+        setRoyaltyRatesById(byId);
+      })
+      .catch(() => {
+        // A display nicety for the schedule/citation row; the computed amounts don't depend on it.
+      });
+  }, []);
+
   const loadRoyaltyData = async () => {
     setLoading(true);
     try {
-      const res = await apiFetch(`/mines/${activeMine.id}/royalty`).catch(() => null);
-      if (res) {
-        setDispatchedQty(res.dispatched || 1620);
-        setHistory(res.history || []);
+      // Royalty, DMF and NMET are three separate computed records on the backend (never a single
+      // bundled figure), each fetched from its own endpoint and merged here by period for display.
+      const [royalties, dmfContributions, nmetContributions] = await Promise.all([
+        apiFetch(`/mines/${activeMine.id}/royalty`).catch(() => []),
+        apiFetch(`/mines/${activeMine.id}/dmf-contributions`).catch(() => []),
+        apiFetch(`/mines/${activeMine.id}/nmet-contributions`).catch(() => []),
+      ]);
+
+      const periodKey = (row) => `${row.year}-${row.month}`;
+      const dmfByPeriod = new Map((Array.isArray(dmfContributions) ? dmfContributions : []).map((row) => [periodKey(row), row]));
+      const nmetByPeriod = new Map((Array.isArray(nmetContributions) ? nmetContributions : []).map((row) => [periodKey(row), row]));
+
+      // The backend returns one Royalty row per mineral dispatched that period (each has its own
+      // rate), so a period's own totals are the sum across whatever minerals it dispatched.
+      const royaltiesByPeriod = new Map();
+      for (const royalty of Array.isArray(royalties) ? royalties : []) {
+        const key = periodKey(royalty);
+        const group = royaltiesByPeriod.get(key) || { year: royalty.year, month: royalty.month, quantity: 0, amount: 0, royaltyRateIds: [] };
+        group.quantity += royalty.quantity || 0;
+        group.amount += royalty.amount || 0;
+        if (royalty.royaltyRateId) group.royaltyRateIds.push(royalty.royaltyRateId);
+        royaltiesByPeriod.set(key, group);
       }
+
+      const periods = [...royaltiesByPeriod.entries()]
+        .map(([key, royalty]) => {
+          const baseAmount = royalty.amount || 0;
+          const dmfAmount = dmfByPeriod.get(key)?.amount || 0;
+          const nmetAmount = nmetByPeriod.get(key)?.amount || 0;
+          return {
+            id: key,
+            year: royalty.year,
+            month: royalty.month,
+            quantity: royalty.quantity,
+            royaltyRateIds: royalty.royaltyRateIds,
+            baseAmount,
+            dmfAmount,
+            nmetAmount,
+            grossLiability: baseAmount + dmfAmount + nmetAmount,
+          };
+        })
+        .sort((a, b) => (b.year * 12 + (MONTH_INDEX[b.month] || 0)) - (a.year * 12 + (MONTH_INDEX[a.month] || 0)));
+
+      setCurrent(periods[0] || null);
+      setHistory(periods);
     } catch (e) {
       console.warn('Royalty fetch error:', e);
     } finally {
@@ -52,18 +94,34 @@ const RoyaltyView = memo(function RoyaltyView({ activeMine, onOpenStatutoryRates
   const dmfPct = 0.30;
   const nmetPct = 0.02;
 
+  // Current period liability — straight from the backend's computed Royalty, never estimated.
+  const dispatchedQty = current?.quantity || 0;
+  const curBase = current?.baseAmount || 0;
+  const curDmf = current?.dmfAmount || 0;
+  const curNmet = current?.nmetAmount || 0;
+  const curGross = current?.grossLiability || 0;
+  const curRatePerMt = dispatchedQty > 0 ? curBase / dispatchedQty : 0;
+
+  // The estimator's starting rate is the mine's own latest real rate (averaged across whatever
+  // minerals it dispatched), not a hardcoded guess — the user can still edit it freely.
+  useEffect(() => {
+    if (curRatePerMt > 0) {
+      setBaseRate(Number(curRatePerMt.toFixed(2)));
+    }
+  }, [curRatePerMt]);
+
+  const curMineralSchedule = (current?.royaltyRateIds || [])
+    .map((id) => royaltyRatesById[id])
+    .filter(Boolean)
+    .map((rate) => `${rate.mineral} (${rate.sourceCitation})`)
+    .join('; ') || '—';
+
   // Estimator math
   const estBase = Math.round(tonnage * baseRate);
   const estDmf = Math.round(estBase * dmfPct);
   const estNmet = Math.round(estBase * nmetPct);
   const estTotal = estBase + estDmf + estNmet;
   const perMtTotal = (estTotal / (tonnage || 1)).toFixed(2);
-
-  // Current period liability
-  const curBase = Math.round(dispatchedQty * baseRate);
-  const curDmf = Math.round(curBase * dmfPct);
-  const curNmet = Math.round(curBase * nmetPct);
-  const curGross = curBase + curDmf + curNmet;
 
   return (
     <section className="page active" id="page-royalty">
@@ -104,7 +162,7 @@ const RoyaltyView = memo(function RoyaltyView({ activeMine, onOpenStatutoryRates
         <div className="rk-card highlight">
           <span className="rk-label">Base Royalty Rate (per MT)</span>
           <span className="rk-val amber" id="rk-base-rate">₹{baseRate}.00 / MT</span>
-          <span className="rk-sub" id="rk-mineral-sub">{mineralRateInfo.schedule}</span>
+          <span className="rk-sub" id="rk-mineral-sub">{curMineralSchedule}</span>
         </div>
         <div className="rk-card">
           <span className="rk-label">Effective Total per MT</span>
@@ -130,15 +188,17 @@ const RoyaltyView = memo(function RoyaltyView({ activeMine, onOpenStatutoryRates
             <div className="cc-header">
               <div>
                 <h3>Current Period Liability</h3>
-                <span className="cc-period" id="cc-period">Monthly Period</span>
+                <span className="cc-period" id="cc-period">
+                  {current ? `${current.month} ${current.year}` : 'No period calculated yet'}
+                </span>
               </div>
-              <span className="rate-pill" id="co-rate-pill">₹{baseRate} / MT Base</span>
+              <span className="rate-pill" id="co-rate-pill">₹{curRatePerMt.toFixed(2)} / MT Base</span>
             </div>
 
             <div className="comp-rows" id="comp-rows">
               <div className="cr">
                 <span>Mineral & Schedule</span>
-                <span className="mono" id="co-mineral-schedule">{mineralRateInfo.schedule}</span>
+                <span className="mono" id="co-mineral-schedule">{curMineralSchedule}</span>
               </div>
               <div className="cr">
                 <span>Dispatched Quantity</span>
@@ -148,7 +208,7 @@ const RoyaltyView = memo(function RoyaltyView({ activeMine, onOpenStatutoryRates
                 <div>
                   <span>Base Royalty</span>
                   <small style={{ display: 'block', fontSize: '10.5px', color: 'var(--text2)' }}>
-                    Rate: ₹{baseRate} / MT
+                    Rate: ₹{curRatePerMt.toFixed(2)} / MT
                   </small>
                 </div>
                 <span className="mono" id="co-base">₹{curBase.toLocaleString()}</span>
@@ -157,7 +217,7 @@ const RoyaltyView = memo(function RoyaltyView({ activeMine, onOpenStatutoryRates
                 <div>
                   <span id="co-dmf-label">District Mineral Foundation (DMF)</span>
                   <small style={{ display: 'block', fontSize: '10.5px', color: 'var(--text2)' }}>
-                    Rate: 30% of Base Royalty
+                    Rate: {curBase > 0 ? Math.round((curDmf / curBase) * 100) : 0}% of Base Royalty
                   </small>
                 </div>
                 <span className="mono" id="co-dmf">₹{curDmf.toLocaleString()}</span>
@@ -166,7 +226,7 @@ const RoyaltyView = memo(function RoyaltyView({ activeMine, onOpenStatutoryRates
                 <div>
                   <span id="co-nmet-label">National Mineral Exploration Trust (NMET)</span>
                   <small style={{ display: 'block', fontSize: '10.5px', color: 'var(--text2)' }}>
-                    Rate: ₹{(baseRate * 0.02).toFixed(2)} / MT (2% of Base)
+                    Rate: {curBase > 0 ? Math.round((curNmet / curBase) * 100) : 0}% of Base Royalty
                   </small>
                 </div>
                 <span className="mono" id="co-nmet">₹{curNmet.toLocaleString()}</span>
@@ -176,7 +236,7 @@ const RoyaltyView = memo(function RoyaltyView({ activeMine, onOpenStatutoryRates
                 <div>
                   <span>Gross Statutory Liability</span>
                   <small style={{ display: 'block', fontSize: '11px', color: 'var(--amber)' }}>
-                    Total: ₹{perMtTotal} / MT
+                    Total: ₹{(dispatchedQty > 0 ? curGross / dispatchedQty : 0).toFixed(2)} / MT
                   </small>
                 </div>
                 <span className="mono amber-text" style={{ fontSize: '17px', fontWeight: 700 }} id="co-gross">
@@ -256,31 +316,33 @@ const RoyaltyView = memo(function RoyaltyView({ activeMine, onOpenStatutoryRates
                 </thead>
                 <tbody id="royalty-history-tbody">
                   {history.length > 0 ? (
-                    history.map((row, i) => (
-                      <tr key={i}>
-                        <td>{row.period}</td>
-                        <td className="num-col">{(row.dispatched || 0).toLocaleString()} MT</td>
-                        <td className="num-col">₹{row.baseRate || baseRate}</td>
-                        <td className="num-col">₹{(row.baseRoyalty || 0).toLocaleString()}</td>
-                        <td className="num-col">₹{(row.dmf || 0).toLocaleString()}</td>
-                        <td className="num-col">₹{(row.nmet || 0).toLocaleString()}</td>
-                        <td className="num-col">₹{row.totalPerMt || perMtTotal}</td>
-                        <td className="num-col" style={{ fontWeight: 600, color: 'var(--amber)' }}>
-                          ₹{(row.gross || 0).toLocaleString()}
-                        </td>
-                      </tr>
-                    ))
+                    history.map((row) => {
+                      const rowQty = row.quantity || 0;
+                      const rowBase = row.baseAmount || 0;
+                      const rowDmf = row.dmfAmount || 0;
+                      const rowNmet = row.nmetAmount || 0;
+                      const rowGross = row.grossLiability || 0;
+                      const rowRate = rowQty > 0 ? rowBase / rowQty : 0;
+                      const rowTotalPerMt = rowQty > 0 ? rowGross / rowQty : 0;
+                      return (
+                        <tr key={row.id || `${row.year}-${row.month}`}>
+                          <td>{row.month} {row.year}</td>
+                          <td className="num-col">{rowQty.toLocaleString()} MT</td>
+                          <td className="num-col">₹{rowRate.toFixed(2)}</td>
+                          <td className="num-col">₹{rowBase.toLocaleString()}</td>
+                          <td className="num-col">₹{rowDmf.toLocaleString()}</td>
+                          <td className="num-col">₹{rowNmet.toLocaleString()}</td>
+                          <td className="num-col">₹{rowTotalPerMt.toFixed(2)}</td>
+                          <td className="num-col" style={{ fontWeight: 600, color: 'var(--amber)' }}>
+                            ₹{rowGross.toLocaleString()}
+                          </td>
+                        </tr>
+                      );
+                    })
                   ) : (
                     <tr>
-                      <td>October 2026</td>
-                      <td className="num-col">108,000 MT</td>
-                      <td className="num-col">₹{baseRate}.00</td>
-                      <td className="num-col">₹{(108000 * baseRate).toLocaleString()}</td>
-                      <td className="num-col">₹{(108000 * baseRate * 0.3).toLocaleString()}</td>
-                      <td className="num-col">₹{(108000 * baseRate * 0.02).toLocaleString()}</td>
-                      <td className="num-col">₹{perMtTotal}</td>
-                      <td className="num-col" style={{ fontWeight: 600, color: 'var(--amber)' }}>
-                        ₹{Math.round(108000 * baseRate * 1.32).toLocaleString()}
+                      <td colSpan="8" style={{ textAlign: 'center', color: 'var(--text2)', padding: '24px' }}>
+                        No royalty calculated yet — add a production entry with a dispatch to generate one.
                       </td>
                     </tr>
                   )}

@@ -15,7 +15,7 @@ import java.time.ZoneOffset;
  */
 @Index(name = "mine_labor_mine_idx", def = "{'mineId': 1}")
 @Index(name = "mine_labor_mine_period_idx", def = "{'mineId': 1, 'periodStart': 1}", unique = true)
-public class MineLabor extends BaseEntity {
+public class LaborPayroll extends BaseEntity {
 
   public static final String FIELD_MINE_ID = "mineId";
   public static final String FIELD_PERIOD_START = "periodStart";
@@ -25,15 +25,15 @@ public class MineLabor extends BaseEntity {
   // The first day of the month this return covers.
   private long periodStart;
 
-  // Paise.
-  private long belowGroundWages;
-  private long openCastWages;
-  private long aboveGroundWages;
+  // Rupees.
+  private double belowGroundWages;
+  private double openCastWages;
+  private double aboveGroundWages;
 
   private int technicalStaffCount;
 
-  // Paise.
-  private long technicalStaffSalary;
+  // Rupees.
+  private double technicalStaffSalary;
 
   /**
    * The deterministic id of a mine's labor return for the calendar month (UTC) {@code
@@ -62,27 +62,27 @@ public class MineLabor extends BaseEntity {
     this.periodStart = periodStart;
   }
 
-  public long getBelowGroundWages() {
+  public double getBelowGroundWages() {
     return belowGroundWages;
   }
 
-  public void setBelowGroundWages(long belowGroundWages) {
+  public void setBelowGroundWages(double belowGroundWages) {
     this.belowGroundWages = belowGroundWages;
   }
 
-  public long getOpenCastWages() {
+  public double getOpenCastWages() {
     return openCastWages;
   }
 
-  public void setOpenCastWages(long openCastWages) {
+  public void setOpenCastWages(double openCastWages) {
     this.openCastWages = openCastWages;
   }
 
-  public long getAboveGroundWages() {
+  public double getAboveGroundWages() {
     return aboveGroundWages;
   }
 
-  public void setAboveGroundWages(long aboveGroundWages) {
+  public void setAboveGroundWages(double aboveGroundWages) {
     this.aboveGroundWages = aboveGroundWages;
   }
 
@@ -94,11 +94,11 @@ public class MineLabor extends BaseEntity {
     this.technicalStaffCount = technicalStaffCount;
   }
 
-  public long getTechnicalStaffSalary() {
+  public double getTechnicalStaffSalary() {
     return technicalStaffSalary;
   }
 
-  public void setTechnicalStaffSalary(long technicalStaffSalary) {
+  public void setTechnicalStaffSalary(double technicalStaffSalary) {
     this.technicalStaffSalary = technicalStaffSalary;
   }
 }

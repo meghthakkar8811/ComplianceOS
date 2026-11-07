@@ -7,7 +7,6 @@ export default function AddMineModal({ isOpen, onClose, onMineAdded }) {
   const [leaseNumber, setLeaseNumber] = useState('');
   const [state, setState] = useState('RAJASTHAN');
   const [district, setDistrict] = useState('');
-  const [mineral, setMineral] = useState('LIMESTONE');
   const [mineType, setMineType] = useState('METALLIFEROUS');
   const [leaseStart, setLeaseStart] = useState(() => new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(false);
@@ -15,7 +14,7 @@ export default function AddMineModal({ isOpen, onClose, onMineAdded }) {
   if (!isOpen) return null;
 
   const handleAddMine = async () => {
-    if (!name.trim() || !leaseNumber.trim() || !state || !mineral || !leaseStart) {
+    if (!name.trim() || !leaseNumber.trim() || !state || !leaseStart) {
       toast('Please fill all required fields', 'error');
       return;
     }
@@ -26,7 +25,6 @@ export default function AddMineModal({ isOpen, onClose, onMineAdded }) {
         leaseNumber: leaseNumber.trim(),
         state,
         district: district.trim(),
-        mineral,
         mineType,
         leaseStartOn: Date.parse(leaseStart + 'T00:00:00Z'),
       };
@@ -107,23 +105,6 @@ export default function AddMineModal({ isOpen, onClose, onMineAdded }) {
                 onChange={(e) => setDistrict(e.target.value)}
                 placeholder="Jodhpur"
               />
-            </div>
-            <div className="fg">
-              <label>Mineral *</label>
-              <select
-                id="am-mineral"
-                value={mineral}
-                onChange={(e) => setMineral(e.target.value)}
-              >
-                <option value="LIMESTONE">Limestone</option>
-                <option value="IRON_ORE">Iron Ore</option>
-                <option value="COAL">Coal</option>
-                <option value="BAUXITE">Bauxite</option>
-                <option value="MANGANESE">Manganese Ore</option>
-                <option value="CHROMITE">Chromite</option>
-                <option value="DOLOMITE">Dolomite</option>
-                <option value="GRANITE">Granite</option>
-              </select>
             </div>
             <div className="fg">
               <label>Mine Type</label>

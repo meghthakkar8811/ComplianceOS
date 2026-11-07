@@ -59,9 +59,48 @@ export async function apiDownload(attachment) {
   window.open(url, '_blank');
 }
 
-export async function catalogSearch(assetType, query) {
+export async function catalogSearch(assetType, query, options) {
   return apiFetch('/catalog/search', {
     method: 'POST',
-    body: JSON.stringify({ assetType, query }),
+    body: JSON.stringify({ assetType, query, options }),
   });
+}
+
+/**
+ * Generates (or re-fetches the already-generated) PDF invoice for a sale and triggers a file
+ * download. Returns `{ required: false }` when the sale's nature never calls for an invoice
+ * (the backend's `204` signal) instead of throwing, so the caller can show an informational
+ * message rather than treating it as an error. A genuine error response throws, same as any
+ * other `apiFetch`-based call.
+ */
+export async function downloadInvoice(mineId, saleId) {
+  const res = await fetch(`${API}/mines/${mineId}/sales/${saleId}/invoice`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+  if (res.status === 204) {
+    return { required: false };
+  }
+  if (!res.ok) {
+    let body = null;
+    try {
+      body = await res.json();
+    } catch (e) {
+      // Response wasn't JSON; fall through with a generic message.
+    }
+    throw new ApiError(res.status, body);
+  }
+  const blob = await res.blob();
+  const disposition = res.headers.get('Content-Disposition') || '';
+  const match = disposition.match(/filename="?([^";]+)"?/i);
+  const filename = match ? match[1] : `invoice_${saleId}.pdf`;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  return { required: true };
 }

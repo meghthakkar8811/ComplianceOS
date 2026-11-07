@@ -5,26 +5,12 @@ function formatState(s) {
   return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function formatMineral(m) {
-  if (!m) return '';
-  const map = {
-    IRON_ORE: 'Iron Ore',
-    COAL: 'Coal',
-    LIMESTONE: 'Limestone',
-    BAUXITE: 'Bauxite',
-    MANGANESE: 'Manganese Ore',
-    CHROMITE: 'Chromite',
-    DOLOMITE: 'Dolomite',
-    GRANITE: 'Granite',
-  };
-  return map[m] || m.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
 const Sidebar = memo(function Sidebar({
   activePage = 'dashboard',
   onNavigate,
   activeMine,
   mines = [],
+  mineralsByMineId = {},
   isMinePickerOpen,
   onToggleMinePicker,
   onSelectMine,
@@ -95,7 +81,7 @@ const Sidebar = memo(function Sidebar({
                         {m.name}
                       </div>
                       <div className="mine-opt-sub">
-                        Lease #{m.leaseNumber || m.code || '—'} · {formatState(m.state)} · {formatMineral(m.mineral)}
+                        Lease #{m.leaseNumber || m.code || '—'} · {formatState(m.state)} · {mineralsByMineId[m.id] || '—'}
                       </div>
                     </div>
                     <button
@@ -184,6 +170,20 @@ const Sidebar = memo(function Sidebar({
         >
           <span className="nav-icon">₹</span>
           <span>Royalty Calculator</span>
+        </a>
+        <a
+          className={`nav-item ${activePage === 'sales' ? 'active' : ''}`}
+          onClick={() => onNavigate('sales')}
+        >
+          <span className="nav-icon">⬢</span>
+          <span>Sales / Dispatches</span>
+        </a>
+        <a
+          className={`nav-item ${activePage === 'buyers' ? 'active' : ''}`}
+          onClick={() => onNavigate('buyers')}
+        >
+          <span className="nav-icon">◆</span>
+          <span>Buyers</span>
         </a>
 
         <div className="nav-section-label">Operations</div>

@@ -5,22 +5,22 @@ import com.agentengine.util.common.repository.DocumentBackend;
 import com.agentengine.util.common.repository.DocumentRepositorySpec;
 import com.agentengine.util.common.validation.ValidationService;
 import com.complianceos.compliance.api.beans.ComplianceDocumentStoreClientType;
-import com.complianceos.compliance.api.beans.Stoppage;
+import com.complianceos.compliance.api.beans.LaborPayroll;
 import io.quarkus.runtime.Startup;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 @Singleton
 @Startup
-public class StoppageRepository extends AbstractRepository<Stoppage> {
+public class LaborPayrollRepository extends AbstractRepository<LaborPayroll> {
 
   @Inject
-  public StoppageRepository(
+  public LaborPayrollRepository(
       final DocumentBackend documentBackend, final ValidationService validationService) {
     super(
         documentBackend.getEntityStore(
             DocumentRepositorySpec.perCustomer(
-                ComplianceDocumentStoreClientType.COMPLIANCE, Stoppage.class)),
+                ComplianceDocumentStoreClientType.COMPLIANCE, LaborPayroll.class)),
         validationService);
   }
 }

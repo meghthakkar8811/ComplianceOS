@@ -6,42 +6,37 @@ import com.agentengine.util.common.query.PaginatedResult;
 import com.agentengine.util.common.utils.CollectionUtils;
 import com.agentengine.util.ms.client.MicroServiceClientProvider;
 import com.complianceos.compliance.api.beans.AssetClass;
-import com.complianceos.compliance.api.beans.Stoppage;
+import com.complianceos.compliance.api.beans.Buyer;
 import com.complianceos.compliance.api.services.MiningService;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import java.util.Map;
 
-/**
- * Stoppages are not independently permissioned — reached only through their mine — so {@code
- * MiningService} filters every result to what the caller may read, the same way a {@code
- * @Permissioned} entity's own repository would via its ACL.
- */
 @Singleton
-public class StoppageAssetHandler implements AssetHandler<Stoppage> {
+public class BuyerAssetHandler implements AssetHandler<Buyer> {
 
   private final MiningService service;
 
   @Inject
-  public StoppageAssetHandler(final MicroServiceClientProvider provider) {
+  public BuyerAssetHandler(final MicroServiceClientProvider provider) {
     this.service = provider.getRaw(MiningService.class);
   }
 
   @Override
   public String getAssetType() {
-    return AssetClass.STOPPAGE;
+    return AssetClass.BUYER;
   }
 
   @Override
-  public PaginatedResult<Stoppage> findAssets(final AssetRequest request) {
-    return service.findStoppages(request.getQuery());
+  public PaginatedResult<Buyer> findAssets(final AssetRequest request) {
+    return service.findBuyers(request.getQuery());
   }
 
   @Override
-  public Map<String, Stoppage> getAssetsByIds(final AssetRequest request) {
+  public Map<String, Buyer> getAssetsByIds(final AssetRequest request) {
     if (CollectionUtils.isEmpty(request.getKeys())) {
       return Map.of();
     }
-    return service.getStoppages(request.getKeys());
+    return service.getBuyers(request.getKeys());
   }
 }

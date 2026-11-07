@@ -1,7 +1,7 @@
 [
   {
     "state": "ODISHA",
-    "mineral": "IRON_ORE",
+    "mineral": "Iron Ore",
     "year": 2026,
     "month": "JULY",
     "ratePerTonne": 58200,
@@ -9,7 +9,7 @@
   },
   {
     "state": "ODISHA",
-    "mineral": "IRON_ORE",
+    "mineral": "Iron Ore",
     "year": 2026,
     "month": "AUGUST",
     "ratePerTonne": 59500,
@@ -17,7 +17,7 @@
   },
   {
     "state": "ODISHA",
-    "mineral": "IRON_ORE",
+    "mineral": "Iron Ore",
     "year": 2026,
     "month": "SEPTEMBER",
     "ratePerTonne": 61000,
@@ -25,7 +25,7 @@
   },
   {
     "state": "ODISHA",
-    "mineral": "IRON_ORE",
+    "mineral": "Iron Ore",
     "year": 2026,
     "month": "OCTOBER",
     "ratePerTonne": 62800,
@@ -33,7 +33,7 @@
   },
   {
     "state": "ODISHA",
-    "mineral": "IRON_ORE",
+    "mineral": "Iron Ore",
     "year": 2026,
     "month": "NOVEMBER",
     "ratePerTonne": 60900,
@@ -41,7 +41,7 @@
   },
   {
     "state": "ODISHA",
-    "mineral": "IRON_ORE",
+    "mineral": "Iron Ore",
     "year": 2026,
     "month": "DECEMBER",
     "ratePerTonne": 63400,

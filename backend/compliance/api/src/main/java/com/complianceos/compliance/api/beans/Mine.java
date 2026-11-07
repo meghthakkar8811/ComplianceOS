@@ -3,6 +3,8 @@ package com.complianceos.compliance.api.beans;
 import com.agentengine.util.common.annotations.Index;
 import com.agentengine.util.common.annotations.Permissioned;
 import com.agentengine.util.common.beans.BaseEntity;
+import com.agentengine.util.common.builder.annotations.UiAccess;
+import com.agentengine.util.common.builder.annotations.UiAccessLevel;
 import com.agentengine.util.common.builder.annotations.UiDate;
 import com.agentengine.util.common.builder.annotations.UiField;
 import com.agentengine.util.common.builder.annotations.UiSelect;
@@ -18,38 +20,31 @@ public class Mine extends BaseEntity {
 
   @UiField(label = "Mine Name", order = 10)
   @UiText
+  @UiAccess(create = UiAccessLevel.REQUIRED, edit = UiAccessLevel.REQUIRED)
   @NotBlank
   private String name;
 
   @UiField(label = "Lease Number", order = 20)
   @UiText
+  @UiAccess(create = UiAccessLevel.REQUIRED, edit = UiAccessLevel.REQUIRED)
   @NotBlank
   private String leaseNumber;
+
+  @UiField(label = "GSTIN", order = 25)
+  @UiText
+  private String gstin;
 
   // Not an enum: the code never distinguishes between states, so which ones are offered is
   // reference data (mining_states.json), not a set the code itself needs to know about.
   @UiField(label = "State", order = 30)
   @UiSelect(optionsResource = "mining_states.json")
+  @UiAccess(create = UiAccessLevel.REQUIRED, edit = UiAccessLevel.REQUIRED)
   @NotBlank
   private String state;
 
   @UiField(label = "District", order = 40)
   @UiText
   private String district;
-
-  // Not an enum: the code never distinguishes between minerals, so which ones are offered is
-  // reference data (minerals.json), not a set the code itself needs to know about.
-  @UiField(label = "Mineral", order = 50)
-  @UiSelect(optionsResource = "minerals.json")
-  @NotBlank
-  private String mineral;
-
-  // An OreType name; parse with OreType.valueOfOrDefault, never typed as the enum itself so a
-  // value an older/newer version doesn't recognize degrades to UNKNOWN instead of failing to
-  // load. Only meaningful when mineral is iron ore.
-  @UiField(label = "Ore Type", order = 55)
-  @UiSelect(enumType = OreType.class)
-  private String oreType;
 
   @UiField(label = "Mine Type", order = 60)
   @UiSelect(optionsResource = "mine_types.json")
@@ -61,6 +56,7 @@ public class Mine extends BaseEntity {
   // tier applies (see MiningConstants.LEASE_TIER_PRE_2015/LEASE_TIER_POST_2015).
   @UiField(label = "Lease Start Date", order = 70)
   @UiDate
+  @UiAccess(create = UiAccessLevel.REQUIRED, edit = UiAccessLevel.REQUIRED)
   @NotNull
   private long leaseStartOn;
 
@@ -82,6 +78,14 @@ public class Mine extends BaseEntity {
     this.leaseNumber = leaseNumber;
   }
 
+  public String getGstin() {
+    return gstin;
+  }
+
+  public void setGstin(String gstin) {
+    this.gstin = gstin;
+  }
+
   public String getState() {
     return state;
   }
@@ -96,22 +100,6 @@ public class Mine extends BaseEntity {
 
   public void setDistrict(String district) {
     this.district = district;
-  }
-
-  public String getMineral() {
-    return mineral;
-  }
-
-  public void setMineral(String mineral) {
-    this.mineral = mineral;
-  }
-
-  public String getOreType() {
-    return oreType;
-  }
-
-  public void setOreType(String oreType) {
-    this.oreType = oreType;
   }
 
   public String getMineType() {

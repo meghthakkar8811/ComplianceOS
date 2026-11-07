@@ -4,41 +4,44 @@ import { toast } from '../context/ToastContext';
 
 const ProductionView = memo(function ProductionView({ activeMineId }) {
   const [showProdForm, setShowProdForm] = useState(false);
-  const [showSaleForm, setShowSaleForm] = useState(false);
   const [entries, setEntries] = useState([]);
-  const [sales, setSales] = useState([]);
   const [search, setSearch] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
+  // The mine's own registered Minerals, for the Mineral/Grade pickers below.
+  const [mineMinerals, setMineMinerals] = useState([]);
 
   // Prod Form State
   const [editEntryId, setEditEntryId] = useState(null);
   const [prodDate, setProdDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [prodShift, setProdShift] = useState('DAY');
   const [prodPit, setProdPit] = useState('');
+  const [prodMineral, setProdMineral] = useState('');
   const [prodGrade, setProdGrade] = useState('');
   const [prodQty, setProdQty] = useState('');
-  const [prodDisp, setProdDisp] = useState('');
   const [prodSup, setProdSup] = useState('');
   const [prodRem, setProdRem] = useState('');
-
-  // Sale Form State
-  const [saleDate, setSaleDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [saleGrade, setSaleGrade] = useState('');
-  const [saleNature, setSaleNature] = useState('DOMESTIC_SALE');
-  const [saleBuyer, setSaleBuyer] = useState('');
-  const [saleBuyerReg, setSaleBuyerReg] = useState('');
-  const [saleQty, setSaleQty] = useState('');
-  const [saleValue, setSaleValue] = useState('');
-  const [saleDeduction, setSaleDeduction] = useState('');
 
   useEffect(() => {
     if (activeMineId) {
       loadProductionData();
+      loadMineMinerals();
     }
   }, [activeMineId, selectedMonth]);
+
+  const loadMineMinerals = async () => {
+    try {
+      const res = await catalogSearch('Mineral', {}, { mineId: activeMineId });
+      setMineMinerals(res.items || []);
+    } catch (e) {
+      setMineMinerals([]);
+    }
+  };
+
+  const mineralNameOf = (mineMineralId) => mineMinerals.find((m) => m.id === mineMineralId)?.mineral || '—';
+  const gradesOf = (mineMineralId) => mineMinerals.find((m) => m.id === mineMineralId)?.grades || [];
 
   const loadProductionData = async () => {
     try {
@@ -46,34 +49,20 @@ const ProductionView = memo(function ProductionView({ activeMineId }) {
       const start = new Date(year, month - 1, 1).getTime();
       const end = new Date(year, month, 1).getTime();
 
-      const [entriesRes, salesRes] = await Promise.all([
-        catalogSearch('ProductionEntry', {
-          filter: {
-            op: 'AND',
-            values: [
-              { field: 'mineId', op: 'EQ', values: [activeMineId] },
-              { field: 'entryTime', op: 'GTE', values: [start - 86400000] },
-              { field: 'entryTime', op: 'LT', values: [end + 86400000] },
-            ],
-          },
-        }).catch(() => ({ items: [] })),
-        catalogSearch('Sale', {
-          filter: {
-            op: 'AND',
-            values: [
-              { field: 'mineId', op: 'EQ', values: [activeMineId] },
-              { field: 'dispatchedOn', op: 'GTE', values: [start] },
-              { field: 'dispatchedOn', op: 'LT', values: [end] },
-            ],
-          },
-        }).catch(() => ({ items: [] })),
-      ]);
+      const entriesRes = await catalogSearch('ProductionEntry', {
+        filter: {
+          op: 'AND',
+          values: [
+            { field: 'mineId', op: 'EQ', values: [activeMineId] },
+            { field: 'entryTime', op: 'GTE', values: [start - 86400000] },
+            { field: 'entryTime', op: 'LT', values: [end + 86400000] },
+          ],
+        },
+      }).catch(() => ({ items: [] }));
 
       const sortedEntries = (entriesRes.items || []).sort((a, b) => (b.entryTime || 0) - (a.entryTime || 0));
-      const sortedSales = (salesRes.items || []).sort((a, b) => (b.dispatchedOn || 0) - (a.dispatchedOn || 0));
 
       setEntries(sortedEntries);
-      setSales(sortedSales);
     } catch (e) {
       toast('Failed to load production data', 'error');
     }
@@ -90,9 +79,9 @@ const ProductionView = memo(function ProductionView({ activeMineId }) {
         entryTime: new Date(prodDate).getTime(),
         shift: prodShift,
         pitSection: prodPit || 'Pit A (North)',
-        mineralGrade: prodGrade || 'Grade A',
+        mineral: prodMineral,
+        grade: prodGrade,
         quantity: Number(prodQty),
-        quantityDispatched: Number(prodDisp) || 0,
         supervisorName: prodSup || 'Pit Supervisor',
         remarks: prodRem,
         status: 'VERIFIED',
@@ -107,8 +96,9 @@ const ProductionView = memo(function ProductionView({ activeMineId }) {
       toast(editEntryId ? 'Entry updated' : 'Production entry saved', 'success');
       setShowProdForm(false);
       setEditEntryId(null);
+      setProdMineral('');
+      setProdGrade('');
       setProdQty('');
-      setProdDisp('');
       loadProductionData();
     } catch (e) {
       toast(e.message || 'Failed to save production entry', 'error');
@@ -120,9 +110,9 @@ const ProductionView = memo(function ProductionView({ activeMineId }) {
     setProdDate(new Date(r.entryTime).toISOString().slice(0, 10));
     setProdShift(r.shift || 'DAY');
     setProdPit(r.pitSection || '');
-    setProdGrade(r.mineralGrade || '');
+    setProdMineral(r.mineral || '');
+    setProdGrade(r.grade || '');
     setProdQty(String(r.quantity || ''));
-    setProdDisp(String(r.quantityDispatched || ''));
     setProdSup(r.supervisorName || '');
     setProdRem(r.remarks || '');
     setShowProdForm(true);
@@ -152,47 +142,16 @@ const ProductionView = memo(function ProductionView({ activeMineId }) {
     }
   };
 
-  const handleSaveSale = async () => {
-    if (!saleDate || !saleQty || !saleBuyer) {
-      toast('Date, Quantity, and Buyer Name are required.', 'error');
-      return;
-    }
-    try {
-      const payload = {
-        mineId: activeMineId,
-        dispatchedOn: new Date(saleDate).getTime(),
-        grade: saleGrade || 'Grade A',
-        natureOfSale: saleNature,
-        buyerName: saleBuyer,
-        buyerIbmRegNo: saleBuyerReg,
-        quantity: Number(saleQty),
-        grossSaleValue: Number(saleValue) || 0,
-        deductionPerTonne: Number(saleDeduction) || 0,
-      };
-      await apiFetch(`/mines/${activeMineId}/sales?skipVersion=true`, {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
-      toast('Dispatch saved successfully', 'success');
-      setShowSaleForm(false);
-      setSaleQty('');
-      setSaleBuyer('');
-      loadProductionData();
-    } catch (e) {
-      toast(e.message || 'Failed to save dispatch entry', 'error');
-    }
-  };
-
   const exportProdCSV = () => {
     const rows = [
-      ['Date', 'Shift', 'Pit', 'Grade', 'Produced (MT)', 'Dispatched (MT)', 'Supervisor', 'Status'],
+      ['Date', 'Shift', 'Pit', 'Mineral', 'Grade', 'Produced (MT)', 'Supervisor', 'Status'],
       ...entries.map((r) => [
         new Date(r.entryTime).toLocaleDateString('en-IN'),
         r.shift,
         r.pitSection,
-        r.mineralGrade,
+        mineralNameOf(r.mineral),
+        r.grade,
         r.quantity,
-        r.quantityDispatched || 0,
         r.supervisorName || '',
         r.status,
       ]),
@@ -211,17 +170,13 @@ const ProductionView = memo(function ProductionView({ activeMineId }) {
   };
 
   const totalP = entries.reduce((s, r) => s + (r.quantity || 0), 0);
-  const totalD = entries.reduce((s, r) => s + (r.quantityDispatched || 0), 0);
-
-  const totalSaleQty = sales.reduce((s, r) => s + (r.quantity || 0), 0);
-  const totalSaleVal = sales.reduce((s, r) => s + (r.grossSaleValue || 0), 0);
 
   const filteredEntries = entries.filter((e) => {
     if (!search) return true;
     const q = search.toLowerCase();
     return (
       (e.pitSection || '').toLowerCase().includes(q) ||
-      (e.mineralGrade || '').toLowerCase().includes(q) ||
+      (e.grade || '').toLowerCase().includes(q) ||
       (e.supervisorName || '').toLowerCase().includes(q)
     );
   });
@@ -273,16 +228,42 @@ const ProductionView = memo(function ProductionView({ activeMineId }) {
               <input id="pf-pit" value={prodPit} onChange={(e) => setProdPit(e.target.value)} placeholder="e.g. Pit A (North)" />
             </div>
             <div className="fg">
+              <label>Mineral</label>
+              <select
+                id="pf-mineral"
+                value={prodMineral}
+                onChange={(e) => {
+                  setProdMineral(e.target.value);
+                  setProdGrade('');
+                }}
+              >
+                <option value="">Select mineral…</option>
+                {mineMinerals.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.mineral}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="fg">
               <label>Grade</label>
-              <input id="pf-grade" value={prodGrade} onChange={(e) => setProdGrade(e.target.value)} placeholder="e.g. Grade A" />
+              <select
+                id="pf-grade"
+                value={prodGrade}
+                onChange={(e) => setProdGrade(e.target.value)}
+                disabled={!prodMineral}
+              >
+                <option value="">Select grade…</option>
+                {gradesOf(prodMineral).map((g) => (
+                  <option key={g.name} value={g.name}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="fg">
               <label>Produced (MT)</label>
               <input type="number" id="pf-prod" value={prodQty} onChange={(e) => setProdQty(e.target.value)} placeholder="1850" />
-            </div>
-            <div className="fg">
-              <label>Dispatched (MT)</label>
-              <input type="number" id="pf-disp" value={prodDisp} onChange={(e) => setProdDisp(e.target.value)} placeholder="1620" />
             </div>
             <div className="fg">
               <label>Supervisor</label>
@@ -305,10 +286,6 @@ const ProductionView = memo(function ProductionView({ activeMineId }) {
         <div className="psr-card">
           <span className="psr-label">Total Produced</span>
           <span className="psr-val">{totalP.toLocaleString('en-IN', { maximumFractionDigits: 1 })} MT</span>
-        </div>
-        <div className="psr-card">
-          <span className="psr-label">Total Dispatched</span>
-          <span className="psr-val">{totalD.toLocaleString('en-IN', { maximumFractionDigits: 1 })} MT</span>
         </div>
         <div className="psr-card">
           <span className="psr-label">Entries</span>
@@ -350,9 +327,9 @@ const ProductionView = memo(function ProductionView({ activeMineId }) {
                 <th>Date</th>
                 <th>Shift</th>
                 <th>Pit</th>
+                <th>Mineral</th>
                 <th>Grade</th>
                 <th className="num-col">Produced</th>
-                <th className="num-col">Dispatched</th>
                 <th>Supervisor</th>
                 <th>Status</th>
                 <th>Action</th>
@@ -365,9 +342,9 @@ const ProductionView = memo(function ProductionView({ activeMineId }) {
                     <td>{new Date(r.entryTime).toLocaleDateString('en-IN')}</td>
                     <td>{r.shift}</td>
                     <td>{r.pitSection}</td>
-                    <td>{r.mineralGrade}</td>
+                    <td>{mineralNameOf(r.mineral)}</td>
+                    <td>{r.grade}</td>
                     <td className="num-col">{r.quantity.toLocaleString('en-IN')} MT</td>
-                    <td className="num-col">{(r.quantityDispatched || 0).toLocaleString('en-IN')} MT</td>
                     <td>{r.supervisorName || '—'}</td>
                     <td>
                       <span className={`status-pill ${r.status === 'VERIFIED' ? 'green' : 'amber'}`}>
@@ -407,125 +384,6 @@ const ProductionView = memo(function ProductionView({ activeMineId }) {
                 <tr>
                   <td colSpan="9" style={{ textAlign: 'center', color: 'var(--text2)', padding: '24px' }}>
                     No production entries recorded for this month.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* ── DISPATCHES / SALES ── */}
-      <div className="page-header" style={{ marginTop: '28px' }}>
-        <div className="page-title-block">
-          <h1 style={{ fontSize: '16px' }}>Dispatches</h1>
-          <p className="page-sub">Buyer-level sales — this is what royalty, stock, and ex-mine price are calculated from</p>
-        </div>
-        <div className="page-actions">
-          <button className="btn-primary" onClick={() => setShowSaleForm(!showSaleForm)}>
-            {showSaleForm ? 'Cancel' : '+ New Dispatch'}
-          </button>
-        </div>
-      </div>
-
-      {showSaleForm && (
-        <div className="prod-form-card" id="sale-form-card" style={{ display: 'block' }}>
-          <div className="pfc-header">
-            <h3>New Dispatch</h3>
-            <button className="icon-close" onClick={() => setShowSaleForm(false)}>✕</button>
-          </div>
-          <div className="pfc-grid">
-            <div className="fg">
-              <label>Date</label>
-              <input type="date" id="sf-date" value={saleDate} onChange={(e) => setSaleDate(e.target.value)} />
-            </div>
-            <div className="fg">
-              <label>Grade</label>
-              <input id="sf-grade" value={saleGrade} onChange={(e) => setSaleGrade(e.target.value)} placeholder="e.g. Grade A" />
-            </div>
-            <div className="fg">
-              <label>Nature</label>
-              <select id="sf-nature" value={saleNature} onChange={(e) => setSaleNature(e.target.value)}>
-                <option value="DOMESTIC_SALE">Domestic Sale</option>
-                <option value="EXPORT">Export</option>
-                <option value="DOMESTIC_TRANSFER">Domestic (Transfer)</option>
-                <option value="CAPTIVE_CONSUMPTION">Captive Consumption</option>
-              </select>
-            </div>
-            <div className="fg">
-              <label>Buyer Name</label>
-              <input id="sf-buyer" value={saleBuyer} onChange={(e) => setSaleBuyer(e.target.value)} placeholder="Buyer name" />
-            </div>
-            <div className="fg">
-              <label>Buyer IBM Reg. No.</label>
-              <input id="sf-buyer-reg" value={saleBuyerReg} onChange={(e) => setSaleBuyerReg(e.target.value)} placeholder="Optional" />
-            </div>
-            <div className="fg">
-              <label>Quantity (MT)</label>
-              <input type="number" id="sf-qty" value={saleQty} onChange={(e) => setSaleQty(e.target.value)} placeholder="1620" />
-            </div>
-            <div className="fg">
-              <label>Sale Value (₹)</label>
-              <input type="number" id="sf-value" value={saleValue} onChange={(e) => setSaleValue(e.target.value)} placeholder="Total sale/FOB value" />
-            </div>
-            <div className="fg">
-              <label>Deduction (₹/MT)</label>
-              <input type="number" id="sf-deduction" value={saleDeduction} onChange={(e) => setSaleDeduction(e.target.value)} placeholder="Beyond mine-head only" />
-            </div>
-          </div>
-          <div className="pfc-actions">
-            <button className="btn-ghost" onClick={() => setShowSaleForm(false)}>Cancel</button>
-            <button className="btn-primary" onClick={handleSaveSale}>Save Dispatch</button>
-          </div>
-        </div>
-      )}
-
-      <div className="prod-summary-row" id="sale-summary">
-        <div className="psr-card">
-          <span className="psr-label">Total Dispatched</span>
-          <span className="psr-val">{totalSaleQty.toLocaleString('en-IN', { maximumFractionDigits: 1 })} MT</span>
-        </div>
-        <div className="psr-card">
-          <span className="psr-label">Total Value</span>
-          <span className="psr-val">₹{totalSaleVal.toLocaleString('en-IN')}</span>
-        </div>
-        <div className="psr-card">
-          <span className="psr-label">Buyers</span>
-          <span className="psr-val">{sales.length}</span>
-        </div>
-      </div>
-
-      <div className="table-card">
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Grade</th>
-                <th>Nature</th>
-                <th>Buyer</th>
-                <th className="num-col">Qty (MT)</th>
-                <th className="num-col">Sale Value</th>
-                <th className="num-col">Deduction/MT</th>
-              </tr>
-            </thead>
-            <tbody id="sale-tbody">
-              {sales.length > 0 ? (
-                sales.map((s) => (
-                  <tr key={s.id}>
-                    <td>{new Date(s.dispatchedOn).toLocaleDateString('en-IN')}</td>
-                    <td>{s.grade}</td>
-                    <td>{(s.natureOfSale || '').replace('_', ' ')}</td>
-                    <td>{s.buyerName}</td>
-                    <td className="num-col">{s.quantity.toLocaleString('en-IN')} MT</td>
-                    <td className="num-col">₹{(s.grossSaleValue || 0).toLocaleString('en-IN')}</td>
-                    <td className="num-col">₹{s.deductionPerTonne || 0}</td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="7" style={{ textAlign: 'center', color: 'var(--text2)', padding: '24px' }}>
-                    No buyer dispatches recorded for this month.
                   </td>
                 </tr>
               )}

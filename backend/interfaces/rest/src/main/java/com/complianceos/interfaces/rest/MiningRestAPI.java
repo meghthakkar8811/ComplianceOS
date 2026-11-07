@@ -3,29 +3,38 @@ package com.complianceos.interfaces.rest;
 import static jakarta.ws.rs.core.MediaType.APPLICATION_JSON;
 
 import com.agentengine.interfaces.rest.ResourceCatalogAPI;
+import com.agentengine.util.cloudstorage.FileService;
+import com.agentengine.util.common.beans.FileDetails;
 import com.agentengine.util.common.query.PaginatedResult;
 import com.agentengine.util.context.ContextAware;
 import com.agentengine.util.ms.client.MicroServiceClientProvider;
 import com.complianceos.compliance.api.beans.ComplianceRecord;
 import com.complianceos.compliance.api.beans.DgmsScore;
-import com.complianceos.compliance.api.beans.ExMinePrice;
-import com.complianceos.compliance.api.beans.ExMinePriceOverride;
+import com.complianceos.compliance.api.beans.DmfContribution;
+import com.complianceos.compliance.api.beans.ExMineMineralPrice;
+import com.complianceos.compliance.api.beans.Invoice;
 import com.complianceos.compliance.api.beans.LaborDay;
+import com.complianceos.compliance.api.beans.LaborPayroll;
 import com.complianceos.compliance.api.beans.LaborSummary;
 import com.complianceos.compliance.api.beans.Mine;
-import com.complianceos.compliance.api.beans.MineLabor;
+import com.complianceos.compliance.api.beans.Mineral;
 import com.complianceos.compliance.api.beans.MinePayment;
 import com.complianceos.compliance.api.beans.MineRent;
+import com.complianceos.compliance.api.beans.MineStoppage;
+import com.complianceos.compliance.api.beans.NmetContribution;
 import com.complianceos.compliance.api.beans.ProductionEntry;
 import com.complianceos.compliance.api.beans.Royalty;
+import com.complianceos.compliance.api.beans.RoyaltyGst;
 import com.complianceos.compliance.api.beans.Sale;
 import com.complianceos.compliance.api.beans.StockBalance;
-import com.complianceos.compliance.api.beans.StockBaseline;
-import com.complianceos.compliance.api.beans.Stoppage;
+import com.complianceos.compliance.api.services.InvoiceService;
+import com.complianceos.compliance.api.services.MineralService;
 import com.complianceos.compliance.api.services.MiningService;
+import com.complianceos.compliance.api.services.RoyaltyService;
 import io.smallrye.common.annotation.RunOnVirtualThread;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
@@ -47,10 +56,21 @@ import java.util.List;
 public class MiningRestAPI {
 
   private final MiningService service;
+  private final RoyaltyService royaltyService;
+  private final MineralService mineralService;
+  private final InvoiceService invoiceService;
+  private final FileService fileService;
 
   @Inject
-  public MiningRestAPI(final MicroServiceClientProvider microServiceClientProvider) {
+  public MiningRestAPI(
+      final MicroServiceClientProvider microServiceClientProvider,
+      final InvoiceService invoiceService,
+      final FileService fileService) {
     this.service = microServiceClientProvider.getRaw(MiningService.class);
+    this.royaltyService = microServiceClientProvider.getRaw(RoyaltyService.class);
+    this.mineralService = microServiceClientProvider.getRaw(MineralService.class);
+    this.invoiceService = invoiceService;
+    this.fileService = fileService;
   }
 
   // ── Mines ──────────────────────────────────────────────────────────────
@@ -104,25 +124,76 @@ public class MiningRestAPI {
     service.deleteProductionEntry(entryId);
   }
 
-  // ── Royalty ────────────────────────────────────────────────────────────
-  // A mine's royalty is computed fresh from its dispatches and the applicable rates on every
-  // call — there is no save endpoint, and nothing to recalculate on a write.
+  // ── Royalty family ─────────────────────────────────────────────────────
+  // Every royalty-family liability is computed fresh from a mine's dispatches and the applicable
+  // rates on every call — there is no save endpoint, and nothing to recalculate on a write.
 
   @GET
   @Path("/{mineId}/royalty")
   @Produces(APPLICATION_JSON)
   @Operation(summary = "Get the mine's calculated royalty for every period with a dispatch")
   public List<Royalty> getRoyalties(@PathParam("mineId") final String mineId) {
-    return service.getRoyaltiesByMine(mineId);
+    return royaltyService.getRoyaltiesByMine(mineId);
   }
 
   @GET
   @Path("/{mineId}/royalty/period")
   @Produces(APPLICATION_JSON)
-  @Operation(summary = "Get the mine's calculated royalty for the month a given timestamp falls in")
-  public Royalty getRoyalty(
+  @Operation(summary = "Get the mine's calculated royalty, one row per mineral, for the month a given timestamp falls in")
+  public List<Royalty> getRoyalty(
       @PathParam("mineId") final String mineId, @QueryParam("asOf") final long asOf) {
-    return service.getRoyalty(mineId, asOf);
+    return royaltyService.getRoyalty(mineId, asOf);
+  }
+
+  @GET
+  @Path("/{mineId}/dmf-contributions")
+  @Produces(APPLICATION_JSON)
+  @Operation(summary = "Get the mine's calculated DMF contribution for every period with a dispatch")
+  public List<DmfContribution> getDmfContributions(@PathParam("mineId") final String mineId) {
+    return royaltyService.getDmfContributionsByMine(mineId);
+  }
+
+  @GET
+  @Path("/{mineId}/dmf-contributions/period")
+  @Produces(APPLICATION_JSON)
+  @Operation(summary = "Get the mine's calculated DMF contribution for the month a given timestamp falls in")
+  public DmfContribution getDmfContribution(
+      @PathParam("mineId") final String mineId, @QueryParam("asOf") final long asOf) {
+    return royaltyService.getDmfContribution(mineId, asOf);
+  }
+
+  @GET
+  @Path("/{mineId}/nmet-contributions")
+  @Produces(APPLICATION_JSON)
+  @Operation(summary = "Get the mine's calculated NMET contribution for every period with a dispatch")
+  public List<NmetContribution> getNmetContributions(@PathParam("mineId") final String mineId) {
+    return royaltyService.getNmetContributionsByMine(mineId);
+  }
+
+  @GET
+  @Path("/{mineId}/nmet-contributions/period")
+  @Produces(APPLICATION_JSON)
+  @Operation(summary = "Get the mine's calculated NMET contribution for the month a given timestamp falls in")
+  public NmetContribution getNmetContribution(
+      @PathParam("mineId") final String mineId, @QueryParam("asOf") final long asOf) {
+    return royaltyService.getNmetContribution(mineId, asOf);
+  }
+
+  @GET
+  @Path("/{mineId}/royalty-gst")
+  @Produces(APPLICATION_JSON)
+  @Operation(summary = "Get the mine's calculated GST-on-royalty RCM liability for every period with a dispatch")
+  public List<RoyaltyGst> getRoyaltyGst(@PathParam("mineId") final String mineId) {
+    return royaltyService.getRoyaltyGstByMine(mineId);
+  }
+
+  @GET
+  @Path("/{mineId}/royalty-gst/period")
+  @Produces(APPLICATION_JSON)
+  @Operation(summary = "Get the mine's calculated GST-on-royalty RCM liability, one row per (mineral, grade), for the month a given timestamp falls in")
+  public List<RoyaltyGst> getRoyaltyGst(
+      @PathParam("mineId") final String mineId, @QueryParam("asOf") final long asOf) {
+    return royaltyService.getRoyaltyGst(mineId, asOf);
   }
 
   // ── Compliance records ────────────────────────────────────────────────
@@ -195,12 +266,12 @@ public class MiningRestAPI {
   @Consumes(APPLICATION_JSON)
   @Produces(APPLICATION_JSON)
   @Operation(summary = "Record a day the mine didn't work, and why")
-  public Stoppage saveStoppage(
+  public MineStoppage saveMineStoppage(
       @PathParam("mineId") final String mineId,
       @QueryParam("skipVersion") @DefaultValue("false") final boolean skipVersion,
-      final Stoppage stoppage) {
+      final MineStoppage stoppage) {
     stoppage.setMineId(mineId);
-    return service.saveStoppage(stoppage, skipVersion);
+    return service.saveMineStoppage(stoppage, skipVersion);
   }
 
   @GET
@@ -238,42 +309,41 @@ public class MiningRestAPI {
   }
 
   @POST
-  @Path("/{mineId}/labor")
+  @Path("/{mineId}/labor-payroll")
   @Consumes(APPLICATION_JSON)
   @Produces(APPLICATION_JSON)
   @Operation(summary = "Save a month's wages and technical-staff labor return")
-  public MineLabor saveMineLabor(
+  public LaborPayroll saveLaborPayroll(
       @PathParam("mineId") final String mineId,
       @QueryParam("skipVersion") @DefaultValue("false") final boolean skipVersion,
-      final MineLabor labor) {
+      final LaborPayroll labor) {
     labor.setMineId(mineId);
-    return service.saveMineLabor(labor, skipVersion);
+    return service.saveLaborPayroll(labor, skipVersion);
   }
 
-  // ── Stock ──────────────────────────────────────────────────────────────
+  // ── Minerals & stock ───────────────────────────────────────────────────
 
   @POST
-  @Path("/{mineId}/stock-baselines")
+  @Path("/{mineId}/minerals")
   @Consumes(APPLICATION_JSON)
   @Produces(APPLICATION_JSON)
-  @Operation(summary = "Set a grade's opening stock as of mine provisioning")
-  public StockBaseline saveStockBaseline(
+  @Operation(summary = "Set a mineral's grades — their opening stock and ex-mine price baselines")
+  public Mineral saveMineral(
       @PathParam("mineId") final String mineId,
       @QueryParam("skipVersion") @DefaultValue("false") final boolean skipVersion,
-      final StockBaseline baseline) {
-    baseline.setMineId(mineId);
-    return service.saveStockBaseline(baseline, skipVersion);
+      final Mineral mineral) {
+    return mineralService.saveMineral(mineId, mineral, skipVersion);
   }
 
   @GET
   @Path("/{mineId}/stock-balance")
   @Produces(APPLICATION_JSON)
-  @Operation(summary = "Get a grade's opening/closing stock for the month a given timestamp falls in")
+  @Operation(summary = "Get a grade's current opening/closing stock")
   public StockBalance getStockBalance(
       @PathParam("mineId") final String mineId,
-      @QueryParam("mineralGrade") final String mineralGrade,
-      @QueryParam("asOf") final long asOf) {
-    return service.getStockBalance(mineId, mineralGrade, asOf);
+      @QueryParam("mineral") final String mineral,
+      @QueryParam("grade") final String grade) {
+    return mineralService.getStockBalance(mineId, mineral, grade);
   }
 
   // ── Dispatches & ex-mine price ────────────────────────────────────────
@@ -294,24 +364,33 @@ public class MiningRestAPI {
   @GET
   @Path("/{mineId}/ex-mine-price")
   @Produces(APPLICATION_JSON)
-  @Operation(summary = "Get a grade's ex-mine price for the month a given timestamp falls in")
-  public ExMinePrice getExMinePrice(
+  @Operation(summary = "Get a grade's current ex-mine price")
+  public ExMineMineralPrice getExMineMineralPrice(
       @PathParam("mineId") final String mineId,
-      @QueryParam("mineralGrade") final String mineralGrade,
-      @QueryParam("asOf") final long asOf) {
-    return service.getExMinePrice(mineId, mineralGrade, asOf);
+      @QueryParam("mineral") final String mineral,
+      @QueryParam("grade") final String grade) {
+    return mineralService.getExMineMineralPrice(mineId, mineral, grade);
   }
 
+  // ── Invoices ───────────────────────────────────────────────────────────
+
+  /**
+   * Generates the sale's invoice on first request and re-downloads the same PDF on every request
+   * after. A {@code 204} means the sale's type never calls for an invoice — not an error, so
+   * the caller can tell the two apart without parsing a response body.
+   */
   @POST
-  @Path("/{mineId}/ex-mine-price-overrides")
-  @Consumes(APPLICATION_JSON)
-  @Produces(APPLICATION_JSON)
-  @Operation(summary = "Manually set a grade's ex-mine price for a month")
-  public ExMinePriceOverride saveExMinePriceOverride(
-      @PathParam("mineId") final String mineId,
-      @QueryParam("skipVersion") @DefaultValue("false") final boolean skipVersion,
-      final ExMinePriceOverride override) {
-    override.setMineId(mineId);
-    return service.saveExMinePriceOverride(override, skipVersion);
+  @Path("/{mineId}/sales/{saleId}/invoice")
+  @Produces("application/pdf")
+  @Operation(summary = "Generate or re-download a sale's invoice PDF")
+  public Response downloadInvoice(@PathParam("saleId") final String saleId) {
+    final Invoice invoice = invoiceService.getOrCreateInvoice(saleId);
+    if (invoice == null) {
+      return Response.noContent().build();
+    }
+    final FileDetails downloaded = fileService.download(invoice.getInvoiceFile());
+    return Response.ok(downloaded.downloaded(), downloaded.mimeType())
+        .header("Content-Disposition", "attachment; filename=\"" + downloaded.name() + "\"")
+        .build();
   }
 }

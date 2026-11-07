@@ -1,1 +1,126 @@
-["LIMESTONE", "IRON_ORE", "COAL", "BAUXITE", "MANGANESE", "CHROMITE", "DOLOMITE", "GRANITE"]
+[
+  {
+    "mineral": "Iron Ore",
+    "grades": [
+      {
+        "name": "Lumps"
+      },
+      {
+        "name": "Fines"
+      },
+      {
+        "name": "Concentrate"
+      }
+    ]
+  },
+  {
+    "mineral": "Limestone",
+    "grades": [
+      {
+        "name": "Cement Grade"
+      },
+      {
+        "name": "SMS Grade"
+      },
+      {
+        "name": "Chemical Grade"
+      },
+      {
+        "name": "Flux Grade"
+      }
+    ]
+  },
+  {
+    "mineral": "Coal",
+    "grades": [
+      {
+        "name": "Steam Coal"
+      },
+      {
+        "name": "Coking Coal"
+      }
+    ]
+  },
+  {
+    "mineral": "Bauxite",
+    "grades": [
+      {
+        "name": "Metallurgical Grade"
+      },
+      {
+        "name": "Refractory Grade"
+      },
+      {
+        "name": "Chemical Grade"
+      },
+      {
+        "name": "Abrasive Grade"
+      },
+      {
+        "name": "Cement Grade"
+      }
+    ]
+  },
+  {
+    "mineral": "Manganese",
+    "grades": [
+      {
+        "name": "Ferro Grade"
+      },
+      {
+        "name": "BF Grade"
+      },
+      {
+        "name": "Chemical Grade"
+      },
+      {
+        "name": "Battery Grade"
+      }
+    ]
+  },
+  {
+    "mineral": "Chromite",
+    "grades": [
+      {
+        "name": "Metallurgical Grade"
+      },
+      {
+        "name": "Chemical Grade"
+      },
+      {
+        "name": "Refractory Grade"
+      },
+      {
+        "name": "Foundry Grade"
+      }
+    ]
+  },
+  {
+    "mineral": "Dolomite",
+    "grades": [
+      {
+        "name": "Metallurgical Grade"
+      },
+      {
+        "name": "Chemical Grade"
+      },
+      {
+        "name": "Refractory Grade"
+      },
+      {
+        "name": "Glass Grade"
+      }
+    ]
+  },
+  {
+    "mineral": "Granite",
+    "grades": [
+      {
+        "name": "Dimension Stone"
+      },
+      {
+        "name": "Crushed"
+      }
+    ]
+  }
+]

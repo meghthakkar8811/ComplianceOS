@@ -7,22 +7,8 @@ function formatState(s) {
   return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function formatMineral(m) {
-  if (!m) return '';
-  const map = {
-    IRON_ORE: 'Iron Ore',
-    COAL: 'Coal',
-    LIMESTONE: 'Limestone',
-    BAUXITE: 'Bauxite',
-    MANGANESE: 'Manganese Ore',
-    CHROMITE: 'Chromite',
-    DOLOMITE: 'Dolomite',
-    GRANITE: 'Granite',
-  };
-  return map[m] || m.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
 
-export default function FormJModal({ isOpen, onClose, activeMine, onSubmitted, user }) {
+export default function FormJModal({ isOpen, onClose, activeMine, activeMineMinerals, onSubmitted, user }) {
   const [referenceNumber, setReferenceNumber] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -106,7 +92,7 @@ export default function FormJModal({ isOpen, onClose, activeMine, onSubmitted, u
                 </div>
                 <div className="fg">
                   <label>State & Mineral</label>
-                  <input readOnly value={`${formatState(activeMine?.state || '')} · ${formatMineral(activeMine?.mineral || '')}`} />
+                  <input readOnly value={`${formatState(activeMine?.state || '')} · ${(activeMineMinerals || "—")}`} />
                 </div>
                 <div className="fg">
                   <label>Reporting Fiscal Year</label>
@@ -129,7 +115,7 @@ export default function FormJModal({ isOpen, onClose, activeMine, onSubmitted, u
                 </thead>
                 <tbody>
                   <tr>
-                    <td>{formatMineral(activeMine?.mineral || '')} — ROM</td>
+                    <td>{(activeMineMinerals || "—")} — ROM</td>
                     <td>3,100.00</td>
                     <td>{annualProd.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
                     <td>{annualDisp.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>

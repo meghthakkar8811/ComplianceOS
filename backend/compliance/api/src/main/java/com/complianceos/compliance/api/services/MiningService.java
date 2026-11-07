@@ -3,31 +3,31 @@ package com.complianceos.compliance.api.services;
 import com.agentengine.util.common.query.PaginatedResult;
 import com.agentengine.util.common.query.Query;
 import com.agentengine.util.ms.client.MicroService;
+import com.complianceos.compliance.api.beans.Buyer;
 import com.complianceos.compliance.api.beans.ComplianceRecord;
 import com.complianceos.compliance.api.beans.DgmsScore;
 import com.complianceos.compliance.api.beans.DmfRate;
-import com.complianceos.compliance.api.beans.ExMinePrice;
-import com.complianceos.compliance.api.beans.ExMinePriceOverride;
+import com.complianceos.compliance.api.beans.GstRate;
 import com.complianceos.compliance.api.beans.LaborDay;
+import com.complianceos.compliance.api.beans.LaborPayroll;
 import com.complianceos.compliance.api.beans.LaborSummary;
 import com.complianceos.compliance.api.beans.Mine;
-import com.complianceos.compliance.api.beans.MineLabor;
 import com.complianceos.compliance.api.beans.MinePayment;
 import com.complianceos.compliance.api.beans.MineRent;
+import com.complianceos.compliance.api.beans.MineStoppage;
 import com.complianceos.compliance.api.beans.NmetRate;
 import com.complianceos.compliance.api.beans.ProductionEntry;
-import com.complianceos.compliance.api.beans.Royalty;
 import com.complianceos.compliance.api.beans.RoyaltyRate;
 import com.complianceos.compliance.api.beans.Sale;
-import com.complianceos.compliance.api.beans.StockBalance;
-import com.complianceos.compliance.api.beans.StockBaseline;
-import com.complianceos.compliance.api.beans.Stoppage;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Everything a mine and its statutory compliance involve: production, royalty, filings, and DGMS
- * register tracking are all sub-resources of a mine, never addressed on their own.
+ * Everything a mine and its statutory compliance involve: production, rent, payments, labor,
+ * sales, and DGMS register tracking are all sub-resources of a mine, never addressed on their
+ * own. Royalty-family computation ({@link RoyaltyService}) and mineral stock/ex-mine-price
+ * ({@link MineralService}) are separate services, since they are each their own self-contained
+ * area of logic rather than another mine sub-resource this class should carry.
  */
 @MicroService("compliance")
 public interface MiningService {
@@ -42,6 +42,17 @@ public interface MiningService {
 
   PaginatedResult<Mine> findMines(Query query);
 
+  /** Saves a buyer — customer-scoped, not mine-scoped, unlike every other entity in this service. */
+  Buyer saveBuyer(Buyer buyer, boolean skipVersion);
+
+  Buyer getBuyer(String id);
+
+  Map<String, Buyer> getBuyers(List<String> ids);
+
+  void deleteBuyer(String id);
+
+  PaginatedResult<Buyer> findBuyers(Query query);
+
   ProductionEntry saveProductionEntry(ProductionEntry entry, boolean skipVersion);
 
   Map<String, ProductionEntry> getProductionEntries(List<String> ids);
@@ -55,15 +66,6 @@ public interface MiningService {
 
   void deleteProductionEntry(String id);
 
-  /**
-   * The mine's royalty for every period that has a {@link Sale} — computed fresh from
-   * its dispatches and the applicable rates on every call, never stored.
-   */
-  List<Royalty> getRoyaltiesByMine(String mineId);
-
-  /** The mine's royalty for the month {@code asOf} falls in, or null if it had no dispatches then. */
-  Royalty getRoyalty(String mineId, long asOf);
-
   RoyaltyRate saveRoyaltyRate(RoyaltyRate rate);
 
   PaginatedResult<RoyaltyRate> findRoyaltyRates(Query query);
@@ -71,6 +73,10 @@ public interface MiningService {
   DmfRate saveDmfRate(DmfRate rate);
 
   NmetRate saveNmetRate(NmetRate rate);
+
+  GstRate saveGstRate(GstRate rate);
+
+  PaginatedResult<GstRate> findGstRates(Query query);
 
   ComplianceRecord saveComplianceRecord(ComplianceRecord record, boolean skipVersion);
 
@@ -116,20 +122,20 @@ public interface MiningService {
   PaginatedResult<MinePayment> findPayments(Query query);
 
   /** Saves the stoppage for its day — a second save for the same mine and day replaces it. */
-  Stoppage saveStoppage(Stoppage stoppage, boolean skipVersion);
+  MineStoppage saveMineStoppage(MineStoppage stoppage, boolean skipVersion);
 
-  Map<String, Stoppage> getStoppages(List<String> ids);
+  Map<String, MineStoppage> getMineStoppages(List<String> ids);
 
   /**
    * Stoppages matching {@code query}, filtered to the ones whose mine the caller may read —
-   * {@code Stoppage} is not independently permissioned, so this filtering stands in for the ACL
-   * filtering a {@code @Permissioned} entity's own repository would otherwise apply.
+   * {@code MineStoppage} is not independently permissioned, so this filtering stands in for the
+   * ACL filtering a {@code @Permissioned} entity's own repository would otherwise apply.
    */
-  PaginatedResult<Stoppage> findStoppages(Query query);
+  PaginatedResult<MineStoppage> findMineStoppages(Query query);
 
   /**
    * The mine's days worked in the month {@code asOf} falls in: the days in that month minus its
-   * distinct {@link Stoppage} days — never stored, since it's always derivable from them.
+   * distinct {@link MineStoppage} days — never stored, since it's always derivable from them.
    */
   int getDaysWorked(String mineId, long asOf);
 
@@ -152,35 +158,16 @@ public interface MiningService {
   LaborSummary getLaborSummary(String mineId, long asOf);
 
   /** Saves a month's labor return — a second save for the same mine and month replaces it. */
-  MineLabor saveMineLabor(MineLabor labor, boolean skipVersion);
+  LaborPayroll saveLaborPayroll(LaborPayroll labor, boolean skipVersion);
 
-  Map<String, MineLabor> getMineLabors(List<String> ids);
+  Map<String, LaborPayroll> getLaborPayrolls(List<String> ids);
 
   /**
    * Labor returns matching {@code query}, filtered to the ones whose mine the caller may read —
-   * {@code MineLabor} is not independently permissioned, so this filtering stands in for the ACL
-   * filtering a {@code @Permissioned} entity's own repository would otherwise apply.
-   */
-  PaginatedResult<MineLabor> findMineLabors(Query query);
-
-  /** The grade's opening stock at the point this mine started being tracked on the platform. */
-  StockBaseline saveStockBaseline(StockBaseline baseline, boolean skipVersion);
-
-  Map<String, StockBaseline> getStockBaselines(List<String> ids);
-
-  /**
-   * Baselines matching {@code query}, filtered to the ones whose mine the caller may read —
-   * {@code StockBaseline} is not independently permissioned, so this filtering stands in for the
+   * {@code LaborPayroll} is not independently permissioned, so this filtering stands in for the
    * ACL filtering a {@code @Permissioned} entity's own repository would otherwise apply.
    */
-  PaginatedResult<StockBaseline> findStockBaselines(Query query);
-
-  /**
-   * The mine's opening/closing stock of {@code mineralGrade} for the month {@code asOf} falls
-   * in: derived from the grade's {@link StockBaseline} plus every {@link ProductionEntry} and
-   * {@link Sale} between it and the end of that month — never stored.
-   */
-  StockBalance getStockBalance(String mineId, String mineralGrade, long asOf);
+  PaginatedResult<LaborPayroll> findLaborPayrolls(Query query);
 
   /** Saves one buyer's purchase of one grade from the mine. */
   Sale saveSale(Sale sale, boolean skipVersion);
@@ -195,23 +182,14 @@ public interface MiningService {
   PaginatedResult<Sale> findSales(Query query);
 
   /**
-   * The grade's ex-mine price for the month {@code asOf} falls in: an {@link
-   * ExMinePriceOverride} for that month if one exists, else that month's {@link Sale} records
-   * averaged out, else the most recent earlier month that had either.
+   * The group-by/metrics buckets {@code query} asks for over {@code mineId}'s own {@link Sale}s
+   * — empty if the caller may not read that mine. Always scoped to one mine explicitly, the same
+   * way every other {@code Sale} operation is, rather than computing which mines the caller can
+   * read and filtering buckets after the fact: a bucket can mix rows from several mines, so
+   * filtering it post-aggregation can't undo an unscoped read the way filtering a list of rows
+   * can.
    */
-  ExMinePrice getExMinePrice(String mineId, String mineralGrade, long asOf);
-
-  /** Saves a month's manually set ex-mine price for a grade. */
-  ExMinePriceOverride saveExMinePriceOverride(ExMinePriceOverride override, boolean skipVersion);
-
-  Map<String, ExMinePriceOverride> getExMinePriceOverrides(List<String> ids);
-
-  /**
-   * Overrides matching {@code query}, filtered to the ones whose mine the caller may read —
-   * {@code ExMinePriceOverride} is not independently permissioned, so this filtering stands in
-   * for the ACL filtering a {@code @Permissioned} entity's own repository would otherwise apply.
-   */
-  PaginatedResult<ExMinePriceOverride> findExMinePriceOverrides(Query query);
+  AggregationResult aggregateSales(String mineId, AggregationQuery query);
 
   /**
    * Creates whatever of the mine's fixed DGMS registers and rolling-12-month recurring filing

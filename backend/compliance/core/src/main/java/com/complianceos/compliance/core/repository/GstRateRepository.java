@@ -5,22 +5,22 @@ import com.agentengine.util.common.repository.DocumentBackend;
 import com.agentengine.util.common.repository.DocumentRepositorySpec;
 import com.agentengine.util.common.validation.ValidationService;
 import com.complianceos.compliance.api.beans.ComplianceDocumentStoreClientType;
-import com.complianceos.compliance.api.beans.StockBaseline;
+import com.complianceos.compliance.api.beans.GstRate;
 import io.quarkus.runtime.Startup;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 @Singleton
 @Startup
-public class StockBaselineRepository extends AbstractRepository<StockBaseline> {
+public class GstRateRepository extends AbstractRepository<GstRate> {
 
   @Inject
-  public StockBaselineRepository(
+  public GstRateRepository(
       final DocumentBackend documentBackend, final ValidationService validationService) {
     super(
         documentBackend.getEntityStore(
-            DocumentRepositorySpec.perCustomer(
-                ComplianceDocumentStoreClientType.COMPLIANCE, StockBaseline.class)),
+            DocumentRepositorySpec.global(
+                ComplianceDocumentStoreClientType.COMPLIANCE, GstRate.class)),
         validationService);
   }
 }

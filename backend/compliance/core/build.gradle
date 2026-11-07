@@ -23,6 +23,7 @@ dependencies {
     implementation 'com.agentengine.util:context:1.0.1-SNAPSHOT'
     implementation 'com.agentengine.util:mongodb:1.0.1-SNAPSHOT'
     implementation 'com.agentengine.util:scripts:1.0.1-SNAPSHOT'
+    implementation 'com.agentengine.util:cloudstorage:1.0.1-SNAPSHOT'
     runtimeOnly 'com.agentengine.util.ms:server:1.0.1-SNAPSHOT'
 
     implementation platform(libs.quarkus.bom)
@@ -30,6 +31,9 @@ dependencies {
     implementation libs.quarkus.grpc
     implementation libs.quarkus.hibernate.validator
     implementation libs.quarkus.opentelemetry
+
+    // HTML-to-PDF rendering for generated invoices.
+    implementation libs.openhtmltopdf.pdfbox
 
     implementation 'com.fasterxml.jackson.core:jackson-annotations'
     implementation 'org.mongodb:bson'

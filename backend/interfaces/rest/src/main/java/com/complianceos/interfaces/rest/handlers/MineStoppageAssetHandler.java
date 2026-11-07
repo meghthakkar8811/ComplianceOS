@@ -6,42 +6,42 @@ import com.agentengine.util.common.query.PaginatedResult;
 import com.agentengine.util.common.utils.CollectionUtils;
 import com.agentengine.util.ms.client.MicroServiceClientProvider;
 import com.complianceos.compliance.api.beans.AssetClass;
-import com.complianceos.compliance.api.beans.StockBaseline;
+import com.complianceos.compliance.api.beans.MineStoppage;
 import com.complianceos.compliance.api.services.MiningService;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import java.util.Map;
 
 /**
- * Stock baselines are not independently permissioned — reached only through their mine — so
- * {@code MiningService} filters every result to what the caller may read, the same way a
- * {@code @Permissioned} entity's own repository would via its ACL.
+ * Stoppages are not independently permissioned — reached only through their mine — so {@code
+ * MiningService} filters every result to what the caller may read, the same way a {@code
+ * @Permissioned} entity's own repository would via its ACL.
  */
 @Singleton
-public class StockBaselineAssetHandler implements AssetHandler<StockBaseline> {
+public class MineStoppageAssetHandler implements AssetHandler<MineStoppage> {
 
   private final MiningService service;
 
   @Inject
-  public StockBaselineAssetHandler(final MicroServiceClientProvider provider) {
+  public MineStoppageAssetHandler(final MicroServiceClientProvider provider) {
     this.service = provider.getRaw(MiningService.class);
   }
 
   @Override
   public String getAssetType() {
-    return AssetClass.STOCK_BASELINE;
+    return AssetClass.MINE_STOPPAGE;
   }
 
   @Override
-  public PaginatedResult<StockBaseline> findAssets(final AssetRequest request) {
-    return service.findStockBaselines(request.getQuery());
+  public PaginatedResult<MineStoppage> findAssets(final AssetRequest request) {
+    return service.findMineStoppages(request.getQuery());
   }
 
   @Override
-  public Map<String, StockBaseline> getAssetsByIds(final AssetRequest request) {
+  public Map<String, MineStoppage> getAssetsByIds(final AssetRequest request) {
     if (CollectionUtils.isEmpty(request.getKeys())) {
       return Map.of();
     }
-    return service.getStockBaselines(request.getKeys());
+    return service.getMineStoppages(request.getKeys());
   }
 }

@@ -4,6 +4,7 @@ import ProdChart from '../components/dashboard/ProdChart';
 const DashboardView = memo(function DashboardView({
   dashboardData,
   activeMine,
+  activeMineMinerals,
   chartType,
   onChartTypeChange,
   onNavigate,
@@ -43,10 +44,10 @@ const DashboardView = memo(function DashboardView({
     { month: 'Nov', produced: 98000, dispatched: 95000 },
   ];
 
-  const monthProduced = dashboardData?.monthProduced ?? 98000;
-  const todayProduced = dashboardData?.todayProduced ?? 3420;
+  const monthProduced = dashboardData?.monthProduced ?? 0;
+  const todayProduced = dashboardData?.todayProduced ?? 0;
   const pendingFilingsCount = dashboardData?.pendingFilingsCount ?? displayPending;
-  const grossRoyalty = dashboardData?.grossRoyalty ?? '₹1,05,600';
+  const grossRoyalty = dashboardData?.grossRoyalty ?? '₹0';
 
   // Deadlines feed
   const upcomingDeadlines = records
@@ -60,7 +61,7 @@ const DashboardView = memo(function DashboardView({
         <div className="page-title-block">
           <h1 id="dash-greeting">Good morning</h1>
           <p className="page-sub" id="dash-sub">
-            {activeMine ? `${activeMine.name} · ${activeMine.mineral || 'Iron Ore'} · ${activeMine.state || 'Odisha'}` : 'Loading your mine data…'}
+            {activeMine ? `${activeMine.name} · ${activeMineMinerals || 'Iron Ore'} · ${activeMine.state || 'Odisha'}` : 'Loading your mine data…'}
           </p>
         </div>
         <div className="page-actions">

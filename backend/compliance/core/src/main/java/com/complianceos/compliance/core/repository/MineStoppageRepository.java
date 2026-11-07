@@ -5,22 +5,22 @@ import com.agentengine.util.common.repository.DocumentBackend;
 import com.agentengine.util.common.repository.DocumentRepositorySpec;
 import com.agentengine.util.common.validation.ValidationService;
 import com.complianceos.compliance.api.beans.ComplianceDocumentStoreClientType;
-import com.complianceos.compliance.api.beans.ExMinePriceOverride;
+import com.complianceos.compliance.api.beans.MineStoppage;
 import io.quarkus.runtime.Startup;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 @Singleton
 @Startup
-public class ExMinePriceOverrideRepository extends AbstractRepository<ExMinePriceOverride> {
+public class MineStoppageRepository extends AbstractRepository<MineStoppage> {
 
   @Inject
-  public ExMinePriceOverrideRepository(
+  public MineStoppageRepository(
       final DocumentBackend documentBackend, final ValidationService validationService) {
     super(
         documentBackend.getEntityStore(
             DocumentRepositorySpec.perCustomer(
-                ComplianceDocumentStoreClientType.COMPLIANCE, ExMinePriceOverride.class)),
+                ComplianceDocumentStoreClientType.COMPLIANCE, MineStoppage.class)),
         validationService);
   }
 }

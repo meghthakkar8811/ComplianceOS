@@ -7,22 +7,8 @@ function formatState(s) {
   return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function formatMineral(m) {
-  if (!m) return '';
-  const map = {
-    IRON_ORE: 'Iron Ore',
-    COAL: 'Coal',
-    LIMESTONE: 'Limestone',
-    BAUXITE: 'Bauxite',
-    MANGANESE: 'Manganese Ore',
-    CHROMITE: 'Chromite',
-    DOLOMITE: 'Dolomite',
-    GRANITE: 'Granite',
-  };
-  return map[m] || m.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
 
-export default function FormBModal({ isOpen, onClose, activeMine, onSubmitted, user }) {
+export default function FormBModal({ isOpen, onClose, activeMine, activeMineMinerals, onSubmitted, user }) {
   const [referenceNumber, setReferenceNumber] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -104,7 +90,7 @@ export default function FormBModal({ isOpen, onClose, activeMine, onSubmitted, u
                 </div>
                 <div className="fg">
                   <label>Mineral</label>
-                  <input readOnly value={formatMineral(activeMine?.mineral || '')} />
+                  <input readOnly value={(activeMineMinerals || "—")} />
                 </div>
                 <div className="fg">
                   <label>Return Period</label>
@@ -125,7 +111,7 @@ export default function FormBModal({ isOpen, onClose, activeMine, onSubmitted, u
                 </thead>
                 <tbody>
                   <tr>
-                    <td>{formatMineral(activeMine?.mineral || '')} — All Grades</td>
+                    <td>{(activeMineMinerals || "—")} — All Grades</td>
                     <td style={{ fontFamily: 'var(--mono)', fontWeight: 600 }}>98,000.000</td>
                     <td style={{ fontFamily: 'var(--mono)', fontWeight: 600 }}>95,000.000</td>
                   </tr>

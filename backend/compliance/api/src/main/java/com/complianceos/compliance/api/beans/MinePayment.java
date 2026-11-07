@@ -4,17 +4,19 @@ import com.agentengine.util.common.annotations.Index;
 import com.agentengine.util.common.beans.BaseEntity;
 
 /**
- * A payment a mine actually made against a statutory liability: royalty, rent, or dead rent.
- * Royalty's own liability is calculated ({@link Royalty}), so a payment against it links {@link
- * #royaltyId}; rent and dead rent are fixed lease terms ({@link MineRent}), never computed by
- * this service, so their payments carry no such link. Several payments may settle one {@link
- * Royalty} over time (partial payments), and {@link #receiptNumber} is what lets the mine owner
- * prove to an inspector that a payment happened at all. Not independently permissioned — reached
- * only through its mine, whose access governs it, same as {@link ProductionEntry} and {@link
- * ComplianceRecord}.
+ * A payment a mine actually made against a statutory liability: royalty, a DMF or NMET
+ * contribution, GST on royalty under reverse charge, rent, or dead rent. Royalty, the DMF/NMET
+ * contributions, and the GST RCM liability are all calculated ({@link Royalty}, {@link
+ * DmfContribution}, {@link NmetContribution}, {@link RoyaltyGst}), so a payment against one
+ * of them links {@link #referenceId}; rent and dead rent are fixed lease terms ({@link MineRent}),
+ * never computed by this service, so their payments carry no such link. Several payments may
+ * settle one computed liability over time (partial payments), and {@link #receiptNumber} is what
+ * lets the mine owner prove to an inspector that a payment happened at all. Not independently
+ * permissioned — reached only through its mine, whose access governs it, same as {@link
+ * ProductionEntry} and {@link ComplianceRecord}.
  */
 @Index(name = "mine_payment_mine_idx", def = "{'mineId': 1}")
-@Index(name = "mine_payment_royalty_idx", def = "{'royaltyId': 1}")
+@Index(name = "mine_payment_reference_idx", def = "{'referenceId': 1}")
 public class MinePayment extends BaseEntity {
 
   public static final String FIELD_MINE_ID = "mineId";
@@ -27,11 +29,12 @@ public class MinePayment extends BaseEntity {
   // to load.
   private String type;
 
-  // Set only when type is ROYALTY: the Royalty this payment settles, in part or in full.
-  private String royaltyId;
+  // Set only when type is ROYALTY, DMF_CONTRIBUTION, NMET_CONTRIBUTION, or GST_ON_ROYALTY_RCM:
+  // the deterministic id of that computed liability this payment settles, in part or in full.
+  private String referenceId;
 
-  // Paise.
-  private long amount;
+  // Rupees.
+  private double amount;
 
   private long paidOn;
 
@@ -54,19 +57,19 @@ public class MinePayment extends BaseEntity {
     this.type = type;
   }
 
-  public String getRoyaltyId() {
-    return royaltyId;
+  public String getReferenceId() {
+    return referenceId;
   }
 
-  public void setRoyaltyId(String royaltyId) {
-    this.royaltyId = royaltyId;
+  public void setReferenceId(String referenceId) {
+    this.referenceId = referenceId;
   }
 
-  public long getAmount() {
+  public double getAmount() {
     return amount;
   }
 
-  public void setAmount(long amount) {
+  public void setAmount(double amount) {
     this.amount = amount;
   }
 

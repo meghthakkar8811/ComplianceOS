@@ -17,7 +17,7 @@ import java.time.ZoneOffset;
  */
 @Index(name = "stoppage_mine_idx", def = "{'mineId': 1}")
 @Index(name = "stoppage_mine_day_idx", def = "{'mineId': 1, 'stoppedOn': 1}", unique = true)
-public class Stoppage extends BaseEntity {
+public class MineStoppage extends BaseEntity {
 
   public static final String FIELD_MINE_ID = "mineId";
   public static final String FIELD_STOPPED_ON = "stoppedOn";

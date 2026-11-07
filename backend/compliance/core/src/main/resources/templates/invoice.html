@@ -1,0 +1,71 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 12px; color: #222; margin: 32px; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  .subtitle { color: #666; margin-bottom: 24px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+  td, th { padding: 6px 8px; border: 1px solid #ccc; text-align: left; vertical-align: top; }
+  th { background: #f2f2f2; }
+  .parties { width: 100%; margin-bottom: 20px; }
+  .parties td { border: none; padding: 0 16px 0 0; }
+  .party-title { font-weight: bold; margin-bottom: 4px; }
+  .totals td { text-align: right; }
+  .totals th { text-align: left; }
+  .grand-total { font-weight: bold; font-size: 14px; }
+</style>
+</head>
+<body>
+  <h1>Tax Invoice</h1>
+  <div class="subtitle">Invoice No. {{ invoice.invoiceNumber }} &middot; Dated {{ new Date(sale.dispatchedOn).format('dd MMM yyyy', TimeZone.getTimeZone('UTC')) }} &middot; {{ invoice.interState ? 'Inter-State' : 'Intra-State' }}</div>
+
+  <table class="parties">
+    <tr>
+      <td style="width: 50%;">
+        <div class="party-title">Seller</div>
+        {{ mine.name ?: '-' }}<br/>
+        GSTIN: {{ mine.gstin ?: '-' }}<br/>
+        State: {{ mine.state ?: '-' }}
+      </td>
+      <td style="width: 50%;">
+        <div class="party-title">Buyer</div>
+        {{ buyer.name ?: '-' }}<br/>
+        GSTIN: {{ buyer.gstin ?: '-' }}<br/>
+        Address: {{ buyer.address ?: '-' }}<br/>
+        State: {{ buyer.state ?: '-' }}
+      </td>
+    </tr>
+  </table>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Sale Type</th>
+        <th>Mineral</th>
+        <th>Grade</th>
+        <th>Quantity</th>
+        <th>Sale Value (Rs.)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>{{ sale.type }}</td>
+        <td>{{ sale.mineral ?: '-' }}</td>
+        <td>{{ sale.grade ?: '-' }}</td>
+        <td>{{ sale.quantity }}</td>
+        <td>{{ '%.2f'.format(sale.saleValue) }}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <table class="totals">
+    <tr><th>Taxable Value</th><td>Rs. {{ '%.2f'.format(sale.saleValue) }}</td></tr>
+    <tr><th>CGST</th><td>Rs. {{ '%.2f'.format(invoice.cgstAmount) }}</td></tr>
+    <tr><th>SGST</th><td>Rs. {{ '%.2f'.format(invoice.sgstAmount) }}</td></tr>
+    <tr><th>IGST</th><td>Rs. {{ '%.2f'.format(invoice.igstAmount) }}</td></tr>
+    <tr class="grand-total"><th>Total</th><td>Rs. {{ '%.2f'.format(sale.saleValue + invoice.cgstAmount + invoice.sgstAmount + invoice.igstAmount) }}</td></tr>
+  </table>
+</body>
+</html>

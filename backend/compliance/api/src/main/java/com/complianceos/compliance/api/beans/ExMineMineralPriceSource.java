@@ -2,15 +2,15 @@ package com.complianceos.compliance.api.beans;
 
 import java.util.Locale;
 
-/** Where a month's {@link ExMinePrice} came from, cheapest/most-authoritative first. */
-public enum ExMinePriceSource {
+/** Where a month's {@link ExMineMineralPrice} came from, cheapest/most-authoritative first. */
+public enum ExMineMineralPriceSource {
   OVERRIDE,
   SALES,
   CARRIED_FORWARD,
   NONE,
   UNKNOWN;
 
-  public static ExMinePriceSource valueOfOrDefault(final String value) {
+  public static ExMineMineralPriceSource valueOfOrDefault(final String value) {
     if (value == null) {
       return UNKNOWN;
     }

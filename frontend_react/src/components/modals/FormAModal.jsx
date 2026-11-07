@@ -7,21 +7,6 @@ function formatState(s) {
   return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function formatMineral(m) {
-  if (!m) return '';
-  const map = {
-    IRON_ORE: 'Iron Ore',
-    COAL: 'Coal',
-    LIMESTONE: 'Limestone',
-    BAUXITE: 'Bauxite',
-    MANGANESE: 'Manganese Ore',
-    CHROMITE: 'Chromite',
-    DOLOMITE: 'Dolomite',
-    GRANITE: 'Granite',
-  };
-  return map[m] || m.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
 export default function FormAModal({ isOpen, onClose, activeMine, onSubmitted, user }) {
   const [referenceNumber, setReferenceNumber] = useState('');
   const [submitting, setSubmitting] = useState(false);

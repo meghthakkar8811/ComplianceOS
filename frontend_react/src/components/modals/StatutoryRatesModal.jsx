@@ -1,26 +1,68 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { catalogSearch } from '../../services/api';
 import { toast } from '../../context/ToastContext';
 
-const STATUTORY_BASE_RATES = {
-  LIMESTONE: { rate: 80, unit: 'MT', method: 'Specific Flat Rate', asp: 720, schedule: 'MMDR Schedule II (Item 33)', citation: 'Govt. Gazette S.O. 2682(E) — ₹80/tonne' },
-  IRON_ORE: { rate: 540, unit: 'MT', method: '15% of IBM ASP', asp: 3600, schedule: 'MMDR Schedule II (Item 23)', citation: 'IBM Monthly ASP Gazette (15% of ASP)' },
-  COAL: { rate: 350, unit: 'MT', method: '14% ad valorem', asp: 2500, schedule: 'MMDR Schedule II (Item 10)', citation: 'Ministry of Coal / MMDR Sched II' },
-  BAUXITE: { rate: 180, unit: 'MT', method: '7.5% of ASP', asp: 2400, schedule: 'MMDR Schedule II (Item 6)', citation: 'IBM Monthly ASP Gazette' },
-  MANGANESE: { rate: 420, unit: 'MT', method: '5% of IBM ASP', asp: 8400, schedule: 'MMDR Schedule II (Item 35)', citation: 'IBM Mineral Statistics Bulletin' },
-  CHROMITE: { rate: 645, unit: 'MT', method: '15% of IBM ASP', asp: 4300, schedule: 'MMDR Schedule II (Item 14)', citation: 'IBM Monthly ASP Bulletin' },
-  DOLOMITE: { rate: 75, unit: 'MT', method: 'Specific Flat Rate', asp: 640, schedule: 'MMDR Schedule II (Item 18)', citation: 'MMDR Schedule II Gazette S.O. 2682(E)' },
-  GRANITE: { rate: 120, unit: 'MT', method: 'State Schedule Rate', asp: 1200, schedule: 'State Minor Mineral Rules', citation: 'State Minor Mineral Concession Rules' },
+const MONTH_INDEX = {
+  JANUARY: 0, FEBRUARY: 1, MARCH: 2, APRIL: 3, MAY: 4, JUNE: 5,
+  JULY: 6, AUGUST: 7, SEPTEMBER: 8, OCTOBER: 9, NOVEMBER: 10, DECEMBER: 11,
 };
 
-export default function StatutoryRatesModal({ isOpen, onClose, activeMineral = 'LIMESTONE' }) {
+/** The latest royalty rate per (state, mineral, grade) — grade is null for a mineral-wide rate. */
+function latestRoyaltyRatesByStateAndMineral(rates) {
+  const latest = new Map();
+  for (const rate of rates) {
+    const key = `${rate.state}:${rate.mineral}:${rate.grade || ''}`;
+    const existing = latest.get(key);
+    const rank = rate.year * 12 + (MONTH_INDEX[rate.month] || 0);
+    const existingRank = existing ? existing.year * 12 + (MONTH_INDEX[existing.month] || 0) : -1;
+    if (!existing || rank > existingRank) {
+      latest.set(key, rate);
+    }
+  }
+  return [...latest.values()];
+}
+
+/** The latest GST rate per mineral, most recently effective first. */
+function latestGstRatesByMineral(rates) {
+  const latest = new Map();
+  for (const rate of rates) {
+    const existing = latest.get(rate.mineral);
+    if (!existing || rate.effectiveFrom > existing.effectiveFrom) {
+      latest.set(rate.mineral, rate);
+    }
+  }
+  return [...latest.values()];
+}
+
+export default function StatutoryRatesModal({ isOpen, onClose, activeMineral = '' }) {
+  const [royaltyRates, setRoyaltyRates] = useState([]);
+  const [gstRates, setGstRates] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    loadRates();
+  }, [isOpen]);
+
+  const loadRates = async () => {
+    setLoading(true);
+    try {
+      const [royaltyRes, gstRes] = await Promise.all([
+        catalogSearch('RoyaltyRate', {}).catch(() => ({ items: [] })),
+        catalogSearch('GstRate', {}).catch(() => ({ items: [] })),
+      ]);
+      setRoyaltyRates(latestRoyaltyRatesByStateAndMineral(royaltyRes.items || []));
+      setGstRates(latestGstRatesByMineral(gstRes.items || []));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!isOpen) return null;
 
-  const dmfPct = 0.30;
-  const nmetPct = 0.02;
-
-  const handleResync = () => {
-    toast('Royalty rates updated successfully from Ministry of Mines & IBM gazette', 'success');
-  };
+  const activeMinerals = new Set(
+    (activeMineral || '').split(',').map((m) => m.trim().toUpperCase()).filter(Boolean)
+  );
 
   return (
     <div
@@ -32,82 +74,129 @@ export default function StatutoryRatesModal({ isOpen, onClose, activeMineral = '
       <div className="modal-box large">
         <div className="modal-header">
           <div>
-            <h2>Government Statutory Royalty Rates Schedule</h2>
-            <p className="modal-sub">MMDR Act Second Schedule & Indian Bureau of Mines (IBM) Live Gazette Feed</p>
+            <h2>Government Statutory Rates Schedule</h2>
+            <p className="modal-sub">MMDR Act Second Schedule royalty rates, and GST rates on royalty under reverse charge</p>
           </div>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body">
           <div className="rate-source-banner" style={{ marginBottom: '14px' }}>
             <div style={{ fontSize: '12px' }}>
-              <strong>Official Source:</strong> Ministry of Mines, Govt. of India · Gazette Notification S.O. 2682(E) & IBM Monthly Average Sale Price (ASP)
+              <strong>Source:</strong> rates recorded on this platform, each with its own official citation.
             </div>
             <button
               className="btn-primary"
               style={{ padding: '4px 10px', fontSize: '11px' }}
-              onClick={handleResync}
+              onClick={() => {
+                loadRates();
+                toast('Statutory rates reloaded', 'success');
+              }}
+              disabled={loading}
             >
-              🔄 Re-sync from Google / Web
+              🔄 Reload
             </button>
           </div>
+
+          <h3 style={{ fontSize: '13px', marginBottom: '8px' }}>Royalty Rates (latest per state, mineral &amp; grade)</h3>
+          <div className="table-wrap" style={{ marginBottom: '20px' }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>State</th>
+                  <th>Mineral</th>
+                  <th>Grade</th>
+                  <th>Effective Period</th>
+                  <th>Rate / MT</th>
+                  <th>Source Citation</th>
+                </tr>
+              </thead>
+              <tbody>
+                {royaltyRates.length > 0 ? (
+                  royaltyRates.map((rate) => {
+                    const isCurrent = activeMinerals.has((rate.mineral || '').toUpperCase());
+                    return (
+                      <tr
+                        key={rate.id}
+                        style={{
+                          background: isCurrent ? 'rgba(240,165,0,0.08)' : undefined,
+                          fontWeight: isCurrent ? 600 : undefined,
+                        }}
+                      >
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>{rate.state}</span>
+                            {isCurrent && <span className="rate-pill">Active Lease</span>}
+                          </div>
+                        </td>
+                        <td>{rate.mineral}</td>
+                        <td>{rate.grade || 'All grades'}</td>
+                        <td>{rate.month} {rate.year}</td>
+                        <td className="num-col">
+                          <span className="rate-pill">₹{Number(rate.ratePerTonne).toFixed(2)}/MT</span>
+                        </td>
+                        <td>
+                          <small style={{ color: 'var(--text2)', fontFamily: 'var(--mono)' }}>{rate.sourceCitation}</small>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan="6" style={{ textAlign: 'center', color: 'var(--text2)', padding: '16px' }}>
+                      {loading ? 'Loading…' : 'No royalty rates recorded yet.'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <h3 style={{ fontSize: '13px', marginBottom: '8px' }}>GST on Royalty, Reverse Charge (latest per mineral)</h3>
           <div className="table-wrap">
             <table className="data-table">
               <thead>
                 <tr>
                   <th>Mineral</th>
-                  <th>Statutory Base Rate</th>
-                  <th>Calculation Method</th>
-                  <th>DMF Rate</th>
-                  <th>NMET Rate</th>
-                  <th>Total / MT</th>
-                  <th>Official Gazette Citation</th>
+                  <th>Effective From</th>
+                  <th>Rate</th>
+                  <th>Source Citation</th>
                 </tr>
               </thead>
-              <tbody id="statutory-rates-tbody">
-                {Object.entries(STATUTORY_BASE_RATES).map(([mineral, info]) => {
-                  const isCurrent = mineral.toUpperCase() === (activeMineral || '').toUpperCase();
-                  const baseRate = info.rate;
-                  const dmf = baseRate * dmfPct;
-                  const nmet = baseRate * nmetPct;
-                  const gross = baseRate + dmf + nmet;
-
-                  return (
-                    <tr
-                      key={mineral}
-                      style={{
-                        background: isCurrent ? 'rgba(240,165,0,0.08)' : undefined,
-                        fontWeight: isCurrent ? 600 : undefined,
-                      }}
-                    >
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span>{mineral}</span>
-                          {isCurrent && <span className="rate-pill">Active Lease</span>}
-                        </div>
-                      </td>
-                      <td className="num-col">
-                        <span className="rate-pill">₹{baseRate.toFixed(2)}/MT</span>
-                      </td>
-                      <td>
-                        <small style={{ color: 'var(--text1)' }}>{info.method}</small>
-                      </td>
-                      <td className="num-col">
-                        ₹{dmf.toFixed(2)} ({Math.round(dmfPct * 100)}%)
-                      </td>
-                      <td className="num-col">
-                        ₹{nmet.toFixed(2)} (2%)
-                      </td>
-                      <td className="num-col">
-                        <span className="rate-pill green">₹{gross.toFixed(2)}/MT</span>
-                      </td>
-                      <td>
-                        <small style={{ color: 'var(--text2)', fontFamily: 'var(--mono)' }}>
-                          {info.citation}
-                        </small>
-                      </td>
-                    </tr>
-                  );
-                })}
+              <tbody>
+                {gstRates.length > 0 ? (
+                  gstRates.map((rate) => {
+                    const isCurrent = activeMinerals.has((rate.mineral || '').toUpperCase());
+                    return (
+                      <tr
+                        key={rate.id}
+                        style={{
+                          background: isCurrent ? 'rgba(240,165,0,0.08)' : undefined,
+                          fontWeight: isCurrent ? 600 : undefined,
+                        }}
+                      >
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>{rate.mineral}</span>
+                            {isCurrent && <span className="rate-pill">Active Lease</span>}
+                          </div>
+                        </td>
+                        <td>{new Date(rate.effectiveFrom).toLocaleDateString('en-IN')}</td>
+                        <td className="num-col">
+                          <span className="rate-pill green">{(Number(rate.rate) * 100).toFixed(2)}%</span>
+                        </td>
+                        <td>
+                          <small style={{ color: 'var(--text2)', fontFamily: 'var(--mono)' }}>{rate.sourceCitation}</small>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan="4" style={{ textAlign: 'center', color: 'var(--text2)', padding: '16px' }}>
+                      {loading ? 'Loading…' : 'No GST rates recorded yet.'}
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

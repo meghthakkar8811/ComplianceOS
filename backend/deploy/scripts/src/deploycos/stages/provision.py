@@ -42,7 +42,12 @@ class ProvisionStage(InternalEndpointStage):
         separate files/keys, not one, because each is set by a separate, independently-amendable
         authority (state MMDR Act notifications for royalty; the DMF Rules, 2015 and the NMET
         Rules, 2015 respectively — two distinct central-government instruments) and so can change
-        on its own schedule without touching the others."""
+        on its own schedule without touching the others.
+
+        `permissionsConfig` (ComplianceOS's own permission catalog and standard roles, including
+        the Mine-scoped permissions agent-engine's own bundled default doesn't have) is seeded the
+        same way, read back by TenancyProvisioningServiceImpl — ComplianceOS never relies on
+        agent-engine's bundled permissions.json."""
         payload = {}
         for key, filename in (
             ("royaltyRates", "royalty_rates.json"),
@@ -53,17 +58,14 @@ class ProvisionStage(InternalEndpointStage):
             rates = json.loads(expand_json_vars(path)) if path.is_file() else []
             if rates:
                 payload[key] = rates
+        permissions_path = CONFIGS_DIR / self.environment / "governance" / "permissions.json"
+        if permissions_path.is_file():
+            payload["permissionsConfig"] = json.loads(expand_json_vars(permissions_path))
         return payload
 
     def _customers(self) -> list[dict]:
         path = CONFIGS_DIR / self.environment / "customers.json"
-        roles_path = CONFIGS_DIR / self.environment / "governance" / "roles.json"
-        roles = json.loads(expand_json_vars(roles_path)) if roles_path.is_file() else []
-        customers = json.loads(expand_json_vars(path)) if path.is_file() else []
-        for customer in customers:
-            if "roles" not in customer:
-                customer["roles"] = roles
-        return customers
+        return json.loads(expand_json_vars(path)) if path.is_file() else []
 
     def _provision(self, target: str, response: httpx.Response, service: str) -> None:
         steps = self._succeeded(response, service).json()["steps"]

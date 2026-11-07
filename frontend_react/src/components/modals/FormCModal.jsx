@@ -7,22 +7,8 @@ function formatState(s) {
   return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function formatMineral(m) {
-  if (!m) return '';
-  const map = {
-    IRON_ORE: 'Iron Ore',
-    COAL: 'Coal',
-    LIMESTONE: 'Limestone',
-    BAUXITE: 'Bauxite',
-    MANGANESE: 'Manganese Ore',
-    CHROMITE: 'Chromite',
-    DOLOMITE: 'Dolomite',
-    GRANITE: 'Granite',
-  };
-  return map[m] || m.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
 
-export default function FormCModal({ isOpen, onClose, activeMine, onSubmitted, user }) {
+export default function FormCModal({ isOpen, onClose, activeMine, activeMineMinerals, onSubmitted, user }) {
   const [referenceNumber, setReferenceNumber] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -108,7 +94,7 @@ export default function FormCModal({ isOpen, onClose, activeMine, onSubmitted, u
                 </div>
                 <div className="fg">
                   <label>Mineral Mined</label>
-                  <input readOnly value={formatMineral(activeMine?.mineral || '')} />
+                  <input readOnly value={(activeMineMinerals || "—")} />
                 </div>
                 <div className="fg">
                   <label>Return Quarter</label>

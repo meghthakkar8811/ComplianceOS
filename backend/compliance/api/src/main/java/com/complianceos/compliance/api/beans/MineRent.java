@@ -30,8 +30,8 @@ public class MineRent extends BaseEntity {
   // to load. Always RENT or DEAD_RENT for this bean.
   private String type;
 
-  // Paise.
-  private long amount;
+  // Rupees.
+  private double amount;
 
   // Who this is owed to — the state government for dead rent, but for surface rent whoever owns
   // the surface, which may be a private landowner. Reference only, not validated or calculated
@@ -69,11 +69,11 @@ public class MineRent extends BaseEntity {
     this.type = type;
   }
 
-  public long getAmount() {
+  public double getAmount() {
     return amount;
   }
 
-  public void setAmount(long amount) {
+  public void setAmount(double amount) {
     this.amount = amount;
   }
 

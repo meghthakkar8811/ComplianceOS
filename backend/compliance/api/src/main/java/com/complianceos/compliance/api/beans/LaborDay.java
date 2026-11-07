@@ -9,7 +9,7 @@ import java.time.ZoneOffset;
 /**
  * One calendar day's headcount for a mine, split into IBM's three employment categories (below
  * ground, open cast, above ground) — the raw data a month's average daily employment is derived
- * from, the same way {@link Stoppage} is what {@code daysWorked} is derived from. One record per
+ * from, the same way {@link MineStoppage} is what {@code daysWorked} is derived from. One record per
  * (mineId, day worked). Not independently permissioned — reached only through its mine, whose
  * access governs it, same as {@link ProductionEntry} and {@link ComplianceRecord}.
  */

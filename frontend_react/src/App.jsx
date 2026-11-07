@@ -11,6 +11,8 @@ import CalendarView from './views/CalendarView';
 import FormsView from './views/FormsView';
 import RoyaltyView from './views/RoyaltyView';
 import ProductionView from './views/ProductionView';
+import SalesView from './views/SalesView';
+import BuyersView from './views/BuyersView';
 import DocumentsView from './views/DocumentsView';
 import DgmsView from './views/DgmsView';
 import AlertsView from './views/AlertsView';
@@ -31,14 +33,61 @@ import ComplianceLoader from './components/layout/ComplianceLoader';
 
 import './styles/dashboard.css';
 
+const NAV_PAGES = ['dashboard', 'calendar', 'royalty', 'sales', 'buyers', 'forms', 'production', 'documents', 'dgms', 'alerts'];
+
+const MONTH_INDEX = {
+  JANUARY: 0, FEBRUARY: 1, MARCH: 2, APRIL: 3, MAY: 4, JUNE: 5,
+  JULY: 6, AUGUST: 7, SEPTEMBER: 8, OCTOBER: 9, NOVEMBER: 10, DECEMBER: 11,
+};
+
+/** Mirrors AlertsView's own alert conditions, so the sidebar/topbar badge count matches what opening Alerts shows. */
+function countActiveAlerts(dashboardData) {
+  if (!dashboardData) return 0;
+  const records = dashboardData.records || [];
+  const now = Date.now();
+  const dgmsScore = dashboardData?.dgms?.overallScore;
+
+  const docRecords = records.filter((r) => r.recordType === 'CLEARANCE' || r.recordType === 'STATUTORY_PLAN');
+  const expiredDocs = docRecords.filter((r) => r.expiry && r.expiry < now);
+  const expiringDocs = docRecords.filter((r) => r.status === 'VALID' && r.expiry >= now && r.expiry - now < 90 * 86400000);
+
+  const filings = records.filter((r) => r.recordType !== 'REGISTER');
+  const pendingFilings = filings.filter((r) => r.status === 'PENDING_SUBMISSION');
+  const overdueFilings = pendingFilings.filter((r) => r.expiry < now);
+
+  let count = 0;
+  if (typeof dgmsScore === 'number' && dgmsScore < 60) count += 1;
+  if (overdueFilings.length > 0) count += 1;
+  if (expiredDocs.length > 0) count += 1;
+  if (pendingFilings.length > 0) count += 1;
+  if (expiringDocs.length > 0) count += 1;
+  return count;
+}
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [authPage, setAuthPage] = useState('login'); // 'login' | 'signup' | 'forgot' | 'verify'
   const [pendingEmail, setPendingEmail] = useState('');
-  const [activePage, setActivePage] = useState('dashboard');
+  const [activePage, setActivePageState] = useState(() => {
+    const fromHash = window.location.hash.replace(/^#\/?/, '');
+    return NAV_PAGES.includes(fromHash) ? fromHash : 'dashboard';
+  });
+  const setActivePage = useCallback((page) => {
+    setActivePageState(page);
+    window.location.hash = `/${page}`;
+  }, []);
+  useEffect(() => {
+    const handleHashChange = () => {
+      const fromHash = window.location.hash.replace(/^#\/?/, '');
+      if (NAV_PAGES.includes(fromHash)) setActivePageState(fromHash);
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [mines, setMines] = useState([]);
+  const [mineralsByMineId, setMineralsByMineId] = useState({});
   const [activeMineId, setActiveMineId] = useState(null);
   const [isMinePickerOpen, setIsMinePickerOpen] = useState(false);
   const [chartType, setChartType] = useState('both');
@@ -54,6 +103,46 @@ export default function App() {
   const [showAddDocModal, setShowAddDocModal] = useState(false);
   const [showStatutoryRatesModal, setShowStatutoryRatesModal] = useState(false);
 
+  // A mine no longer has a single mineral field — it can produce several, each tracked as its
+  // own Mineral record — so every mine's display label is the comma-joined list of those. The
+  // Mineral lookup is scoped per mine via the mineId option, not a query filter, so one mine at a
+  // time (small lists, so a handful of parallel requests is fine).
+  const loadMineralsByMineId = useCallback(async (mineList) => {
+    if (mineList.length === 0) {
+      setMineralsByMineId({});
+      return;
+    }
+    try {
+      const results = await Promise.all(
+        mineList.map((mine) => catalogSearch('Mineral', {}, { mineId: mine.id }).catch(() => ({ items: [] })))
+      );
+      const joined = {};
+      mineList.forEach((mine, index) => {
+        joined[mine.id] = (results[index].items || []).map((mineral) => mineral.mineral).join(', ');
+      });
+      setMineralsByMineId(joined);
+    } catch (err) {
+      // A display nicety; leave labels blank for unresolved mines rather than failing the page.
+    }
+  }, []);
+
+  // Load Mines
+  const loadMines = useCallback(async () => {
+    try {
+      const res = await catalogSearch('Mine', { filter: { field: 'active', op: 'EQ', values: [true] } });
+      const mineList = res.items || [];
+      setMines(mineList);
+      loadMineralsByMineId(mineList);
+      if (mineList.length > 0) {
+        const savedMineId = localStorage.getItem('cos_active_mine') || localStorage.getItem('cos_mine_id');
+        const defaultMine = mineList.find((m) => m.id === savedMineId) || mineList[0];
+        setActiveMineId(defaultMine.id);
+      }
+    } catch (err) {
+      console.error('Failed to load mines:', err);
+    }
+  }, [loadMineralsByMineId]);
+
   // Check Session Auth
   const checkAuth = useCallback(async () => {
     try {
@@ -65,27 +154,11 @@ export default function App() {
     } finally {
       setAuthChecked(true);
     }
-  }, []);
+  }, [loadMines]);
 
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
-
-  // Load Mines
-  const loadMines = async () => {
-    try {
-      const res = await catalogSearch('Mine', { filter: { field: 'active', op: 'EQ', values: [true] } });
-      const mineList = res.items || [];
-      setMines(mineList);
-      if (mineList.length > 0) {
-        const savedMineId = localStorage.getItem('cos_active_mine') || localStorage.getItem('cos_mine_id');
-        const defaultMine = mineList.find((m) => m.id === savedMineId) || mineList[0];
-        setActiveMineId(defaultMine.id);
-      }
-    } catch (err) {
-      console.error('Failed to load mines:', err);
-    }
-  };
 
   // Delete Mine
   const handleDeleteMine = async (id, name) => {
@@ -129,7 +202,7 @@ export default function App() {
       const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
       const todayStart = new Date().setHours(0, 0, 0, 0);
 
-      const [recordsRes, entriesRes, salesRes, dgmsRes, royaltyRes] = await Promise.all([
+      const [recordsRes, entriesRes, salesRes, dgmsRes, royaltyRes, dmfRes, nmetRes] = await Promise.all([
         catalogSearch('ComplianceRecord', { filter: { field: 'mineId', op: 'EQ', values: [mineId] } }).catch(() => ({ items: [] })),
         catalogSearch('ProductionEntry', {
           filter: {
@@ -149,8 +222,10 @@ export default function App() {
             ],
           },
         }).catch(() => ({ items: [] })),
-        apiFetch(`/mines/${mineId}/dgms-readiness`).catch(() => ({ overallScore: 84 })),
-        apiFetch(`/mines/${mineId}/royalty`).catch(() => null),
+        apiFetch(`/mines/${mineId}/dgms-readiness`).catch(() => null),
+        apiFetch(`/mines/${mineId}/royalty`).catch(() => []),
+        apiFetch(`/mines/${mineId}/dmf-contributions`).catch(() => []),
+        apiFetch(`/mines/${mineId}/nmet-contributions`).catch(() => []),
       ]);
 
       const entries = entriesRes.items || [];
@@ -175,14 +250,30 @@ export default function App() {
       const todayProduced = entries.filter((e) => e.entryTime >= todayStart).reduce((s, e) => s + (e.quantity || 0), 0);
       const extractedYtd = entries.reduce((s, e) => s + (e.quantity || 0), 0);
 
+      // Royalty, DMF and NMET are three separate computed records on the backend (never a single
+      // bundled figure) — the current period's gross liability is their sum, not a field on any
+      // one of them.
+      const periodKey = (row) => `${row.year}-${row.month}`;
+      const royaltyPeriods = (Array.isArray(royaltyRes) ? royaltyRes : []).slice().sort(
+        (a, b) => (b.year * 12 + (MONTH_INDEX[b.month] || 0)) - (a.year * 12 + (MONTH_INDEX[a.month] || 0))
+      );
+      const currentRoyalty = royaltyPeriods[0] || null;
+      const dmfByPeriod = new Map((Array.isArray(dmfRes) ? dmfRes : []).map((row) => [periodKey(row), row]));
+      const nmetByPeriod = new Map((Array.isArray(nmetRes) ? nmetRes : []).map((row) => [periodKey(row), row]));
+      const currentGrossRoyalty = currentRoyalty
+        ? (currentRoyalty.amount || 0)
+          + (dmfByPeriod.get(periodKey(currentRoyalty))?.amount || 0)
+          + (nmetByPeriod.get(periodKey(currentRoyalty))?.amount || 0)
+        : 0;
+
       setDashboardData({
         records: recordsRes.items || [],
         dgms: dgmsRes,
         chart: chart.length > 0 && chart.some((c) => c.produced > 0) ? chart : undefined,
-        monthProduced: monthProduced || 98000,
-        todayProduced: todayProduced || 3420,
-        extractedYtd: extractedYtd || 842150,
-        grossRoyalty: royaltyRes?.gross ? `₹${royaltyRes.gross.toLocaleString()}` : '₹1,05,600',
+        monthProduced,
+        todayProduced,
+        extractedYtd,
+        grossRoyalty: currentRoyalty ? `₹${currentGrossRoyalty.toLocaleString()}` : '₹0',
       });
     } catch (err) {
       console.warn('Dashboard data fetch fallback used:', err);
@@ -222,6 +313,8 @@ export default function App() {
           6: 'documents',
           7: 'dgms',
           8: 'alerts',
+          9: 'sales',
+          0: 'buyers',
         };
         if (navMap[e.key]) {
           e.preventDefault();
@@ -245,7 +338,9 @@ export default function App() {
   };
 
   const activeMine = mines.find((m) => m.id === activeMineId) || mines[0];
-  const healthScore = dashboardData?.dgms?.overallScore ?? 84;
+  const activeMineMinerals = mineralsByMineId[activeMine?.id] || '';
+  const healthScore = dashboardData?.dgms?.overallScore ?? 0;
+  const alertCount = countActiveAlerts(dashboardData);
 
   if (!authChecked) {
     return <ComplianceLoader />;
@@ -291,6 +386,7 @@ export default function App() {
           onNavigate={setActivePage}
           activeMine={activeMine}
           mines={mines}
+          mineralsByMineId={mineralsByMineId}
           isMinePickerOpen={isMinePickerOpen}
           onToggleMinePicker={() => setIsMinePickerOpen(!isMinePickerOpen)}
           onSelectMine={(id) => {
@@ -301,7 +397,7 @@ export default function App() {
           onOpenAddMine={() => setShowAddMineModal(true)}
           user={user}
           dgmsScore={healthScore}
-          alertCount={2}
+          alertCount={alertCount}
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
           onLogout={handleLogout}
@@ -313,7 +409,7 @@ export default function App() {
             activePage={activePage}
             onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
             onNavigate={setActivePage}
-            alertCount={2}
+            alertCount={alertCount}
             healthScore={healthScore}
             user={user}
           />
@@ -323,6 +419,7 @@ export default function App() {
             <DashboardView
               dashboardData={dashboardData}
               activeMine={activeMine}
+              activeMineMinerals={activeMineMinerals}
               chartType={chartType}
               onChartTypeChange={setChartType}
               onNavigate={setActivePage}
@@ -357,6 +454,14 @@ export default function App() {
             <ProductionView activeMineId={activeMineId} />
           )}
 
+          {activePage === 'sales' && (
+            <SalesView activeMineId={activeMineId} />
+          )}
+
+          {activePage === 'buyers' && (
+            <BuyersView />
+          )}
+
           {activePage === 'documents' && (
             <DocumentsView
               activeMineId={activeMineId}
@@ -365,7 +470,7 @@ export default function App() {
           )}
 
           {activePage === 'dgms' && (
-            <DgmsView activeMineId={activeMineId} activeMine={activeMine} />
+            <DgmsView activeMineId={activeMineId} activeMine={activeMine} activeMineMinerals={activeMineMinerals} />
           )}
 
           {activePage === 'alerts' && (
@@ -384,6 +489,7 @@ export default function App() {
           isOpen={showFormBModal}
           onClose={() => setShowFormBModal(false)}
           activeMine={activeMine}
+          activeMineMinerals={activeMineMinerals}
           user={user}
           onSubmitted={() => loadDashboardData(activeMineId)}
         />
@@ -392,6 +498,7 @@ export default function App() {
           isOpen={showFormCModal}
           onClose={() => setShowFormCModal(false)}
           activeMine={activeMine}
+          activeMineMinerals={activeMineMinerals}
           user={user}
           onSubmitted={() => loadDashboardData(activeMineId)}
         />
@@ -400,6 +507,7 @@ export default function App() {
           isOpen={showFormJModal}
           onClose={() => setShowFormJModal(false)}
           activeMine={activeMine}
+          activeMineMinerals={activeMineMinerals}
           user={user}
           onSubmitted={() => loadDashboardData(activeMineId)}
         />
@@ -422,7 +530,7 @@ export default function App() {
         <StatutoryRatesModal
           isOpen={showStatutoryRatesModal}
           onClose={() => setShowStatutoryRatesModal(false)}
-          activeMineral={activeMine?.mineral}
+          activeMineral={activeMineMinerals}
         />
       </ToastProvider>
     </ThemeProvider>

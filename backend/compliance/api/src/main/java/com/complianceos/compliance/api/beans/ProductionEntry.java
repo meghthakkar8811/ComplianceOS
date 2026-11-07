@@ -2,6 +2,9 @@ package com.complianceos.compliance.api.beans;
 
 import com.agentengine.util.common.annotations.Index;
 import com.agentengine.util.common.beans.BaseEntity;
+import com.agentengine.util.common.builder.annotations.UiField;
+import com.agentengine.util.common.builder.annotations.UiLookup;
+import com.agentengine.util.common.builder.annotations.UiLookupOption;
 
 /**
  * A mine's production entry for one shift, one pit section, one grade. What it dispatches is
@@ -15,7 +18,8 @@ public class ProductionEntry extends BaseEntity {
 
   public static final String FIELD_MINE_ID = "mineId";
   public static final String FIELD_ENTRY_TIME = "entryTime";
-  public static final String FIELD_MINERAL_GRADE = "mineralGrade";
+  public static final String FIELD_MINERAL = "mineral";
+  public static final String FIELD_GRADE = "grade";
 
   private String mineId;
   private long entryTime;
@@ -25,7 +29,22 @@ public class ProductionEntry extends BaseEntity {
   private String shift;
 
   private String pitSection;
-  private String mineralGrade;
+
+  // The id of the mine's own Mineral record for whichever mineral this entry is of.
+  @UiField(label = "Mineral", order = 15)
+  @UiLookup(assetType = AssetClass.MINERAL, options = {@UiLookupOption(key = "mineId", expr = "$.mineId")})
+  private String mineral;
+
+  // One of the grades that Mineral lists.
+  @UiField(label = "Grade", order = 20)
+  @UiLookup(
+      assetType = AssetClass.MINERAL_GRADE,
+      options = {
+        @UiLookupOption(key = "mineId", expr = "$.mineId"),
+        @UiLookupOption(key = "mineral", expr = "$.mineral")
+      })
+  private String grade;
+
   private double quantity;
   private String supervisorName;
   private String remarks;
@@ -67,12 +86,20 @@ public class ProductionEntry extends BaseEntity {
     this.pitSection = pitSection;
   }
 
-  public String getMineralGrade() {
-    return mineralGrade;
+  public String getMineral() {
+    return mineral;
   }
 
-  public void setMineralGrade(String mineralGrade) {
-    this.mineralGrade = mineralGrade;
+  public void setMineral(String mineral) {
+    this.mineral = mineral;
+  }
+
+  public String getGrade() {
+    return grade;
+  }
+
+  public void setGrade(String grade) {
+    this.grade = grade;
   }
 
   public double getQuantity() {

@@ -7,21 +7,6 @@ function formatState(s) {
   return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function formatMineral(m) {
-  if (!m) return '';
-  const map = {
-    IRON_ORE: 'Iron Ore',
-    COAL: 'Coal',
-    LIMESTONE: 'Limestone',
-    BAUXITE: 'Bauxite',
-    MANGANESE: 'Manganese Ore',
-    CHROMITE: 'Chromite',
-    DOLOMITE: 'Dolomite',
-    GRANITE: 'Granite',
-  };
-  return map[m] || m.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
 const REGISTER_CATEGORY_NAMES = {
   ACCIDENT_REGISTER: 'Accident Register',
   SAFETY_COMMITTEE: 'Safety Meetings',
@@ -33,7 +18,7 @@ const REGISTER_CATEGORY_NAMES = {
   EMPLOYMENT_REGISTER: 'Employment',
 };
 
-const DgmsView = memo(function DgmsView({ activeMineId, activeMine }) {
+const DgmsView = memo(function DgmsView({ activeMineId, activeMine, activeMineMinerals }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -120,7 +105,7 @@ const DgmsView = memo(function DgmsView({ activeMineId, activeMine }) {
   <tr><th>Name</th><td>${activeMine?.name || '—'}</td></tr>
   <tr><th>Lease Number</th><td>${activeMine?.leaseNumber || activeMine?.code || '—'}</td></tr>
   <tr><th>State</th><td>${formatState(activeMine?.state || '')}</td></tr>
-  <tr><th>Mineral</th><td>${formatMineral(activeMine?.mineral || '')}</td></tr>
+  <tr><th>Mineral</th><td>${activeMineMinerals || '—'}</td></tr>
 </table>
 <h2>Overall Readiness</h2>
 <p class="score">${overallScore}/100 — ${verdict}</p>
