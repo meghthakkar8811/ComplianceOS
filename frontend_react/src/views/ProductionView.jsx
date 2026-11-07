@@ -25,6 +25,7 @@ const ProductionView = memo(function ProductionView({ activeMineId }) {
   const [prodRem, setProdRem] = useState('');
 
   // Sale Form State
+  const [editSaleId, setEditSaleId] = useState(null);
   const [saleDate, setSaleDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [saleGrade, setSaleGrade] = useState('');
   const [saleNature, setSaleNature] = useState('DOMESTIC_SALE');
@@ -152,31 +153,96 @@ const ProductionView = memo(function ProductionView({ activeMineId }) {
     }
   };
 
+  const getSaleValue = (s) => {
+    if (s.saleValue !== undefined && s.saleValue !== null) {
+      return s.saleValue / 100; // backend stores in paise
+    }
+    return s.grossSaleValue || 0;
+  };
+
+  const getSaleDeduction = (s) => {
+    if (s.deductionPerUnit !== undefined && s.deductionPerUnit !== null) {
+      return s.deductionPerUnit / 100; // backend stores in paise
+    }
+    return s.deductionPerTonne || 0;
+  };
+
+  const formatSaleNature = (n) => {
+    if (!n) return '—';
+    const map = {
+      DOMESTIC: 'Domestic Sale',
+      DOMESTIC_SALE: 'Domestic Sale',
+      EXPORT: 'Export',
+      DOMESTIC_TRANSFER: 'Domestic (Transfer)',
+      CAPTIVE_CONSUMPTION: 'Captive Consumption',
+    };
+    return map[n] || n.replace(/_/g, ' ');
+  };
+
+  const handleEditSale = (s) => {
+    setEditSaleId(s.id || s.key || null);
+    if (s.dispatchedOn) {
+      setSaleDate(new Date(s.dispatchedOn).toISOString().split('T')[0]);
+    }
+    setSaleGrade(s.mineralGrade || s.grade || '');
+    setSaleNature(s.nature || s.natureOfSale || 'DOMESTIC_SALE');
+    setSaleBuyer(s.buyerName || '');
+    setSaleBuyerReg(s.buyerRegistrationNumber || s.buyerIbmRegNo || '');
+    setSaleQty(String(s.quantity || ''));
+    const val = getSaleValue(s);
+    setSaleValue(val ? String(val) : '');
+    const ded = getSaleDeduction(s);
+    setSaleDeduction(ded ? String(ded) : '');
+    setShowSaleForm(true);
+  };
+
+  const handleCloseSaleForm = () => {
+    setShowSaleForm(false);
+    setEditSaleId(null);
+    setSaleQty('');
+    setSaleBuyer('');
+    setSaleValue('');
+    setSaleDeduction('');
+    setSaleGrade('');
+    setSaleBuyerReg('');
+  };
+
   const handleSaveSale = async () => {
     if (!saleDate || !saleQty || !saleBuyer) {
       toast('Date, Quantity, and Buyer Name are required.', 'error');
       return;
     }
+    const mineralGradeVal = (saleGrade || '').trim() || 'Grade A';
+    const qtyVal = parseFloat(saleQty) || 0;
+    const valInRupees = parseFloat(saleValue) || 0;
+    const dedInRupees = parseFloat(saleDeduction) || 0;
+
     try {
       const payload = {
         mineId: activeMineId,
-        dispatchedOn: new Date(saleDate).getTime(),
-        grade: saleGrade || 'Grade A',
-        natureOfSale: saleNature,
-        buyerName: saleBuyer,
-        buyerIbmRegNo: saleBuyerReg,
-        quantity: Number(saleQty),
-        grossSaleValue: Number(saleValue) || 0,
-        deductionPerTonne: Number(saleDeduction) || 0,
+        dispatchedOn: new Date(saleDate + 'T00:00:00Z').getTime() || new Date(saleDate).getTime(),
+        mineralGrade: mineralGradeVal,
+        grade: mineralGradeVal,
+        nature: saleNature || 'DOMESTIC_SALE',
+        natureOfSale: saleNature || 'DOMESTIC_SALE',
+        buyerName: (saleBuyer || '').trim(),
+        buyerRegistrationNumber: (saleBuyerReg || '').trim(),
+        buyerIbmRegNo: (saleBuyerReg || '').trim(),
+        quantity: qtyVal,
+        saleValue: Math.round(valInRupees * 100), // paise for backend
+        grossSaleValue: valInRupees,
+        deductionPerUnit: Math.round(dedInRupees * 100), // paise for backend
+        deductionPerTonne: dedInRupees,
       };
+      if (editSaleId) {
+        payload.id = editSaleId;
+      }
       await apiFetch(`/mines/${activeMineId}/sales?skipVersion=true`, {
         method: 'POST',
         body: JSON.stringify(payload),
       });
-      toast('Dispatch saved successfully', 'success');
-      setShowSaleForm(false);
-      setSaleQty('');
-      setSaleBuyer('');
+      toast(editSaleId ? 'Dispatch updated successfully' : 'Dispatch saved successfully', 'success');
+      handleCloseSaleForm();
       loadProductionData();
     } catch (e) {
       toast(e.message || 'Failed to save dispatch entry', 'error');
@@ -214,7 +280,7 @@ const ProductionView = memo(function ProductionView({ activeMineId }) {
   const totalD = entries.reduce((s, r) => s + (r.quantityDispatched || 0), 0);
 
   const totalSaleQty = sales.reduce((s, r) => s + (r.quantity || 0), 0);
-  const totalSaleVal = sales.reduce((s, r) => s + (r.grossSaleValue || 0), 0);
+  const totalSaleVal = sales.reduce((s, r) => s + getSaleValue(r), 0);
 
   const filteredEntries = entries.filter((e) => {
     if (!search) return true;
@@ -422,7 +488,7 @@ const ProductionView = memo(function ProductionView({ activeMineId }) {
           <p className="page-sub">Buyer-level sales — this is what royalty, stock, and ex-mine price are calculated from</p>
         </div>
         <div className="page-actions">
-          <button className="btn-primary" onClick={() => setShowSaleForm(!showSaleForm)}>
+          <button className="btn-primary" onClick={() => { if (showSaleForm) { handleCloseSaleForm(); } else { setShowSaleForm(true); } }}>
             {showSaleForm ? 'Cancel' : '+ New Dispatch'}
           </button>
         </div>
@@ -431,8 +497,8 @@ const ProductionView = memo(function ProductionView({ activeMineId }) {
       {showSaleForm && (
         <div className="prod-form-card" id="sale-form-card" style={{ display: 'block' }}>
           <div className="pfc-header">
-            <h3>New Dispatch</h3>
-            <button className="icon-close" onClick={() => setShowSaleForm(false)}>✕</button>
+            <h3>{editSaleId ? 'Edit Dispatch' : 'New Dispatch'}</h3>
+            <button className="icon-close" onClick={handleCloseSaleForm}>✕</button>
           </div>
           <div className="pfc-grid">
             <div className="fg">
@@ -441,7 +507,7 @@ const ProductionView = memo(function ProductionView({ activeMineId }) {
             </div>
             <div className="fg">
               <label>Grade</label>
-              <input id="sf-grade" value={saleGrade} onChange={(e) => setSaleGrade(e.target.value)} placeholder="e.g. Grade A" />
+              <input id="sf-grade" value={saleGrade} onChange={(e) => setSaleGrade(e.target.value)} placeholder="e.g. Iron Ore 62% Fe" />
             </div>
             <div className="fg">
               <label>Nature</label>
@@ -466,7 +532,7 @@ const ProductionView = memo(function ProductionView({ activeMineId }) {
             </div>
             <div className="fg">
               <label>Sale Value (₹)</label>
-              <input type="number" id="sf-value" value={saleValue} onChange={(e) => setSaleValue(e.target.value)} placeholder="Total sale/FOB value" />
+              <input type="number" id="sf-value" value={saleValue} onChange={(e) => setSaleValue(e.target.value)} placeholder="Total sale / FOB value" />
             </div>
             <div className="fg">
               <label>Deduction (₹/MT)</label>
@@ -474,8 +540,10 @@ const ProductionView = memo(function ProductionView({ activeMineId }) {
             </div>
           </div>
           <div className="pfc-actions">
-            <button className="btn-ghost" onClick={() => setShowSaleForm(false)}>Cancel</button>
-            <button className="btn-primary" onClick={handleSaveSale}>Save Dispatch</button>
+            <button className="btn-ghost" onClick={handleCloseSaleForm}>Cancel</button>
+            <button className="btn-primary" onClick={handleSaveSale}>
+              {editSaleId ? 'Update Dispatch' : 'Save Dispatch'}
+            </button>
           </div>
         </div>
       )}
@@ -486,11 +554,11 @@ const ProductionView = memo(function ProductionView({ activeMineId }) {
           <span className="psr-val">{totalSaleQty.toLocaleString('en-IN', { maximumFractionDigits: 1 })} MT</span>
         </div>
         <div className="psr-card">
-          <span className="psr-label">Total Value</span>
-          <span className="psr-val">₹{totalSaleVal.toLocaleString('en-IN')}</span>
+          <span className="psr-label">Total Sale Value</span>
+          <span className="psr-val">₹{Math.round(totalSaleVal).toLocaleString('en-IN')}</span>
         </div>
         <div className="psr-card">
-          <span className="psr-label">Buyers</span>
+          <span className="psr-label">Dispatches</span>
           <span className="psr-val">{sales.length}</span>
         </div>
       </div>
@@ -507,24 +575,40 @@ const ProductionView = memo(function ProductionView({ activeMineId }) {
                 <th className="num-col">Qty (MT)</th>
                 <th className="num-col">Sale Value</th>
                 <th className="num-col">Deduction/MT</th>
+                <th style={{ width: '80px', textAlign: 'center' }}>Actions</th>
               </tr>
             </thead>
             <tbody id="sale-tbody">
               {sales.length > 0 ? (
-                sales.map((s) => (
-                  <tr key={s.id}>
-                    <td>{new Date(s.dispatchedOn).toLocaleDateString('en-IN')}</td>
-                    <td>{s.grade}</td>
-                    <td>{(s.natureOfSale || '').replace('_', ' ')}</td>
-                    <td>{s.buyerName}</td>
-                    <td className="num-col">{s.quantity.toLocaleString('en-IN')} MT</td>
-                    <td className="num-col">₹{(s.grossSaleValue || 0).toLocaleString('en-IN')}</td>
-                    <td className="num-col">₹{s.deductionPerTonne || 0}</td>
-                  </tr>
-                ))
+                sales.map((s) => {
+                  const val = getSaleValue(s);
+                  const ded = getSaleDeduction(s);
+                  return (
+                    <tr key={s.id || s.key || s.buyerName + s.dispatchedOn}>
+                      <td>{new Date(s.dispatchedOn).toLocaleDateString('en-IN')}</td>
+                      <td>{s.mineralGrade || s.grade || '—'}</td>
+                      <td>{formatSaleNature(s.nature || s.natureOfSale)}</td>
+                      <td>{s.buyerName || '—'}</td>
+                      <td className="num-col">{(s.quantity || 0).toLocaleString('en-IN')} MT</td>
+                      <td className="num-col">₹{Math.round(val).toLocaleString('en-IN')}</td>
+                      <td className="num-col">
+                        {ded > 0 ? `₹${Math.round(ded).toLocaleString('en-IN')}` : '₹0'}
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <button
+                          className="btn-ghost"
+                          style={{ padding: '3px 8px', fontSize: '11px' }}
+                          onClick={() => handleEditSale(s)}
+                        >
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
-                  <td colSpan="7" style={{ textAlign: 'center', color: 'var(--text2)', padding: '24px' }}>
+                  <td colSpan="8" style={{ textAlign: 'center', color: 'var(--text2)', padding: '24px' }}>
                     No buyer dispatches recorded for this month.
                   </td>
                 </tr>
