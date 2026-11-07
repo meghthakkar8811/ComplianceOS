@@ -27,7 +27,6 @@ export default function AddDocModal({ isOpen, onClose, activeMineId, onDocAdded 
       const attachment = await apiUpload(file, `${activeMineId}/${Date.now()}_${file.name}`);
       const issuedOn = issuedDate ? Date.parse(issuedDate + 'T00:00:00Z') : null;
       const expiry = expiryDate ? Date.parse(expiryDate + 'T00:00:00Z') : null;
-      const status = expiry && expiry < Date.now() ? 'EXPIRED' : 'VALID';
 
       const payload = {
         title: title.trim(),
@@ -36,10 +35,9 @@ export default function AddDocModal({ isOpen, onClose, activeMineId, onDocAdded 
         attachment,
         issuedOn,
         expiry,
-        status,
       };
 
-      await apiFetch(`/mines/${activeMineId}/compliance-records`, {
+      await apiFetch(`/mines/${activeMineId}/compliance/records/documents`, {
         method: 'POST',
         body: JSON.stringify(payload),
       });

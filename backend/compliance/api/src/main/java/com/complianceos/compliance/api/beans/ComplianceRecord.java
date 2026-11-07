@@ -22,6 +22,7 @@ import com.agentengine.util.common.beans.FileDetails;
 public class ComplianceRecord extends BaseEntity {
 
   public static final String FIELD_MINE_ID = "mineId";
+  public static final String FIELD_RECORD_TYPE = "recordType";
   public static final String FIELD_STATUS = "status";
   public static final String FIELD_SUBMITTED_ON = "submittedOn";
   public static final String FIELD_LAST_UPDATED_AT = "lastUpdatedAt";

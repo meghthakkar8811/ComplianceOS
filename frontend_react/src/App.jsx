@@ -36,17 +36,13 @@ import './styles/dashboard.css';
 
 const NAV_PAGES = ['dashboard', 'calendar', 'royalty', 'sales', 'buyers', 'forms', 'production', 'documents', 'dgms', 'alerts', 'star-rating'];
 
-const MONTH_INDEX = {
-  JANUARY: 0, FEBRUARY: 1, MARCH: 2, APRIL: 3, MAY: 4, JUNE: 5,
-  JULY: 6, AUGUST: 7, SEPTEMBER: 8, OCTOBER: 9, NOVEMBER: 10, DECEMBER: 11,
-};
-
 /** Mirrors AlertsView's own alert conditions, so the sidebar/topbar badge count matches what opening Alerts shows. */
 function countActiveAlerts(dashboardData) {
   if (!dashboardData) return 0;
   const records = dashboardData.records || [];
   const now = Date.now();
-  const dgmsScore = dashboardData?.dgms?.overallScore;
+  const totalActions = dashboardData?.dgms?.totalActions ?? 0;
+  const completedActions = dashboardData?.dgms?.completedActions ?? 0;
 
   const docRecords = records.filter((r) => r.recordType === 'CLEARANCE' || r.recordType === 'STATUTORY_PLAN');
   const expiredDocs = docRecords.filter((r) => r.expiry && r.expiry < now);
@@ -57,7 +53,7 @@ function countActiveAlerts(dashboardData) {
   const overdueFilings = pendingFilings.filter((r) => r.expiry < now);
 
   let count = 0;
-  if (typeof dgmsScore === 'number' && dgmsScore < 60) count += 1;
+  if (totalActions > 0 && completedActions / totalActions < 0.6) count += 1;
   if (overdueFilings.length > 0) count += 1;
   if (expiredDocs.length > 0) count += 1;
   if (pendingFilings.length > 0) count += 1;
@@ -203,7 +199,7 @@ export default function App() {
       const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
       const todayStart = new Date().setHours(0, 0, 0, 0);
 
-      const [recordsRes, entriesRes, salesRes, dgmsRes, royaltyRes, dmfRes, nmetRes] = await Promise.all([
+      const [recordsRes, entriesRes, salesRes, dgmsRes] = await Promise.all([
         catalogSearch('ComplianceRecord', { filter: { field: 'mineId', op: 'EQ', values: [mineId] } }).catch(() => ({ items: [] })),
         catalogSearch('ProductionEntry', {
           filter: {
@@ -223,10 +219,7 @@ export default function App() {
             ],
           },
         }).catch(() => ({ items: [] })),
-        apiFetch(`/mines/${mineId}/dgms-readiness`).catch(() => null),
-        apiFetch(`/mines/${mineId}/royalty`).catch(() => []),
-        apiFetch(`/mines/${mineId}/dmf-contributions`).catch(() => []),
-        apiFetch(`/mines/${mineId}/nmet-contributions`).catch(() => []),
+        apiFetch(`/mines/${mineId}/compliance/progress`, { method: 'POST', body: JSON.stringify(null) }).catch(() => null),
       ]);
 
       const entries = entriesRes.items || [];
@@ -251,21 +244,22 @@ export default function App() {
       const todayProduced = entries.filter((e) => e.entryTime >= todayStart).reduce((s, e) => s + (e.quantity || 0), 0);
       const extractedYtd = entries.reduce((s, e) => s + (e.quantity || 0), 0);
 
-      // Royalty, DMF and NMET are three separate computed records on the backend (never a single
-      // bundled figure) — the current period's gross liability is their sum, not a field on any
-      // one of them.
-      const periodKey = (row) => `${row.year}-${row.month}`;
-      const royaltyPeriods = (Array.isArray(royaltyRes) ? royaltyRes : []).slice().sort(
-        (a, b) => (b.year * 12 + (MONTH_INDEX[b.month] || 0)) - (a.year * 12 + (MONTH_INDEX[a.month] || 0))
-      );
-      const currentRoyalty = royaltyPeriods[0] || null;
-      const dmfByPeriod = new Map((Array.isArray(dmfRes) ? dmfRes : []).map((row) => [periodKey(row), row]));
-      const nmetByPeriod = new Map((Array.isArray(nmetRes) ? nmetRes : []).map((row) => [periodKey(row), row]));
-      const currentGrossRoyalty = currentRoyalty
-        ? (currentRoyalty.amount || 0)
-          + (dmfByPeriod.get(periodKey(currentRoyalty))?.amount || 0)
-          + (nmetByPeriod.get(periodKey(currentRoyalty))?.amount || 0)
-        : 0;
+      // Royalty/DMF/NMET are computed and stored directly on each Sale's own liability at save
+      // time — the current period's gross liability is just the sum of those fields across its
+      // sales, already fetched above for the chart. Sale has no stored period fields of its own,
+      // so the period key is derived from dispatchedOn here.
+      const royaltyByPeriod = new Map();
+      for (const sale of sales) {
+        if (sale.dispatchedOn == null) continue;
+        const dispatchedDate = new Date(sale.dispatchedOn);
+        const key = dispatchedDate.getFullYear() * 12 + dispatchedDate.getMonth();
+        const liability = sale.liability || {};
+        const grossAmount =
+          (royaltyByPeriod.get(key) || 0) + (liability.royaltyAmount || 0) + (liability.dmfAmount || 0) + (liability.nmetAmount || 0);
+        royaltyByPeriod.set(key, grossAmount);
+      }
+      const latestPeriodKey = royaltyByPeriod.size > 0 ? Math.max(...royaltyByPeriod.keys()) : null;
+      const currentGrossRoyalty = latestPeriodKey != null ? royaltyByPeriod.get(latestPeriodKey) : 0;
 
       setDashboardData({
         records: recordsRes.items || [],
@@ -274,7 +268,7 @@ export default function App() {
         monthProduced,
         todayProduced,
         extractedYtd,
-        grossRoyalty: currentRoyalty ? `₹${currentGrossRoyalty.toLocaleString()}` : '₹0',
+        grossRoyalty: latestPeriodKey != null ? `₹${currentGrossRoyalty.toLocaleString()}` : '₹0',
       });
     } catch (err) {
       console.warn('Dashboard data fetch fallback used:', err);
@@ -340,7 +334,9 @@ export default function App() {
 
   const activeMine = mines.find((m) => m.id === activeMineId) || mines[0];
   const activeMineMinerals = mineralsByMineId[activeMine?.id] || '';
-  const healthScore = dashboardData?.dgms?.overallScore ?? 0;
+  const dgmsTotalActions = dashboardData?.dgms?.totalActions ?? 0;
+  const dgmsCompletedActions = dashboardData?.dgms?.completedActions ?? 0;
+  const healthScore = dgmsTotalActions > 0 ? Math.round((dgmsCompletedActions / dgmsTotalActions) * 100) : 100;
   const alertCount = countActiveAlerts(dashboardData);
 
   if (!authChecked) {

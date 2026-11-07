@@ -5,15 +5,15 @@ import com.agentengine.util.common.beans.BaseEntity;
 
 /**
  * A payment a mine actually made against a statutory liability: royalty, a DMF or NMET
- * contribution, GST on royalty under reverse charge, rent, or dead rent. Royalty, the DMF/NMET
- * contributions, and the GST RCM liability are all calculated ({@link Royalty}, {@link
- * DmfContribution}, {@link NmetContribution}, {@link RoyaltyGst}), so a payment against one
- * of them links {@link #referenceId}; rent and dead rent are fixed lease terms ({@link MineRent}),
- * never computed by this service, so their payments carry no such link. Several payments may
- * settle one computed liability over time (partial payments), and {@link #receiptNumber} is what
- * lets the mine owner prove to an inspector that a payment happened at all. Not independently
- * permissioned — reached only through its mine, whose access governs it, same as {@link
- * ProductionEntry} and {@link ComplianceRecord}.
+ * contribution, GST on royalty under reverse charge, rent, or dead rent. Royalty and the
+ * DMF/NMET/GST-on-royalty liabilities are each computed and stored directly on the {@link Sale}
+ * they're owed against (see {@code MiningService#saveSale}), so a payment against one of them
+ * links {@link #referenceId} to that sale's own id; rent and dead rent are fixed lease terms
+ * ({@link MineRent}), never computed by this service, so their payments carry no such link.
+ * Several payments may settle one sale's liability over time (partial payments), and {@link
+ * #receiptNumber} is what lets the mine owner prove to an inspector that a payment happened at
+ * all. Not independently permissioned — reached only through its mine, whose access governs it,
+ * same as {@link ProductionEntry} and {@link ComplianceRecord}.
  */
 @Index(name = "mine_payment_mine_idx", def = "{'mineId': 1}")
 @Index(name = "mine_payment_reference_idx", def = "{'referenceId': 1}")
@@ -30,7 +30,7 @@ public class MinePayment extends BaseEntity {
   private String type;
 
   // Set only when type is ROYALTY, DMF_CONTRIBUTION, NMET_CONTRIBUTION, or GST_ON_ROYALTY_RCM:
-  // the deterministic id of that computed liability this payment settles, in part or in full.
+  // the id of the Sale whose liability this payment settles, in part or in full.
   private String referenceId;
 
   // Rupees.

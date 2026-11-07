@@ -48,10 +48,30 @@ const DgmsView = memo(function DgmsView({ activeMineId, activeMine, activeMineMi
   const loadDgmsData = async () => {
     setLoading(true);
     try {
-      const d = await apiFetch(`/mines/${activeMineId}/dgms-readiness`);
-      if (d && d.scores && d.scores.length > 0) {
-        setData(d);
-        setLocalScores(d.scores);
+      const registersResult = await catalogSearch('ComplianceRecord', {
+        filter: {
+          op: 'AND',
+          values: [
+            { field: 'mineId', op: 'EQ', values: [activeMineId] },
+            { field: 'recordType', op: 'EQ', values: ['REGISTER'] },
+          ],
+        },
+      });
+      const records = registersResult?.items || [];
+      if (records.length > 0) {
+        const mapped = records.map((r) => {
+          const daysSince = Math.max(0, Math.floor((Date.now() - (r.lastUpdatedAt || 0)) / 86400000));
+          const maxDays = Math.max(r.maxDaysAllowed || 1, 1);
+          const status = daysSince <= maxDays ? 'GREEN' : daysSince <= maxDays * 2 ? 'AMBER' : 'RED';
+          const score = status === 'GREEN' ? 100 : status === 'AMBER' ? 60 : 20;
+          return {
+            register: r,
+            score,
+            status,
+            daysSinceUpdate: daysSince,
+          };
+        });
+        setLocalScores(mapped);
       }
     } catch (e) {
       console.warn('DGMS fetch note:', e);
@@ -87,19 +107,10 @@ const DgmsView = memo(function DgmsView({ activeMineId, activeMine, activeMineMi
 
     // Call backend API if available
     try {
-      const record = (
-        await catalogSearch('ComplianceRecord', { filter: { field: 'id', op: 'EQ', values: [registerId] } })
-      ).items?.[0];
-      if (record) {
-        await apiFetch(`/mines/${activeMineId}/compliance-records`, {
-          method: 'POST',
-          body: JSON.stringify({
-            ...record,
-            lastUpdatedAt: lastUpdatedAt,
-            notes: `${officer}: ${notes}`
-          }),
-        });
-      }
+      await apiFetch(`/mines/${activeMineId}/compliance/records/${registerId}/mark-updated`, {
+        method: 'POST',
+      });
+      toast('Register marked as updated', 'success');
     } catch (err) {
       console.warn('Backend record sync note:', err);
     }

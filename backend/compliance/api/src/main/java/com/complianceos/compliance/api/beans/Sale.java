@@ -75,6 +75,8 @@ public class Sale extends BaseEntity {
   @UiNumber
   private double deductionPerUnit;
 
+  private SaleLiability liability = new SaleLiability();
+
   public String getMineId() {
     return mineId;
   }
@@ -145,5 +147,13 @@ public class Sale extends BaseEntity {
 
   public void setDeductionPerUnit(double deductionPerUnit) {
     this.deductionPerUnit = deductionPerUnit;
+  }
+
+  public SaleLiability getLiability() {
+    return liability;
+  }
+
+  public void setLiability(SaleLiability liability) {
+    this.liability = liability;
   }
 }

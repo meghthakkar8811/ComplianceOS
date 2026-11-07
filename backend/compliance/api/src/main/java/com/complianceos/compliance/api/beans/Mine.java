@@ -18,6 +18,9 @@ import jakarta.validation.constraints.NotNull;
 @Permissioned(assetClass = AssetClass.MINE)
 public class Mine extends BaseEntity {
 
+  public static final String FIELD_NAME = "name";
+  public static final String FIELD_ACTIVE = "active";
+
   @UiField(label = "Mine Name", order = 10)
   @UiText
   @UiAccess(create = UiAccessLevel.REQUIRED, edit = UiAccessLevel.REQUIRED)

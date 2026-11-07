@@ -66,6 +66,13 @@ export async function catalogSearch(assetType, query, options) {
   });
 }
 
+export async function catalogAggregate(assetType, query, options) {
+  return apiFetch('/catalog/aggregate', {
+    method: 'POST',
+    body: JSON.stringify({ assetType, query, options }),
+  });
+}
+
 /**
  * Generates (or re-fetches the already-generated) PDF invoice for a sale and triggers a file
  * download. Returns `{ required: false }` when the sale's nature never calls for an invoice

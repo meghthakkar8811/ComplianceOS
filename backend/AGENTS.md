@@ -19,7 +19,7 @@ feature reference only — this backend is not a line-by-line port of it.
 |-------------------------------|------------------------------------------------------------------------------------------------|
 | `compliance:api`               | Beans (`Mine`, `ProductionEntry`, `Royalty`, `RoyaltyRate`, `ComplianceRecord`) and the `MiningService` contract (`@MicroService("compliance")`) |
 | `compliance:core`               | **Compliance service** — repositories and `MiningServiceImpl`, deployed standalone and called over gRPC |
-| `interfaces:rest`               | **REST gateway** — depends on agent-engine's own `interfaces:rest` artifact and extends it in one running process: agent-engine's REST surface (chat, sessions, governance, the resource catalog, etc.) plus this module's own domain endpoints (`MiningRestAPI`) and `AssetHandler`s, thin over `MiningService` via `MicroServiceClientProvider`, no business logic |
+| `interfaces:rest`               | **REST gateway** — depends on agent-engine's own `interfaces:rest` artifact and extends it in one running process: agent-engine's REST surface (chat, sessions, governance, the resource catalog, etc.) plus this module's own domain endpoints, split by sub-domain (`MineRestAPI`, `ComplianceRestAPI`, `SalesRestAPI`, `BuyerRestAPI`) and `AssetHandler`s, thin over `MiningService` via `MicroServiceClientProvider`, no business logic |
 | `agent:api`, `agent:core`       | Reserved for compliance-specific agent Tools (royalty calculator, DGMS lookups, Form-B autofill) extending agent-engine's agent runtime — currently empty; no concrete tool has been scoped yet |
 | `internal`                      | Reserved for compliance-specific internal/ops endpoints — currently empty; agent-engine's own `internal` service covers general ops needs until one is |
 | `deploy/docker/`, `deploy/k8s/`, `deploy/configs/`, `deploy/scripts/` | Same shape as agent-engine's own deploy tooling — one Helm chart + tier config per deployable |
@@ -33,8 +33,8 @@ repos are developed side by side.
 `*:api` contracts.** This product extends agent-engine module by module by depending on its
 published artifact directly, rather than running a separate, unmodified instance of it alongside
 this product's own services: `interfaces:rest` is the first one wired this way, depending on
-`com.agentengine.interfaces:rest` and extending it in the same process (its own `MiningRestAPI`
-and `AssetHandler`s sit alongside agent-engine's REST surface, including its
+`com.agentengine.interfaces:rest` and extending it in the same process (its own mine-scoped REST
+resources, split by sub-domain, and `AssetHandler`s sit alongside agent-engine's REST surface, including its
 `ResourceCatalogAPI` — `compliance:api`'s four handlers register as additional
 `AssetHandler`s on agent-engine's own framework rather than a parallel one). Other modules
 (`agent:core` extending agent-engine's agent runtime, etc.) are expected to follow the same

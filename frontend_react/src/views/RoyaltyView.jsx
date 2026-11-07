@@ -1,10 +1,10 @@
 import React, { useState, useEffect, memo } from 'react';
-import { apiFetch, catalogSearch } from '../services/api';
+import { catalogAggregate, catalogSearch } from '../services/api';
 
-const MONTH_INDEX = {
-  JANUARY: 0, FEBRUARY: 1, MARCH: 2, APRIL: 3, MAY: 4, JUNE: 5,
-  JULY: 6, AUGUST: 7, SEPTEMBER: 8, OCTOBER: 9, NOVEMBER: 10, DECEMBER: 11,
-};
+const MONTH_NAMES = [
+  'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
+  'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER',
+];
 
 const RoyaltyView = memo(function RoyaltyView({ activeMine, onOpenStatutoryRates }) {
   const [tonnage, setTonnage] = useState(1000);
@@ -39,48 +39,51 @@ const RoyaltyView = memo(function RoyaltyView({ activeMine, onOpenStatutoryRates
   const loadRoyaltyData = async () => {
     setLoading(true);
     try {
-      // Royalty, DMF and NMET are three separate computed records on the backend (never a single
-      // bundled figure), each fetched from its own endpoint and merged here by period for display.
-      const [royalties, dmfContributions, nmetContributions] = await Promise.all([
-        apiFetch(`/mines/${activeMine.id}/royalty`).catch(() => []),
-        apiFetch(`/mines/${activeMine.id}/dmf-contributions`).catch(() => []),
-        apiFetch(`/mines/${activeMine.id}/nmet-contributions`).catch(() => []),
-      ]);
+      // Royalty/DMF/NMET are computed and stored directly on each Sale at save time, so a
+      // period's totals are a plain sum over its sales — grouped by royaltyRateId (not just
+      // mineral/grade) so distinct rates applied that period can still be listed for display.
+      // year/month are derived from dispatchedOn by the aggregation itself (month comes back as
+      // 1-12, not a name), since Sale has no stored period fields of its own to group by.
+      const result = await catalogAggregate(
+        'Sale',
+        {
+          groupByFields: [
+            { field: 'dispatchedOn', alias: 'year', additional: { dateTruncUnit: 'YEARS' } },
+            { field: 'dispatchedOn', alias: 'month', additional: { dateTruncUnit: 'MONTHS' } },
+            { field: 'liability.royaltyRateId', alias: 'royaltyRateId' },
+          ],
+          metrics: [
+            { field: 'quantity', function: 'SUM', alias: 'quantity' },
+            { field: 'liability.royaltyAmount', function: 'SUM', alias: 'royaltyAmount' },
+            { field: 'liability.dmfAmount', function: 'SUM', alias: 'dmfAmount' },
+            { field: 'liability.nmetAmount', function: 'SUM', alias: 'nmetAmount' },
+          ],
+        },
+        { mineId: activeMine.id }
+      );
 
-      const periodKey = (row) => `${row.year}-${row.month}`;
-      const dmfByPeriod = new Map((Array.isArray(dmfContributions) ? dmfContributions : []).map((row) => [periodKey(row), row]));
-      const nmetByPeriod = new Map((Array.isArray(nmetContributions) ? nmetContributions : []).map((row) => [periodKey(row), row]));
-
-      // The backend returns one Royalty row per mineral dispatched that period (each has its own
-      // rate), so a period's own totals are the sum across whatever minerals it dispatched.
-      const royaltiesByPeriod = new Map();
-      for (const royalty of Array.isArray(royalties) ? royalties : []) {
-        const key = periodKey(royalty);
-        const group = royaltiesByPeriod.get(key) || { year: royalty.year, month: royalty.month, quantity: 0, amount: 0, royaltyRateIds: [] };
-        group.quantity += royalty.quantity || 0;
-        group.amount += royalty.amount || 0;
-        if (royalty.royaltyRateId) group.royaltyRateIds.push(royalty.royaltyRateId);
-        royaltiesByPeriod.set(key, group);
+      const periodKey = (bucket) => `${bucket.year}-${bucket.month}`;
+      const periodsByKey = new Map();
+      for (const bucket of result?.buckets || []) {
+        const key = periodKey(bucket);
+        const period =
+          periodsByKey.get(key) ||
+          { year: bucket.year, month: MONTH_NAMES[bucket.month - 1], quantity: 0, baseAmount: 0, dmfAmount: 0, nmetAmount: 0, royaltyRateIds: [] };
+        period.quantity += bucket.quantity || 0;
+        period.baseAmount += bucket.royaltyAmount || 0;
+        period.dmfAmount += bucket.dmfAmount || 0;
+        period.nmetAmount += bucket.nmetAmount || 0;
+        if (bucket.royaltyRateId) period.royaltyRateIds.push(bucket.royaltyRateId);
+        periodsByKey.set(key, period);
       }
 
-      const periods = [...royaltiesByPeriod.entries()]
-        .map(([key, royalty]) => {
-          const baseAmount = royalty.amount || 0;
-          const dmfAmount = dmfByPeriod.get(key)?.amount || 0;
-          const nmetAmount = nmetByPeriod.get(key)?.amount || 0;
-          return {
-            id: key,
-            year: royalty.year,
-            month: royalty.month,
-            quantity: royalty.quantity,
-            royaltyRateIds: royalty.royaltyRateIds,
-            baseAmount,
-            dmfAmount,
-            nmetAmount,
-            grossLiability: baseAmount + dmfAmount + nmetAmount,
-          };
-        })
-        .sort((a, b) => (b.year * 12 + (MONTH_INDEX[b.month] || 0)) - (a.year * 12 + (MONTH_INDEX[a.month] || 0)));
+      const periods = [...periodsByKey.entries()]
+        .map(([key, period]) => ({
+          id: key,
+          ...period,
+          grossLiability: period.baseAmount + period.dmfAmount + period.nmetAmount,
+        }))
+        .sort((a, b) => b.year - a.year || MONTH_NAMES.indexOf(b.month) - MONTH_NAMES.indexOf(a.month));
 
       setCurrent(periods[0] || null);
       setHistory(periods);
@@ -94,7 +97,7 @@ const RoyaltyView = memo(function RoyaltyView({ activeMine, onOpenStatutoryRates
   const dmfPct = 0.30;
   const nmetPct = 0.02;
 
-  // Current period liability — straight from the backend's computed Royalty, never estimated.
+  // Current period liability — summed from each Sale's own stored royalty/DMF/NMET amounts, never estimated.
   const dispatchedQty = current?.quantity || 0;
   const curBase = current?.baseAmount || 0;
   const curDmf = current?.dmfAmount || 0;

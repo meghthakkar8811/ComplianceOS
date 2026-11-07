@@ -1,5 +1,6 @@
 package com.complianceos.compliance.core.service;
 
+import com.agentengine.util.common.beans.FileDetails;
 import com.agentengine.util.common.codec.JsonUtils;
 import com.agentengine.util.common.exception.UnauthorizedException;
 import com.agentengine.util.common.query.AggregationQuery;
@@ -16,31 +17,8 @@ import com.agentengine.util.context.Context;
 import com.agentengine.util.scripts.TemplateUtils;
 import com.agentengine.util.scripts.templated.Template;
 import com.agentengine.util.tenancy.Permission;
-import com.complianceos.compliance.api.beans.AssetClass;
-import com.complianceos.compliance.api.beans.Authority;
-import com.complianceos.compliance.api.beans.Buyer;
-import com.complianceos.compliance.api.beans.ComplianceRecord;
-import com.complianceos.compliance.api.beans.ComplianceStatus;
-import com.complianceos.compliance.api.beans.DgmsRecordScore;
-import com.complianceos.compliance.api.beans.DgmsScore;
-import com.complianceos.compliance.api.beans.DmfRate;
-import com.complianceos.compliance.api.beans.GstRate;
-import com.complianceos.compliance.api.beans.LaborDay;
-import com.complianceos.compliance.api.beans.LaborPayroll;
-import com.complianceos.compliance.api.beans.LaborSummary;
-import com.complianceos.compliance.api.beans.Mine;
-import com.complianceos.compliance.api.beans.Mineral;
-import com.complianceos.compliance.api.beans.MinePayment;
-import com.complianceos.compliance.api.beans.MineRent;
-import com.complianceos.compliance.api.beans.MineStoppage;
-import com.complianceos.compliance.api.beans.NmetRate;
-import com.complianceos.compliance.api.beans.PaymentType;
-import com.complianceos.compliance.api.beans.ProductionEntry;
-import com.complianceos.compliance.api.beans.DgmsRecordStatus;
-import com.complianceos.compliance.api.beans.DgmsVerdict;
-import com.complianceos.compliance.api.beans.RecordType;
-import com.complianceos.compliance.api.beans.RoyaltyRate;
-import com.complianceos.compliance.api.beans.Sale;
+import com.complianceos.compliance.api.beans.*;
+import com.complianceos.compliance.api.services.MineralService;
 import com.complianceos.compliance.api.services.MiningService;
 import com.complianceos.compliance.core.repository.BuyerRepository;
 import com.complianceos.compliance.core.repository.ComplianceRecordRepository;
@@ -63,44 +41,30 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 @Singleton
 public class MiningServiceImpl implements MiningService {
 
-  /**
-   * How much each DGMS register counts toward the overall readiness score, reflecting how
-   * serious a stale entry is: a late accident register is a bigger safety risk than a late
-   * employment register.
-   */
-  private static final Map<String, Double> DGMS_REGISTER_WEIGHTS =
-      Map.of(
-          "ACCIDENT_REGISTER", 1.5,
-          "SAFETY_COMMITTEE", 1.0,
-          "EXPLOSIVE_CONSUMPTION", 1.0,
-          "SHOTFIRER_COMPETENCY", 0.8,
-          "FIRST_AID", 0.8,
-          "MACHINERY_REGISTER", 1.0,
-          "WEIGHBRIDGE_REGISTER", 1.0,
-          "EMPLOYMENT_REGISTER", 0.9);
-
-  private static final int GREEN_THRESHOLD = 70;
-  private static final int AMBER_THRESHOLD = 40;
-  private static final int GOOD_THRESHOLD = 80;
-  private static final int NEEDS_ATTENTION_THRESHOLD = 50;
-
   /** How far ahead {@link #ensureComplianceRecords} keeps each mine's calendar populated. */
   private static final int CALENDAR_WINDOW_MONTHS = 12;
 
-  // Fixed statutory registers a mine must keep current, each scored for DGMS readiness by how
-  // overdue it is against maxDaysAllowed (see DGMS_REGISTER_WEIGHTS/getDgmsReadinessScore).
-  // Resolved against `mine` so a future, confirmed condition on a register (e.g. only for a
-  // mineType) is a change to this resource, not to this class.
+  /**
+   * How far back {@link #recomputeSaleLiabilities} looks for sales that might need a corrected
+   * rate applied. A rate correction is assumed to always land within a month of the dispatches it
+   * affects, so a sale older than this is never revisited.
+   */
+  private static final Duration RECOMPUTE_LOOKBACK = Duration.ofDays(31);
+
+  // Fixed statutory registers a mine must keep current, each counted up to date in
+  // getComplianceProgress while its lastUpdatedAt is within maxDaysAllowed. Resolved against
+  // `mine` so a future, confirmed condition on a register (e.g. only for a mineType) is a change
+  // to this resource, not to this class.
   private static final Template<List<Map<String, Object>>> DGMS_REGISTERS =
       TemplateUtils.buildTemplate(
           JsonUtils.fromJson(
@@ -143,6 +107,7 @@ public class MiningServiceImpl implements MiningService {
   private final LaborDayRepository laborDayRepository;
   private final LaborPayrollRepository laborPayrollRepository;
   private final MineralRepository mineralRepository;
+  private final MineralService mineralService;
   private final SaleRepository saleRepository;
 
   @Inject
@@ -161,6 +126,7 @@ public class MiningServiceImpl implements MiningService {
       final LaborDayRepository laborDayRepository,
       final LaborPayrollRepository laborPayrollRepository,
       final MineralRepository mineralRepository,
+      final MineralService mineralService,
       final SaleRepository saleRepository) {
     this.mineRepository = mineRepository;
     this.buyerRepository = buyerRepository;
@@ -176,17 +142,13 @@ public class MiningServiceImpl implements MiningService {
     this.laborDayRepository = laborDayRepository;
     this.laborPayrollRepository = laborPayrollRepository;
     this.mineralRepository = mineralRepository;
+    this.mineralService = mineralService;
     this.saleRepository = saleRepository;
   }
 
   @Override
   public Mine saveMine(final Mine mine, final boolean skipVersion) {
     return skipVersion ? mineRepository.saveIgnoringVersion(mine) : mineRepository.save(mine);
-  }
-
-  @Override
-  public Mine getMine(final String id) {
-    return mineRepository.findById(id);
   }
 
   @Override
@@ -225,11 +187,6 @@ public class MiningServiceImpl implements MiningService {
   @Override
   public Buyer saveBuyer(final Buyer buyer, final boolean skipVersion) {
     return skipVersion ? buyerRepository.saveIgnoringVersion(buyer) : buyerRepository.save(buyer);
-  }
-
-  @Override
-  public Buyer getBuyer(final String id) {
-    return buyerRepository.findById(id);
   }
 
   @Override
@@ -333,11 +290,107 @@ public class MiningServiceImpl implements MiningService {
   }
 
   @Override
-  public ComplianceRecord saveComplianceRecord(final ComplianceRecord record, final boolean skipVersion) {
-    requireMineEdit(record.getMineId());
-    return skipVersion
-        ? complianceRecordRepository.saveIgnoringVersion(record)
-        : complianceRecordRepository.save(record);
+  public ComplianceRecord fileReturn(
+      final String mineId, final String title, final String referenceNumber) {
+    requireMineEdit(mineId);
+    final ComplianceRecord record = new ComplianceRecord();
+    record.setMineId(mineId);
+    record.setAuthority(Authority.IBM.name());
+    record.setRecordType(RecordType.RETURN.name());
+    record.setTitle(title);
+    record.setStatus(ComplianceStatus.SUBMITTED.name());
+    record.setSubmittedOn(System.currentTimeMillis());
+    record.setReferenceNumber(referenceNumber);
+    return complianceRecordRepository.save(record);
+  }
+
+  @Override
+  public ComplianceRecord addDocument(
+      final String mineId,
+      final String authority,
+      final String recordType,
+      final String title,
+      final FileDetails attachment,
+      final Long issuedOn,
+      final Long expiry) {
+    requireMineEdit(mineId);
+    final ComplianceRecord record = new ComplianceRecord();
+    record.setMineId(mineId);
+    record.setAuthority(authority);
+    record.setRecordType(recordType);
+    record.setTitle(title);
+    record.setAttachment(attachment);
+    if (issuedOn != null) {
+      record.setIssuedOn(issuedOn);
+    }
+    if (expiry != null) {
+      record.setExpiry(expiry);
+    }
+    record.setStatus(
+        (expiry != null && expiry < System.currentTimeMillis()
+                ? ComplianceStatus.EXPIRED
+                : ComplianceStatus.VALID)
+            .name());
+    return complianceRecordRepository.save(record);
+  }
+
+  @Override
+  public ComplianceRecord markRegisterUpdated(final String mineId, final String recordId) {
+    requireMineEdit(mineId);
+    final ComplianceRecord record = complianceRecordRepository.findById(recordId);
+    if (record == null || !mineId.equals(record.getMineId())) {
+      throw new IllegalArgumentException("No register " + recordId + " for mine " + mineId);
+    }
+    record.setLastUpdatedAt(System.currentTimeMillis());
+    record.setNotes("Updated via ComplianceOS");
+    return complianceRecordRepository.save(record);
+  }
+
+  @Override
+  public ComplianceRecord markReturnSubmitted(
+      final String mineId, final String recordId, final String referenceNumber) {
+    requireMineEdit(mineId);
+    final ComplianceRecord record = complianceRecordRepository.findById(recordId);
+    if (record == null || !mineId.equals(record.getMineId())) {
+      throw new IllegalArgumentException("No compliance record " + recordId + " for mine " + mineId);
+    }
+    record.setStatus(ComplianceStatus.SUBMITTED.name());
+    record.setSubmittedOn(System.currentTimeMillis());
+    record.setReferenceNumber(referenceNumber);
+    return complianceRecordRepository.save(record);
+  }
+
+  @Override
+  public ComplianceRecord updateDocument(
+      final String mineId,
+      final String recordId,
+      final String authority,
+      final String recordType,
+      final String title,
+      final FileDetails attachment,
+      final Long issuedOn,
+      final Long expiry) {
+    requireMineEdit(mineId);
+    final ComplianceRecord record = complianceRecordRepository.findById(recordId);
+    if (record == null || !mineId.equals(record.getMineId())) {
+      throw new IllegalArgumentException("No compliance record " + recordId + " for mine " + mineId);
+    }
+    record.setAuthority(authority);
+    record.setRecordType(recordType);
+    record.setTitle(title);
+    record.setAttachment(attachment);
+    if (issuedOn != null) {
+      record.setIssuedOn(issuedOn);
+    }
+    if (expiry != null) {
+      record.setExpiry(expiry);
+    }
+    record.setStatus(
+        (expiry != null && expiry < System.currentTimeMillis()
+                ? ComplianceStatus.EXPIRED
+                : ComplianceStatus.VALID)
+            .name());
+    return complianceRecordRepository.save(record);
   }
 
   @Override
@@ -379,39 +432,39 @@ public class MiningServiceImpl implements MiningService {
   }
 
   @Override
-  public DgmsScore getDgmsReadinessScore(final String mineId) {
+  public ComplianceProgress getComplianceProgress(final String mineId, final Query query) {
     if (!mineRepository.hasPermission(mineId, Permission.READ)) {
-      return new DgmsScore(0, dgmsVerdictOf(0), List.of());
+      return new ComplianceProgress(0, 0);
     }
+    final Filter requestedFilter = query == null ? null : query.getFilter();
+    final Filter filter =
+        requestedFilter == null
+            ? Filters.eq(ComplianceRecord.FIELD_MINE_ID, mineId)
+            : Filters.and(Filters.eq(ComplianceRecord.FIELD_MINE_ID, mineId), requestedFilter);
     final List<ComplianceRecord> records =
         complianceRecordRepository
-            .findByQuery(
-                new Query()
-                    .withFilter(
-                        Filters.and(
-                            Filters.eq(ComplianceRecord.FIELD_MINE_ID, mineId),
-                            Filters.eq("recordType", RecordType.REGISTER.name()))))
+            .findByQuery(new Query().withFilter(filter).withPage(Page.UNBOUNDED))
             .getItems();
 
-    final List<DgmsRecordScore> scores = new ArrayList<>();
-    double weightedSum = 0;
-    double totalWeight = 0;
     final Instant now = Instant.now();
-
+    int completed = 0;
     for (final ComplianceRecord record : records) {
-      final long daysSince =
-          Math.max(
-              0, Duration.between(Instant.ofEpochMilli(record.getLastUpdatedAt()), now).toDays());
-      final int maxDays = Math.max(record.getMaxDaysAllowed(), 1);
-      final int score = Math.max(0, (int) Math.round(100 - (100.0 * daysSince / maxDays)));
-      final double weight = DGMS_REGISTER_WEIGHTS.getOrDefault(record.getRegisterCode(), 1.0);
-      weightedSum += score * weight;
-      totalWeight += weight;
-      scores.add(new DgmsRecordScore(record, score, daysSince, dgmsStatusOf(score)));
+      if (RecordType.valueOfOrDefault(record.getRecordType()) == RecordType.REGISTER) {
+        final long daysSince =
+            Math.max(
+                0,
+                Duration.between(Instant.ofEpochMilli(record.getLastUpdatedAt()), now).toDays());
+        if (daysSince <= Math.max(record.getMaxDaysAllowed(), 1)) {
+          completed++;
+        }
+      } else {
+        final ComplianceStatus status = ComplianceStatus.valueOfOrDefault(record.getStatus());
+        if (status == ComplianceStatus.VALID || status == ComplianceStatus.SUBMITTED) {
+          completed++;
+        }
+      }
     }
-
-    final int overall = totalWeight > 0 ? (int) Math.round(weightedSum / totalWeight) : 0;
-    return new DgmsScore(overall, dgmsVerdictOf(overall), scores);
+    return new ComplianceProgress(records.size(), completed);
   }
 
   @Override
@@ -538,26 +591,6 @@ public class MiningServiceImpl implements MiningService {
   }
 
   @Override
-  public int getDaysWorked(final String mineId, final long asOf) {
-    if (!mineRepository.hasPermission(mineId, Permission.READ)) {
-      return 0;
-    }
-    final YearMonth period = periodOf(asOf);
-    final long periodStart = monthStartMillis(period);
-    final long periodEnd = monthStartMillis(period.plusMonths(1));
-    final PaginatedResult<MineStoppage> stoppages =
-        mineStoppageRepository.findByQuery(
-            new Query()
-                .withFilter(
-                    Filters.and(
-                        Filters.eq(MineStoppage.FIELD_MINE_ID, mineId),
-                        Filters.gte(MineStoppage.FIELD_STOPPED_ON, periodStart),
-                        Filters.lt(MineStoppage.FIELD_STOPPED_ON, periodEnd)))
-                .withPage(Page.UNBOUNDED));
-    return period.lengthOfMonth() - stoppages.getItems().size();
-  }
-
-  @Override
   public LaborDay saveLaborDay(final LaborDay day, final boolean skipVersion) {
     requireMineEdit(day.getMineId());
     day.setId(LaborDay.id(day.getMineId(), day.getWorkedOn()));
@@ -592,41 +625,6 @@ public class MiningServiceImpl implements MiningService {
             .filter(entry -> accessibleMines.containsKey(entry.getMineId()))
             .toList());
     return result;
-  }
-
-  @Override
-  public LaborSummary getLaborSummary(final String mineId, final long asOf) {
-    if (!mineRepository.hasPermission(mineId, Permission.READ)) {
-      return new LaborSummary(0, 0, 0);
-    }
-    final int daysWorked = getDaysWorked(mineId, asOf);
-    if (daysWorked == 0) {
-      return new LaborSummary(0, 0, 0);
-    }
-    final YearMonth period = periodOf(asOf);
-    final long periodStart = monthStartMillis(period);
-    final long periodEnd = monthStartMillis(period.plusMonths(1));
-    final PaginatedResult<LaborDay> laborDays =
-        laborDayRepository.findByQuery(
-            new Query()
-                .withFilter(
-                    Filters.and(
-                        Filters.eq(LaborDay.FIELD_MINE_ID, mineId),
-                        Filters.gte(LaborDay.FIELD_WORKED_ON, periodStart),
-                        Filters.lt(LaborDay.FIELD_WORKED_ON, periodEnd)))
-                .withPage(Page.UNBOUNDED));
-    long belowGroundManDays = 0;
-    long openCastManDays = 0;
-    long aboveGroundManDays = 0;
-    for (final LaborDay day : laborDays.getItems()) {
-      belowGroundManDays += day.getBelowGroundCount();
-      openCastManDays += day.getOpenCastCount();
-      aboveGroundManDays += day.getAboveGroundCount();
-    }
-    return new LaborSummary(
-        (double) belowGroundManDays / daysWorked,
-        (double) openCastManDays / daysWorked,
-        (double) aboveGroundManDays / daysWorked);
   }
 
   @Override
@@ -669,9 +667,43 @@ public class MiningServiceImpl implements MiningService {
   @Override
   public Sale saveSale(final Sale sale, final boolean skipVersion) {
     requireMineEdit(sale.getMineId());
+    applyLiabilities(sale);
     return skipVersion
         ? saleRepository.saveIgnoringVersion(sale)
         : saleRepository.save(sale);
+  }
+
+  @Override
+  public void recomputeSaleLiabilities(final String mineId) {
+    final long recomputeSince = Instant.now().minus(RECOMPUTE_LOOKBACK).toEpochMilli();
+    final PaginatedResult<Sale> sales =
+        saleRepository.findByQuery(
+            new Query()
+                .withFilter(
+                    Filters.and(
+                        Filters.eq(Sale.FIELD_MINE_ID, mineId),
+                        Filters.gte(Sale.FIELD_DISPATCHED_ON, recomputeSince)))
+                .withPage(Page.UNBOUNDED));
+    for (final Sale sale : sales.getItems()) {
+      final SaleLiability previousLiability = sale.getLiability();
+      applyLiabilities(sale);
+      if (!Objects.equals(previousLiability, sale.getLiability())) {
+        saleRepository.saveIgnoringVersion(sale);
+      }
+    }
+  }
+
+  /** Recomputes {@code sale}'s liability fields from whichever rate is currently in force. */
+  private void applyLiabilities(final Sale sale) {
+    final LiabilityCalculator calculator = new LiabilityCalculator(
+            sale,
+            mineRepository,
+            mineralService,
+            royaltyRateRepository,
+            dmfRateRepository,
+            nmetRateRepository,
+            gstRateRepository);
+    sale.setLiability(calculator.calculate());
   }
 
   @Override
@@ -793,27 +825,9 @@ public class MiningServiceImpl implements MiningService {
     }
   }
 
-  private static String dgmsStatusOf(final int score) {
-    if (score >= GREEN_THRESHOLD) {
-      return DgmsRecordStatus.GREEN.name();
-    }
-    return (score >= AMBER_THRESHOLD ? DgmsRecordStatus.AMBER : DgmsRecordStatus.RED).name();
-  }
-
-  private static String dgmsVerdictOf(final int overallScore) {
-    if (overallScore >= GOOD_THRESHOLD) {
-      return DgmsVerdict.GOOD.name();
-    }
-    return (overallScore >= NEEDS_ATTENTION_THRESHOLD
-            ? DgmsVerdict.NEEDS_ATTENTION
-            : DgmsVerdict.CRITICAL)
-        .name();
-  }
-
   /**
-   * Royalty and ComplianceRecord are not independently permissioned: they are reached only
-   * through their mine, so every write to one requires the caller to hold {@code permission} on
-   * its mine.
+   * Sale and ComplianceRecord are not independently permissioned: they are reached only through
+   * their mine, so every write to one requires the caller to hold {@code permission} on its mine.
    */
   private void requireMineEdit(final String mineId) {
     if (!mineRepository.hasPermission(mineId, Permission.EDIT)) {
@@ -821,13 +835,6 @@ public class MiningServiceImpl implements MiningService {
     }
   }
 
-  private static YearMonth periodOf(final long entryTime) {
-    return YearMonth.from(Instant.ofEpochMilli(entryTime).atZone(ZoneOffset.UTC));
-  }
-
-  private static long monthStartMillis(final YearMonth period) {
-    return period.atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli();
-  }
 
   /** The mine's current (not yet superseded) {@link MineRent} of {@code type}, or null if none is. */
   private MineRent currentMineRent(final String mineId, final String type) {

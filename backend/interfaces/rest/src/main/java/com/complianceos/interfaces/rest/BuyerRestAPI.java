@@ -21,8 +21,9 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 /**
  * Saving and deleting a {@link Buyer} — customer-scoped, not mine-scoped, unlike every other
- * entity {@link MiningRestAPI} addresses. Listing/searching buyers goes through agent-engine's
- * {@code ResourceCatalogAPI} instead, via {@code BuyerAssetHandler}.
+ * entity this module's mine-scoped REST resources (e.g. {@link MineRestAPI}) address. Listing/
+ * searching buyers goes through agent-engine's {@code ResourceCatalogAPI} instead, via
+ * {@code BuyerAssetHandler}.
  */
 @Path("/v1/buyers")
 @Tag(name = "Buyers", description = "Buyer master data")

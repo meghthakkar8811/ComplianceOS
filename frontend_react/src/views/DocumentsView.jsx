@@ -88,7 +88,7 @@ const DocumentsView = memo(function DocumentsView({ activeMineId, onOpenUploadDo
   const handleDeleteDoc = async (id) => {
     if (!confirm('Are you sure you want to delete this document?')) return;
     try {
-      await apiFetch(`/mines/${activeMineId}/compliance-records/${id}`, { method: 'DELETE' });
+      await apiFetch(`/mines/${activeMineId}/compliance/records/${id}`, { method: 'DELETE' });
       toast('Document deleted', 'success');
       loadDocuments();
     } catch (e) {
@@ -119,19 +119,16 @@ const DocumentsView = memo(function DocumentsView({ activeMineId, onOpenUploadDo
       }
       const issuedOn = editIssued ? Date.parse(editIssued + 'T00:00:00Z') : null;
       const expiry = editExpiry ? Date.parse(editExpiry + 'T00:00:00Z') : null;
-      const status = expiry && expiry < Date.now() ? 'EXPIRED' : 'VALID';
 
-      await apiFetch(`/mines/${activeMineId}/compliance-records`, {
+      await apiFetch(`/mines/${activeMineId}/compliance/records/${editingDoc.id}/documents`, {
         method: 'POST',
         body: JSON.stringify({
-          ...editingDoc,
           title: editTitle,
           authority: editAuthority,
           recordType: editRecordType,
           attachment,
           issuedOn,
           expiry,
-          status,
         }),
       });
       toast('Document updated successfully', 'success');

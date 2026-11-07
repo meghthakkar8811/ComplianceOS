@@ -3,5 +3,10 @@
     "id": "{{ customerId }}:EnsureComplianceCalendar",
     "jobClassName": "com.complianceos.compliance.jobs.EnsureComplianceCalendarJob",
     "cronSchedule": "0 0 2 ? * SUN"
+  },
+  {
+    "id": "{{ customerId }}:RecomputeSaleLiabilities",
+    "jobClassName": "com.complianceos.compliance.jobs.RecomputeSaleLiabilitiesJob",
+    "cronSchedule": "0 30 2 ? * *"
   }
 ]

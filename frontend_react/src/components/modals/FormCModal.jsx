@@ -30,16 +30,10 @@ export default function FormCModal({ isOpen, onClose, activeMine, activeMineMine
     setSubmitting(true);
     try {
       if (activeMine) {
-        await apiFetch(`/mines/${activeMine.id}/compliance-records`, {
+        await apiFetch(`/mines/${activeMine.id}/compliance/records/returns`, {
           method: 'POST',
           body: JSON.stringify({
-            mineId: activeMine.id,
-            authority: 'IBM',
-            recordType: 'RETURN',
             title: 'IBM Form C — Quarterly Return of Labour Employed',
-            status: 'SUBMITTED',
-            submittedOn: Date.now(),
-            expiry: Date.now(),
             referenceNumber: referenceNumber.trim(),
           }),
         });

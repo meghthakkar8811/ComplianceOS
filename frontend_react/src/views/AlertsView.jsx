@@ -5,7 +5,8 @@ const AlertsView = memo(function AlertsView({ dashboardData, onNavigate }) {
   const [allRead, setAllRead] = useState(false);
   const records = dashboardData?.records || [];
   const now = Date.now();
-  const dgmsScore = dashboardData?.dgms?.overallScore ?? 84;
+  const dgmsTotalActions = dashboardData?.dgms?.totalActions ?? 0;
+  const dgmsCompletedActions = dashboardData?.dgms?.completedActions ?? 0;
 
   const docRecords = records.filter((r) => r.recordType === 'CLEARANCE' || r.recordType === 'STATUTORY_PLAN');
   const expiredDocs = docRecords.filter((r) => r.expiry && r.expiry < now);
@@ -19,12 +20,12 @@ const AlertsView = memo(function AlertsView({ dashboardData, onNavigate }) {
 
   const alerts = [];
 
-  if (dgmsScore < 60) {
+  if (dgmsTotalActions > 0 && dgmsCompletedActions / dgmsTotalActions < 0.6) {
     alerts.push({
       type: 'critical',
       icon: '⚠',
       title: 'DGMS Readiness is Critical',
-      desc: `Score: ${dgmsScore}/100. Multiple registers are overdue. A DGMS inspection today would result in violations.`,
+      desc: `${dgmsCompletedActions} of ${dgmsTotalActions} compliance actions are up to date. Multiple registers are overdue. A DGMS inspection today would result in violations.`,
       time: 'Now',
       action: 'Fix Now',
       nav: 'dgms',

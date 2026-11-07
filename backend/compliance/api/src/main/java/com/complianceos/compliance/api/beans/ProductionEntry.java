@@ -9,7 +9,7 @@ import com.agentengine.util.common.builder.annotations.UiLookupOption;
 /**
  * A mine's production entry for one shift, one pit section, one grade. What it dispatches is
  * tracked separately, per buyer, by {@link Sale} — not independently permissioned —
- * reached only through its mine, whose access governs it, same as {@link Royalty} and
+ * reached only through its mine, whose access governs it, same as {@link Sale} and
  * {@link ComplianceRecord}.
  */
 @Index(name = "production_mine_idx", def = "{'mineId': 1}")

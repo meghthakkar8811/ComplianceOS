@@ -21,4 +21,5 @@ dependencies {
     implementation 'com.agentengine.util.ms:client:1.0.1-SNAPSHOT'
     // For BuilderDefinitionUtils, generating Mine's schema in MineSchemaDTOProvider.
     implementation 'com.agentengine.util:agents:1.0.1-SNAPSHOT'
+    implementation 'com.agentengine.util:cloudstorage:1.0.1-SNAPSHOT'
 }

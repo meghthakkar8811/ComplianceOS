@@ -11,8 +11,7 @@ import java.util.Map;
 /**
  * GST invoicing for a {@link Sale}: whether its type requires one at all, and the lazy
  * generate-or-refetch flow a download request drives — kept out of {@code MiningService} as its
- * own self-contained area of logic, same reasoning as {@link RoyaltyService} and {@link
- * MineralService}.
+ * own self-contained area of logic, same reasoning as {@link MineralService}.
  */
 @MicroService("compliance")
 public interface InvoiceService {

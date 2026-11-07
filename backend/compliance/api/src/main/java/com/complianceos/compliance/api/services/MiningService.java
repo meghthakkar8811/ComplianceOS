@@ -1,16 +1,18 @@
 package com.complianceos.compliance.api.services;
 
+import com.agentengine.util.common.beans.FileDetails;
+import com.agentengine.util.common.query.AggregationQuery;
+import com.agentengine.util.common.query.AggregationResult;
 import com.agentengine.util.common.query.PaginatedResult;
 import com.agentengine.util.common.query.Query;
 import com.agentengine.util.ms.client.MicroService;
 import com.complianceos.compliance.api.beans.Buyer;
+import com.complianceos.compliance.api.beans.ComplianceProgress;
 import com.complianceos.compliance.api.beans.ComplianceRecord;
-import com.complianceos.compliance.api.beans.DgmsScore;
 import com.complianceos.compliance.api.beans.DmfRate;
 import com.complianceos.compliance.api.beans.GstRate;
 import com.complianceos.compliance.api.beans.LaborDay;
 import com.complianceos.compliance.api.beans.LaborPayroll;
-import com.complianceos.compliance.api.beans.LaborSummary;
 import com.complianceos.compliance.api.beans.Mine;
 import com.complianceos.compliance.api.beans.MinePayment;
 import com.complianceos.compliance.api.beans.MineRent;
@@ -25,16 +27,16 @@ import java.util.Map;
 /**
  * Everything a mine and its statutory compliance involve: production, rent, payments, labor,
  * sales, and DGMS register tracking are all sub-resources of a mine, never addressed on their
- * own. Royalty-family computation ({@link RoyaltyService}) and mineral stock/ex-mine-price
- * ({@link MineralService}) are separate services, since they are each their own self-contained
- * area of logic rather than another mine sub-resource this class should carry.
+ * own. A sale's own royalty/DMF/NMET/GST liability is computed and stored on it directly (see
+ * {@link #saveSale}, {@link #recomputeSaleLiabilities}) rather than recomputed fresh on every
+ * read. Mineral stock/ex-mine-price ({@link MineralService}) is a separate service, since it is
+ * its own self-contained area of logic rather than another mine sub-resource this class should
+ * carry.
  */
 @MicroService("compliance")
 public interface MiningService {
 
   Mine saveMine(Mine mine, boolean skipVersion);
-
-  Mine getMine(String id);
 
   Map<String, Mine> getMines(List<String> ids);
 
@@ -44,8 +46,6 @@ public interface MiningService {
 
   /** Saves a buyer — customer-scoped, not mine-scoped, unlike every other entity in this service. */
   Buyer saveBuyer(Buyer buyer, boolean skipVersion);
-
-  Buyer getBuyer(String id);
 
   Map<String, Buyer> getBuyers(List<String> ids);
 
@@ -78,7 +78,35 @@ public interface MiningService {
 
   PaginatedResult<GstRate> findGstRates(Query query);
 
-  ComplianceRecord saveComplianceRecord(ComplianceRecord record, boolean skipVersion);
+  /** Records a statutory return as filed — a RETURN record for {@code title}, submitted now under {@code referenceNumber}. */
+  ComplianceRecord fileReturn(String mineId, String title, String referenceNumber);
+
+  /** Records a clearance, statutory plan, or notice the customer has on file, with its attachment. */
+  ComplianceRecord addDocument(
+      String mineId,
+      String authority,
+      String recordType,
+      String title,
+      FileDetails attachment,
+      Long issuedOn,
+      Long expiry);
+
+  /** Marks a DGMS register as updated today. */
+  ComplianceRecord markRegisterUpdated(String mineId, String recordId);
+
+  /** Marks an existing return or notice as filed, recording the authority's reference number against it. */
+  ComplianceRecord markReturnSubmitted(String mineId, String recordId, String referenceNumber);
+
+  /** Updates an existing clearance, statutory plan, or notice's own editable fields. */
+  ComplianceRecord updateDocument(
+      String mineId,
+      String recordId,
+      String authority,
+      String recordType,
+      String title,
+      FileDetails attachment,
+      Long issuedOn,
+      Long expiry);
 
   void deleteComplianceRecord(String id);
 
@@ -91,8 +119,15 @@ public interface MiningService {
    */
   PaginatedResult<ComplianceRecord> findComplianceRecords(Query query);
 
-  /** The mine's current DGMS inspection readiness: a weighted score over its REGISTER records. */
-  DgmsScore getDgmsReadinessScore(String mineId);
+  /**
+   * How many of the mine's compliance actions matching {@code query} are currently up to date,
+   * out of how many match — {@code query}'s filter is applied as-is, same as {@link
+   * #findComplianceRecords}; a null/empty filter is every record over its whole lifetime, not
+   * just one window. A register (continuously tracked) has no {@code expiry} of its own, so a
+   * filter on {@code expiry} excludes every register — callers wanting registers in a windowed
+   * view must say so explicitly in their own filter.
+   */
+  ComplianceProgress getComplianceProgress(String mineId, Query query);
 
   /**
    * Saves a rent revision. When it's the first non-closed revision for its mine and {@code type}
@@ -133,11 +168,6 @@ public interface MiningService {
    */
   PaginatedResult<MineStoppage> findMineStoppages(Query query);
 
-  /**
-   * The mine's days worked in the month {@code asOf} falls in: the days in that month minus its
-   * distinct {@link MineStoppage} days — never stored, since it's always derivable from them.
-   */
-  int getDaysWorked(String mineId, long asOf);
 
   /** Saves the day's headcount — a second save for the same mine and day replaces it. */
   LaborDay saveLaborDay(LaborDay day, boolean skipVersion);
@@ -151,11 +181,6 @@ public interface MiningService {
    */
   PaginatedResult<LaborDay> findLaborDays(Query query);
 
-  /**
-   * The mine's average daily employment per category for the month {@code asOf} falls in,
-   * derived from its {@link LaborDay} records and {@link #getDaysWorked} — never stored.
-   */
-  LaborSummary getLaborSummary(String mineId, long asOf);
 
   /** Saves a month's labor return — a second save for the same mine and month replaces it. */
   LaborPayroll saveLaborPayroll(LaborPayroll labor, boolean skipVersion);
@@ -180,6 +205,15 @@ public interface MiningService {
    * filtering a {@code @Permissioned} entity's own repository would otherwise apply.
    */
   PaginatedResult<Sale> findSales(Query query);
+
+  /**
+   * Re-derives {@code mineId}'s recent sales' (dispatched within the last month — a rate
+   * correction is assumed to always land within that window) royalty/DMF/NMET/GST liability from
+   * whichever rate is currently in force, saving only the ones whose resolved rate actually
+   * changed. Not a customer-facing write — run by the recurring job that catches a sale left
+   * stale by a rate change (or anything else) that happened after it was saved.
+   */
+  void recomputeSaleLiabilities(String mineId);
 
   /**
    * The group-by/metrics buckets {@code query} asks for over {@code mineId}'s own {@link Sale}s

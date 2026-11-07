@@ -25,13 +25,6 @@ public class ClientProducer {
   @Produces
   @Singleton
   @DefaultBean
-  public RoyaltyService royaltyService(final MicroServiceClientProvider provider) {
-    return provider.get(RoyaltyService.class);
-  }
-
-  @Produces
-  @Singleton
-  @DefaultBean
   public InvoiceService invoiceService(final MicroServiceClientProvider provider) {
     return provider.get(InvoiceService.class);
   }

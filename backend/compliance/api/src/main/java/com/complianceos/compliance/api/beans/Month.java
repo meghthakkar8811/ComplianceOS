@@ -2,7 +2,6 @@ package com.complianceos.compliance.api.beans;
 
 import java.util.Locale;
 
-/** The calendar month a {@link Royalty} period falls in. */
 public enum Month {
   JANUARY,
   FEBRUARY,

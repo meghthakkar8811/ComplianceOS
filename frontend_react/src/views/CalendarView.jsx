@@ -49,9 +49,9 @@ const CalendarView = memo(function CalendarView({ activeMineId }) {
     if (!refNum) return;
 
     try {
-      await apiFetch(`/mines/${activeMineId}/compliance-records`, {
+      await apiFetch(`/mines/${activeMineId}/compliance/records/${ev.id}/mark-submitted`, {
         method: 'POST',
-        body: JSON.stringify({ ...ev, status: 'SUBMITTED', submittedOn: Date.now(), referenceNumber: refNum }),
+        body: JSON.stringify({ referenceNumber: refNum }),
       });
       toast(`Marked "${ev.title}" as submitted!`, 'success');
       loadCalendarData();

@@ -146,16 +146,10 @@ export default function FormBModal({ isOpen, onClose, activeMine, activeMineMine
     setSubmitting(true);
     try {
       if (activeMine) {
-        await apiFetch(`/mines/${activeMine.id}/compliance-records`, {
+        await apiFetch(`/mines/${activeMine.id}/compliance/records/returns`, {
           method: 'POST',
           body: JSON.stringify({
-            mineId: activeMine.id,
             title: `IBM Monthly Return (Form F-1) — ${per}`,
-            authority: 'IBM',
-            recordType: 'RETURN',
-            status: 'SUBMITTED',
-            submittedOn: Date.now(),
-            expiry: Date.now(),
             referenceNumber: referenceNumber.trim(),
           }),
         });
