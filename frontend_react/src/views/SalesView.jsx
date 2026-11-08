@@ -2,8 +2,9 @@ import React, { useState, useEffect, memo } from 'react';
 import { catalogSearch, apiFetch, downloadInvoice } from '../services/api';
 import { toast } from '../context/ToastContext';
 import { SchemaForm } from '../components/forms/SchemaForm';
+import DispatchInvoiceModal from '../components/modals/DispatchInvoiceModal';
 
-const SalesView = memo(function SalesView({ activeMineId }) {
+const SalesView = memo(function SalesView({ activeMineId, activeMine }) {
   const [showSaleForm, setShowSaleForm] = useState(false);
   const [sales, setSales] = useState([]);
   const [buyerNames, setBuyerNames] = useState({});
@@ -13,6 +14,7 @@ const SalesView = memo(function SalesView({ activeMineId }) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
   const [downloadingId, setDownloadingId] = useState(null);
+  const [previewSale, setPreviewSale] = useState(null);
 
   useEffect(() => {
     if (activeMineId) {
@@ -204,20 +206,44 @@ const SalesView = memo(function SalesView({ activeMineId }) {
                     <td className="num-col">₹{(s.saleValue || 0).toLocaleString('en-IN')}</td>
                     <td className="num-col">₹{(s.deductionPerUnit || 0).toLocaleString('en-IN')}</td>
                     <td>
-                      <button
-                        className="btn-ghost"
-                        style={{ padding: '3px 8px', fontSize: '11px' }}
-                        disabled={downloadingId === s.id}
-                        onClick={() => handleDownloadInvoice(s)}
-                      >
-                        {downloadingId === s.id ? '…' : 'Download'}
-                      </button>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button
+                          className="btn-primary"
+                          style={{
+                            padding: '3px 8px',
+                            fontSize: '11px',
+                            backgroundColor: '#e8a020',
+                            color: '#050810',
+                            fontWeight: 600,
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer'
+                          }}
+                          onClick={() => setPreviewSale({
+                            ...s,
+                            mineralName: mineralNames[s.mineral] || s.mineral,
+                            buyerName: buyerNames[s.buyerId] || s.buyerName
+                          })}
+                          title="Generate and view A4 Statutory Tax Invoice"
+                        >
+                          📄 Bill
+                        </button>
+                        <button
+                          className="btn-ghost"
+                          style={{ padding: '3px 8px', fontSize: '11px' }}
+                          disabled={downloadingId === s.id}
+                          onClick={() => handleDownloadInvoice(s)}
+                          title="Download backend generated PDF"
+                        >
+                          {downloadingId === s.id ? '…' : '⬇ PDF'}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="8" style={{ textAlign: 'center', color: 'var(--text2)', padding: '24px' }}>
+                  <td colSpan="9" style={{ textAlign: 'center', color: 'var(--text2)', padding: '24px' }}>
                     No buyer dispatches recorded for this month.
                   </td>
                 </tr>
@@ -226,6 +252,15 @@ const SalesView = memo(function SalesView({ activeMineId }) {
           </table>
         </div>
       </div>
+
+      {previewSale && (
+        <DispatchInvoiceModal
+          isOpen={Boolean(previewSale)}
+          onClose={() => setPreviewSale(null)}
+          dispatch={previewSale}
+          activeMine={activeMine}
+        />
+      )}
     </section>
   );
 });

@@ -455,7 +455,7 @@ export default function App() {
           )}
 
           {activePage === 'sales' && (
-            <SalesView activeMineId={activeMineId} />
+            <SalesView activeMineId={activeMineId} activeMine={activeMine} />
           )}
 
           {activePage === 'buyers' && (
