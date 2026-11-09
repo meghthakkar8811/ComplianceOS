@@ -105,10 +105,22 @@ const SalesView = memo(function SalesView({ activeMineId, activeMine }) {
     try {
       const result = await downloadInvoice(activeMineId, sale.id);
       if (!result.required) {
-        toast('No invoice required for this sale', 'info');
+        setPreviewSale({
+          ...sale,
+          mineralName: mineralNames[sale.mineral] || sale.mineral,
+          buyerName: buyerNames[sale.buyerId] || sale.buyerName
+        });
+        toast('Opening invoice preview & PDF generator', 'info');
+      } else {
+        toast('Invoice PDF downloaded successfully', 'success');
       }
     } catch (e) {
-      toast(e.message || 'Failed to download invoice', 'error');
+      setPreviewSale({
+        ...sale,
+        mineralName: mineralNames[sale.mineral] || sale.mineral,
+        buyerName: buyerNames[sale.buyerId] || sale.buyerName
+      });
+      toast('Generating invoice via client PDF engine', 'info');
     } finally {
       setDownloadingId(null);
     }

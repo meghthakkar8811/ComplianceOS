@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import html2pdf from 'html2pdf.js';
 import { downloadInvoice } from '../../services/api';
 import { toast } from '../../context/ToastContext';
 
@@ -79,31 +80,128 @@ export default function DispatchInvoiceModal({ isOpen, onClose, dispatch, active
   const gstAmount = (grossSaleValue * gstRate) / 100;
   const totalPayable = grossSaleValue + royaltyAmount + dmfAmount + nmetAmount + gstAmount;
 
+  // 1. ISOLATED CLEAN PRINT ENGINE (WORKS IN ALL BROWSERS)
   const handlePrint = () => {
-    window.print();
+    const printableNode = document.getElementById('statutory-invoice-printable');
+    if (!printableNode) return;
+
+    const printWindow = window.open('', '_blank', 'width=950,height=1100');
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+
+    const invoiceHtml = printableNode.innerHTML;
+    printWindow.document.open();
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <title>Tax Invoice - ${invoiceNo}</title>
+        <style>
+          @page {
+            size: A4 portrait;
+            margin: 10mm;
+          }
+          * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          body {
+            margin: 0;
+            padding: 0;
+            background: #ffffff !important;
+            color: #111827 !important;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.4;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+          }
+        </style>
+      </head>
+      <body>
+        <div style="max-width: 100%; margin: 0 auto; padding: 4px;">
+          ${invoiceHtml}
+        </div>
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.focus();
+              window.print();
+              setTimeout(function() { window.close(); }, 600);
+            }, 250);
+          };
+        </script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
+  // 2. CLIENT-SIDE VECTOR/CANVAS A4 PDF DOWNLOAD
+  const handleDownloadPdf = async () => {
+    const element = document.getElementById('statutory-invoice-printable');
+    if (!element) {
+      toast('Invoice element not ready', 'error');
+      return;
+    }
+    setIsDownloadingPdf(true);
+    toast('Generating high-resolution A4 PDF...', 'info');
+
+    try {
+      const opt = {
+        margin: [8, 8, 8, 8],
+        filename: `Tax_Invoice_${invoiceNo.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#ffffff',
+          scrollY: 0,
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+
+      await html2pdf().set(opt).from(element).save();
+      toast('Invoice PDF downloaded successfully!', 'success');
+    } catch (err) {
+      console.error('PDF export error:', err);
+      toast('Falling back to print-to-PDF...', 'info');
+      handlePrint();
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
+
+  // 3. SERVER-SIDE PDF DOWNLOAD WITH AUTOMATIC CLIENT FALLBACK
   const handleServerPdf = async () => {
     if (!dispatch.id) {
-      toast('Dispatch ID missing; use in-browser print', 'error');
+      handleDownloadPdf();
       return;
     }
     const mineId = activeMine?.id || dispatch.mineId;
     if (!mineId) {
-      toast('Active mine ID missing', 'error');
+      handleDownloadPdf();
       return;
     }
     setIsDownloadingPdf(true);
     try {
       const res = await downloadInvoice(mineId, dispatch.id);
       if (!res.required) {
-        toast('No server invoice required for this sale type', 'info');
+        // Fallback to client PDF
+        await handleDownloadPdf();
       } else {
-        toast('Invoice PDF downloaded', 'success');
+        toast('Server PDF downloaded successfully', 'success');
       }
     } catch (e) {
-      toast(e.message || 'Server PDF generation unavailable, using browser print', 'info');
-      window.print();
+      console.warn('Server PDF fallback to client-side generator:', e);
+      await handleDownloadPdf();
     } finally {
       setIsDownloadingPdf(false);
     }
@@ -142,7 +240,7 @@ export default function DispatchInvoiceModal({ isOpen, onClose, dispatch, active
             top: 0 !important;
             width: 100% !important;
             margin: 0 !important;
-            padding: 15mm !important;
+            padding: 10mm !important;
             box-shadow: none !important;
             border: 1px solid #111 !important;
             background: #ffffff !important;
@@ -187,13 +285,14 @@ export default function DispatchInvoiceModal({ isOpen, onClose, dispatch, active
             <div>
               <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>Statutory Mineral Tax Invoice & Dispatch Challan</h3>
               <p style={{ margin: 0, fontSize: '11px', color: 'var(--text2, #94a3b8)' }}>
-                Conforms with Rule 45 MCDR 2017 & Goods and Services Tax Act 2017
+                Rule 45 MCDR 2017 & GST Act Compliant
               </p>
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
-              onClick={handlePrint}
+              onClick={handleDownloadPdf}
+              disabled={isDownloadingPdf}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -205,29 +304,29 @@ export default function DispatchInvoiceModal({ isOpen, onClose, dispatch, active
                 fontWeight: 600,
                 fontSize: '12px',
                 border: 'none',
-                cursor: 'pointer'
+                cursor: isDownloadingPdf ? 'not-allowed' : 'pointer',
+                boxShadow: '0 2px 8px rgba(232, 160, 32, 0.3)'
               }}
             >
-              🖨️ Print / A4 PDF
+              {isDownloadingPdf ? '⏳ Generating PDF…' : '⬇️ Download PDF'}
             </button>
             <button
-              onClick={handleServerPdf}
-              disabled={isDownloadingPdf}
+              onClick={handlePrint}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '6px',
                 padding: '7px 14px',
                 borderRadius: '6px',
-                backgroundColor: 'rgba(0, 180, 216, 0.15)',
-                color: '#00b4d8',
-                border: '1px solid rgba(0, 180, 216, 0.35)',
+                backgroundColor: '#1e293b',
+                color: '#f8fafc',
+                border: '1px solid #475569',
                 fontWeight: 600,
                 fontSize: '12px',
-                cursor: isDownloadingPdf ? 'not-allowed' : 'pointer'
+                cursor: 'pointer'
               }}
             >
-              {isDownloadingPdf ? '⏳ Generating…' : '⬇️ Server PDF'}
+              🖨️ Print
             </button>
             <button
               onClick={onClose}
