@@ -201,3 +201,4 @@ export default function Rule11CappingCard({ activeMine, cumulativeYtdProduced, o
     </div>
   );
 }
+

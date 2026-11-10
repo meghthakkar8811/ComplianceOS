@@ -426,3 +426,4 @@ export default function InspectionDossierModal({ isOpen, onClose, activeMine, da
     </div>
   );
 }
+

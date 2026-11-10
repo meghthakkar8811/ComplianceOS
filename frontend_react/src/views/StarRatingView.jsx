@@ -270,3 +270,4 @@ const StarRatingView = memo(function StarRatingView({ activeMine }) {
 });
 
 export default StarRatingView;
+

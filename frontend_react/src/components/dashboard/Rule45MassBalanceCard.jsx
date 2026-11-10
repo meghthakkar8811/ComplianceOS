@@ -237,3 +237,4 @@ export default function Rule45MassBalanceCard({
     </div>
   );
 }
+
