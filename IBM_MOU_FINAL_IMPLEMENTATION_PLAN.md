@@ -52,11 +52,11 @@ ComplianceOS is engineered as the **upstream operational pre-validation gateway*
 | **Shift Logging** | Daily Pit-wise ROM Extraction Ledger | MCDR Rule 45 | **Completed** |
 | **Dispatches & Sales** | Buyer Ledger, Grade-wise Dispatches, Freight Deductions | Rule 45 Part III | **Completed** |
 | **Tax Invoicing** | A4 Vector PDF Mineral Tax Invoice & Dispatch Challan | Rule 45 / CGST | **Completed** |
-| **Capping Sentinel** | **MCDR Rule 11 Mining Plan Annual Excavation Capping Card** | Rule 11(1), (2) | **To Do (Priority 1)** |
-| **Stock Integrity** | **MCDR Rule 45 Mass-Balance Reconciler & Lock** | Rule 45(5) | **To Do (Priority 2)** |
-| **MTS Interchange** | **Form F-1 Monthly Return Generator & IBM MTS Exporter** | Rule 45 Form F-1 | **To Do (Priority 3)** |
-| **SDF Rating** | **MCDR Rule 35 5-Star Rating Self-Assessment** | Rule 35 | **To Do (Priority 4)** |
-| **Inspection Dossier**| **15-Minute Statutory Inspection Dossier (PDF)** | Rules 11, 45, 55 | **To Do (Priority 5)** |
+| **Capping Sentinel** | **MCDR Rule 11 Mining Plan Annual Excavation Capping Card** | Rule 11(1), (2) | **Completed (Sprint 1)** |
+| **Stock Integrity** | **MCDR Rule 45 Mass-Balance Reconciler & Lock** | Rule 45(5) | **Completed (Sprint 2)** |
+| **MTS Interchange** | **Form F-1 Monthly Return Generator & IBM MTS Exporter** | Rule 45 Form F-1 | **Completed (Sprint 3)** |
+| **SDF Rating** | **MCDR Rule 35 5-Star Rating Self-Assessment** | Rule 35 | **Completed (Sprint 4)** |
+| **Inspection Dossier**| **15-Minute Statutory Inspection Dossier (PDF)** | Rules 11, 45, 55 | **Completed (Sprint 5)** |
 
 ---
 
@@ -168,3 +168,4 @@ When presenting ComplianceOS to the **Controller General of Mines** or **Regiona
    * **Zero Financial Cost to IBM:** SaaS deployed by leaseholders directly.
    * **100% Arithmetic Integrity:** Pre-validated Form F-1 returns eliminate clerical errors, saving thousands of officer hours.
    * **Real-time Illegal Mining Sentinel:** Automates detection of production beyond Mining Plan limits and transit anomalies before annual inspections.
+

@@ -162,6 +162,13 @@ const Sidebar = memo(function Sidebar({
           <span className="nav-icon">▣</span>
           <span>Documents</span>
         </a>
+        <a
+          className={`nav-item ${activePage === 'star-rating' ? 'active' : ''}`}
+          onClick={() => onNavigate('star-rating')}
+        >
+          <span className="nav-icon" style={{ color: '#e8a020' }}>★</span>
+          <span>Rule 35 Star Rating</span>
+        </a>
 
         <div className="nav-section-label">Finance</div>
         <a

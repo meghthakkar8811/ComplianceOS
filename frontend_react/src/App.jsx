@@ -16,6 +16,7 @@ import BuyersView from './views/BuyersView';
 import DocumentsView from './views/DocumentsView';
 import DgmsView from './views/DgmsView';
 import AlertsView from './views/AlertsView';
+import StarRatingView from './views/StarRatingView';
 import LoginView from './pages/LoginView';
 import SignupView from './pages/SignupView';
 import ForgotView from './pages/ForgotView';
@@ -33,7 +34,7 @@ import ComplianceLoader from './components/layout/ComplianceLoader';
 
 import './styles/dashboard.css';
 
-const NAV_PAGES = ['dashboard', 'calendar', 'royalty', 'sales', 'buyers', 'forms', 'production', 'documents', 'dgms', 'alerts'];
+const NAV_PAGES = ['dashboard', 'calendar', 'royalty', 'sales', 'buyers', 'forms', 'production', 'documents', 'dgms', 'alerts', 'star-rating'];
 
 const MONTH_INDEX = {
   JANUARY: 0, FEBRUARY: 1, MARCH: 2, APRIL: 3, MAY: 4, JUNE: 5,
@@ -475,6 +476,10 @@ export default function App() {
 
           {activePage === 'alerts' && (
             <AlertsView dashboardData={dashboardData} onNavigate={setActivePage} />
+          )}
+
+          {activePage === 'star-rating' && (
+            <StarRatingView activeMine={activeMine} />
           )}
         </main>
 
