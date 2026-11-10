@@ -409,3 +409,4 @@ export default function DgmsInspectionPackModal({ isOpen, onClose, activeMine, a
     </div>
   );
 }
+

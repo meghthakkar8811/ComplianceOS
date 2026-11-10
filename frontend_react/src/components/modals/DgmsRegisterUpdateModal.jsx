@@ -146,3 +146,4 @@ export default function DgmsRegisterUpdateModal({ isOpen, onClose, registerItem,
     </div>
   );
 }
+
