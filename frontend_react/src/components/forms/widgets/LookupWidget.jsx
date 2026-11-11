@@ -1,43 +1,47 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { catalogSearch } from '../../../services/api';
 
-const SEARCH_DEBOUNCE_MS = 300;
+const SEARCH_DEBOUNCE_MS = 250;
 const CLOSE_DELAY_MS = 150;
 
 function displayName(item) {
   if (!item) return '';
-  return item.name || item.label || item.id || '';
+  return item.name || item.mineral || item.label || item.id || '';
+}
+
+function searchFieldFor(assetType) {
+  if (assetType === 'Mineral') return 'mineral';
+  return 'name';
 }
 
 /**
- * A debounced async catalog lookup: types into a text input, searches the given asset type by
- * name as you type, and picks a result from the dropdown to store its id as the field's value.
- * The input shows the picked entity's display name when idle, and a fresh search box while
- * focused.
+ * A debounced async catalog lookup: types into a text input (or opens all options on focus),
+ * searches the given asset type with its scoped `lookupOptions`, and stores the selected item's
+ * id as the field's value.
  */
-export function LookupWidget({ value, onChange, assetType, disabled, placeholder }) {
+export function LookupWidget({ value, onChange, assetType, lookupOptions, disabled, placeholder }) {
   const [query, setQuery] = useState('');
   const [options, setOptions] = useState([]);
   const [open, setOpen] = useState(false);
   const [resolvedLabel, setResolvedLabel] = useState('');
   const debounceRef = useRef(null);
-  const resolvedForId = useRef(null);
+  const resolvedKeyRef = useRef(null);
+  const optionsKey = JSON.stringify(lookupOptions || {});
 
-  // Resolve the current id's display name, e.g. when the field already holds a value on mount
-  // (edit/view mode) rather than from a selection made in this widget.
   useEffect(() => {
     if (!value) {
       setResolvedLabel('');
-      resolvedForId.current = null;
+      resolvedKeyRef.current = null;
       return;
     }
-    if (value === resolvedForId.current) return;
+    const key = `${value}|${optionsKey}`;
+    if (key === resolvedKeyRef.current) return;
     let cancelled = false;
-    catalogSearch(assetType, { filter: { field: 'id', op: 'EQ', values: [value] } })
+    catalogSearch(assetType, { filter: { field: 'id', op: 'EQ', values: [value] } }, lookupOptions)
       .then((res) => {
         if (cancelled) return;
         const match = (res.items || [])[0];
-        resolvedForId.current = value;
+        resolvedKeyRef.current = key;
         setResolvedLabel(displayName(match) || value);
       })
       .catch(() => {
@@ -46,19 +50,33 @@ export function LookupWidget({ value, onChange, assetType, disabled, placeholder
     return () => {
       cancelled = true;
     };
-  }, [value, assetType]);
+  }, [value, assetType, optionsKey]);
 
   const search = useCallback(
     (text) => {
-      if (!text) {
-        setOptions([]);
-        return;
-      }
-      catalogSearch(assetType, { filter: { field: 'name', op: 'CONTAINS', values: [text] } })
-        .then((res) => setOptions(res.items || []))
+      const trimmed = (text || '').trim();
+      // MineralGradeAssetHandler filters in memory and ignores query.filter; MineralAssetHandler
+      // without mineId returns the platform catalog unfiltered. Query with empty filter when text is
+      // blank (or for MineralGrade), and refine locally where handlers don't evaluate filter.
+      const useServerFilter = Boolean(trimmed) && assetType !== 'MineralGrade';
+      const searchQuery = useServerFilter
+        ? { filter: { field: searchFieldFor(assetType), op: 'CONTAINS', values: [trimmed] } }
+        : {};
+      catalogSearch(assetType, searchQuery, lookupOptions)
+        .then((res) => {
+          let items = res?.items || [];
+          if (trimmed && !useServerFilter) {
+            const needle = trimmed.toLowerCase();
+            items = items.filter((item) => displayName(item).toLowerCase().includes(needle));
+          } else if (trimmed && assetType === 'Mineral' && !lookupOptions?.mineId) {
+            const needle = trimmed.toLowerCase();
+            items = items.filter((item) => displayName(item).toLowerCase().includes(needle));
+          }
+          setOptions(items);
+        })
         .catch(() => setOptions([]));
     },
-    [assetType]
+    [assetType, optionsKey]
   );
 
   const handleChange = (e) => {
@@ -72,7 +90,7 @@ export function LookupWidget({ value, onChange, assetType, disabled, placeholder
     if (disabled) return;
     setOpen(true);
     setQuery('');
-    setOptions([]);
+    search('');
   };
 
   const handleBlur = () => {
@@ -80,7 +98,7 @@ export function LookupWidget({ value, onChange, assetType, disabled, placeholder
   };
 
   const handleSelect = (item) => {
-    resolvedForId.current = item.id;
+    resolvedKeyRef.current = `${item.id}|${optionsKey}`;
     setResolvedLabel(displayName(item));
     onChange(item.id);
     setQuery('');
@@ -119,7 +137,7 @@ export function LookupWidget({ value, onChange, assetType, disabled, placeholder
             <div
               key={item.id}
               onMouseDown={() => handleSelect(item)}
-              style={{ padding: '8px 11px', cursor: 'pointer', fontSize: '13px' }}
+              style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '13px', borderBottom: '1px solid var(--border)' }}
             >
               {displayName(item)}
             </div>

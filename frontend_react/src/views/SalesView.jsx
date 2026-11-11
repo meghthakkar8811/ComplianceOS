@@ -1,78 +1,54 @@
-import React, { useState, useEffect, memo } from 'react';
-import { catalogSearch, apiFetch, downloadInvoice } from '../services/api';
+import React, { useState, useEffect, useCallback, memo } from 'react';
+import { catalogSearch, catalogAggregate, apiFetch, downloadInvoice } from '../services/api';
 import { toast } from '../context/ToastContext';
 import { SchemaForm } from '../components/forms/SchemaForm';
-import DispatchInvoiceModal from '../components/modals/DispatchInvoiceModal';
+import PaginationBar from '../components/common/PaginationBar';
 
-const SalesView = memo(function SalesView({ activeMineId, activeMine }) {
+const PAGE_SIZE = 20;
+
+const SalesView = memo(function SalesView({ activeMineId, onDataChanged }) {
   const [showSaleForm, setShowSaleForm] = useState(false);
   const [sales, setSales] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(0);
+  const [summary, setSummary] = useState({ totalQty: 0, totalVal: 0, dispatchCount: 0, distinctBuyers: 0 });
   const [buyerNames, setBuyerNames] = useState({});
   const [mineralNames, setMineralNames] = useState({});
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
   });
   const [downloadingId, setDownloadingId] = useState(null);
-  const [previewSale, setPreviewSale] = useState(null);
 
   useEffect(() => {
-    if (activeMineId) {
-      loadSales();
-    }
+    setPage(0);
   }, [activeMineId, selectedMonth]);
-
-  const loadSales = async () => {
-    try {
-      const [year, month] = selectedMonth.split('-').map(Number);
-      const start = new Date(year, month - 1, 1).getTime();
-      const end = new Date(year, month, 1).getTime();
-
-      const salesRes = await catalogSearch('Sale', {
-        filter: {
-          op: 'AND',
-          values: [
-            { field: 'mineId', op: 'EQ', values: [activeMineId] },
-            { field: 'dispatchedOn', op: 'GTE', values: [start] },
-            { field: 'dispatchedOn', op: 'LT', values: [end] },
-          ],
-        },
-      }).catch(() => ({ items: [] }));
-
-      const sortedSales = (salesRes.items || []).sort((a, b) => (b.dispatchedOn || 0) - (a.dispatchedOn || 0));
-      setSales(sortedSales);
-      loadBuyerNames(sortedSales);
-      loadMineralNames(sortedSales);
-    } catch (e) {
-      toast('Failed to load dispatches', 'error');
-    }
-  };
 
   const loadBuyerNames = async (saleRows) => {
     const buyerIds = [...new Set(saleRows.map((s) => s.buyerId).filter(Boolean))];
     if (buyerIds.length === 0) return;
     try {
-      const res = await catalogSearch('Buyer', { filter: { field: 'id', op: 'IN', values: buyerIds } });
+      const res = await catalogSearch('Buyer', {
+        filter: { field: 'id', op: 'IN', values: buyerIds },
+        page: { offset: 0, limit: buyerIds.length },
+      });
       const names = {};
       for (const buyer of res.items || []) {
         names[buyer.id] = buyer.name;
       }
       setBuyerNames(names);
     } catch (e) {
-      // Buyer names are a display nicety; leave the column blank for unresolved ids rather than
-      // failing the whole dispatch list.
+      // Display nicety
     }
   };
 
-  // Sale.mineral holds a Mineral record id (e.g. "mine123:Iron Ore"), not a display name —
-  // resolve it to the mineral name the same way buyerId is resolved to a buyer name.
   const loadMineralNames = async (saleRows) => {
     const mineralIds = [...new Set(saleRows.map((s) => s.mineral).filter(Boolean))];
     if (mineralIds.length === 0) return;
     try {
       const res = await catalogSearch(
         'Mineral',
-        { filter: { field: 'id', op: 'IN', values: mineralIds } },
+        { filter: { field: 'id', op: 'IN', values: mineralIds }, page: { offset: 0, limit: mineralIds.length } },
         { mineId: activeMineId }
       );
       const names = {};
@@ -81,9 +57,79 @@ const SalesView = memo(function SalesView({ activeMineId, activeMine }) {
       }
       setMineralNames(names);
     } catch (e) {
-      // A display nicety; leave the column blank for unresolved ids rather than failing the list.
+      // Display nicety
     }
   };
+
+  const loadSales = useCallback(async () => {
+    if (!activeMineId) return;
+    try {
+      const [year, month] = selectedMonth.split('-').map(Number);
+      const start = Date.UTC(year, month - 1, 1);
+      const end = Date.UTC(year, month, 1);
+
+      const filter = {
+        op: 'AND',
+        values: [
+          { field: 'mineId', op: 'EQ', values: [activeMineId] },
+          { field: 'dispatchedOn', op: 'GTE', values: [start] },
+          { field: 'dispatchedOn', op: 'LT', values: [end] },
+        ],
+      };
+
+      const [salesRes, totalsRes, buyersRes] = await Promise.all([
+        catalogSearch('Sale', {
+          filter,
+          sorts: [{ field: 'dispatchedOn', order: 'DESC' }],
+          page: { offset: page * PAGE_SIZE, limit: PAGE_SIZE },
+          includeCount: true,
+        }),
+        catalogAggregate(
+          'Sale',
+          {
+            filter,
+            metrics: [
+              { field: 'quantity', function: 'SUM', alias: 'totalQty' },
+              { field: 'saleValue', function: 'SUM', alias: 'totalVal' },
+              { field: 'id', function: 'COUNT', alias: 'dispatchCount' },
+            ],
+          },
+          { mineId: activeMineId }
+        ).catch(() => ({ buckets: [] })),
+        catalogAggregate(
+          'Sale',
+          {
+            filter,
+            groupByFields: [{ field: 'buyerId', alias: 'buyerId' }],
+            metrics: [{ field: 'id', function: 'COUNT', alias: 'count' }],
+          },
+          { mineId: activeMineId }
+        ).catch(() => ({ buckets: [] })),
+      ]);
+
+      const items = salesRes?.items || [];
+      setSales(items);
+      setTotalCount(salesRes?.totalCount ?? items.length);
+
+      const t = totalsRes?.buckets?.[0];
+      const distinctBuyers = (buyersRes?.buckets || []).filter((b) => b.buyerId).length;
+      setSummary({
+        totalQty: t?.totalQty || 0,
+        totalVal: t?.totalVal || 0,
+        dispatchCount: t?.dispatchCount || 0,
+        distinctBuyers,
+      });
+
+      loadBuyerNames(items);
+      loadMineralNames(items);
+    } catch (e) {
+      toast('Failed to load dispatches', 'error');
+    }
+  }, [activeMineId, selectedMonth, page]);
+
+  useEffect(() => {
+    loadSales();
+  }, [loadSales]);
 
   const handleSaveSale = async (formData) => {
     try {
@@ -95,6 +141,7 @@ const SalesView = memo(function SalesView({ activeMineId, activeMine }) {
       toast('Dispatch saved successfully', 'success');
       setShowSaleForm(false);
       loadSales();
+      if (onDataChanged) onDataChanged();
     } catch (e) {
       toast(e.message || 'Failed to save dispatch entry', 'error');
     }
@@ -105,29 +152,16 @@ const SalesView = memo(function SalesView({ activeMineId, activeMine }) {
     try {
       const result = await downloadInvoice(activeMineId, sale.id);
       if (!result.required) {
-        setPreviewSale({
-          ...sale,
-          mineralName: mineralNames[sale.mineral] || sale.mineral,
-          buyerName: buyerNames[sale.buyerId] || sale.buyerName
-        });
-        toast('Opening invoice preview & PDF generator', 'info');
+        toast('This sale does not require an invoice (non-commercial dispatch).', 'info');
       } else {
-        toast('Invoice PDF downloaded successfully', 'success');
+        toast('Invoice PDF downloaded successfully.', 'success');
       }
     } catch (e) {
-      setPreviewSale({
-        ...sale,
-        mineralName: mineralNames[sale.mineral] || sale.mineral,
-        buyerName: buyerNames[sale.buyerId] || sale.buyerName
-      });
-      toast('Generating invoice via client PDF engine', 'info');
+      toast('Failed to download invoice: ' + (e.message || 'Server error'), 'error');
     } finally {
       setDownloadingId(null);
     }
   };
-
-  const totalSaleQty = sales.reduce((s, r) => s + (r.quantity || 0), 0);
-  const totalSaleVal = sales.reduce((s, r) => s + (r.saleValue || 0), 0);
 
   return (
     <section className="page active" id="page-sales">
@@ -165,8 +199,10 @@ const SalesView = memo(function SalesView({ activeMineId, activeMine }) {
             <button className="icon-close" onClick={() => setShowSaleForm(false)}>✕</button>
           </div>
           <SchemaForm
+            key={activeMineId}
             assetType="Sale"
             mode="create"
+            initialData={{ mineId: activeMineId }}
             onSubmit={handleSaveSale}
             onCancel={() => setShowSaleForm(false)}
             submitLabel="Save Dispatch"
@@ -174,18 +210,23 @@ const SalesView = memo(function SalesView({ activeMineId, activeMine }) {
         </div>
       )}
 
+      {/* SUMMARY ROW (Server-Side Aggregated) */}
       <div className="prod-summary-row" id="sale-summary">
         <div className="psr-card">
           <span className="psr-label">Total Dispatched</span>
-          <span className="psr-val">{totalSaleQty.toLocaleString('en-IN', { maximumFractionDigits: 1 })} MT</span>
+          <span className="psr-val">{summary.totalQty.toLocaleString('en-IN', { maximumFractionDigits: 1 })} MT</span>
         </div>
         <div className="psr-card">
           <span className="psr-label">Total Value</span>
-          <span className="psr-val">₹{totalSaleVal.toLocaleString('en-IN')}</span>
+          <span className="psr-val">₹{summary.totalVal.toLocaleString('en-IN')}</span>
         </div>
         <div className="psr-card">
-          <span className="psr-label">Buyers</span>
-          <span className="psr-val">{sales.length}</span>
+          <span className="psr-label">Dispatches</span>
+          <span className="psr-val">{summary.dispatchCount}</span>
+        </div>
+        <div className="psr-card">
+          <span className="psr-label">Distinct Buyers</span>
+          <span className="psr-val">{summary.distinctBuyers}</span>
         </div>
       </div>
 
@@ -222,32 +263,18 @@ const SalesView = memo(function SalesView({ activeMineId, activeMine }) {
                         <button
                           className="btn-primary"
                           style={{
-                            padding: '3px 8px',
+                            padding: '4px 10px',
                             fontSize: '11px',
-                            backgroundColor: '#e8a020',
-                            color: '#050810',
-                            fontWeight: 600,
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer'
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            cursor: 'pointer',
                           }}
-                          onClick={() => setPreviewSale({
-                            ...s,
-                            mineralName: mineralNames[s.mineral] || s.mineral,
-                            buyerName: buyerNames[s.buyerId] || s.buyerName
-                          })}
-                          title="Generate and view A4 Statutory Tax Invoice"
-                        >
-                          📄 Bill
-                        </button>
-                        <button
-                          className="btn-ghost"
-                          style={{ padding: '3px 8px', fontSize: '11px' }}
                           disabled={downloadingId === s.id}
                           onClick={() => handleDownloadInvoice(s)}
-                          title="Download backend generated PDF"
+                          title="Download Official Tax Invoice PDF (Generated by ComplianceOS Backend)"
                         >
-                          {downloadingId === s.id ? '…' : '⬇ PDF'}
+                          {downloadingId === s.id ? '…' : '📄 Invoice'}
                         </button>
                       </div>
                     </td>
@@ -263,16 +290,14 @@ const SalesView = memo(function SalesView({ activeMineId, activeMine }) {
             </tbody>
           </table>
         </div>
-      </div>
-
-      {previewSale && (
-        <DispatchInvoiceModal
-          isOpen={Boolean(previewSale)}
-          onClose={() => setPreviewSale(null)}
-          dispatch={previewSale}
-          activeMine={activeMine}
+        <PaginationBar
+          page={page}
+          pageSize={PAGE_SIZE}
+          totalCount={totalCount}
+          itemCount={sales.length}
+          onPageChange={setPage}
         />
-      )}
+      </div>
     </section>
   );
 });

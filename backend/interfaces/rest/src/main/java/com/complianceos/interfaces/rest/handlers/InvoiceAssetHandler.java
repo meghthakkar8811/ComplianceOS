@@ -29,7 +29,7 @@ public class InvoiceAssetHandler implements AssetHandler<Invoice> {
 
   @Override
   public PaginatedResult<Invoice> findAssets(final AssetRequest request) {
-    return service.findInvoices(request.getQuery());
+    throw new UnsupportedOperationException("Listing invoices is not supported");
   }
 
   @Override

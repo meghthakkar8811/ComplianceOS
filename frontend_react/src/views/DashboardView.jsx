@@ -1,8 +1,6 @@
-import React, { useState, memo } from 'react';
+import React, { memo } from 'react';
 import ProdChart from '../components/dashboard/ProdChart';
 import Rule11CappingCard from '../components/dashboard/Rule11CappingCard';
-import Rule45MassBalanceCard from '../components/dashboard/Rule45MassBalanceCard';
-import InspectionDossierModal from '../components/modals/InspectionDossierModal';
 
 const DashboardView = memo(function DashboardView({
   dashboardData,
@@ -14,50 +12,29 @@ const DashboardView = memo(function DashboardView({
   onOpenLogProd,
   onOpenFormB,
 }) {
-  const [showDossierModal, setShowDossierModal] = useState(false);
-  const records = dashboardData?.records || [];
   const now = Date.now();
+  const progress = dashboardData?.progress || { totalActions: 0, completedActions: 0 };
+  const dgmsProgress = dashboardData?.dgms || { totalActions: 0, completedActions: 0 };
+  const counts = dashboardData?.complianceCounts || {
+    overdueFilingsCount: 0,
+    pendingFilingsCount: 0,
+    expiredDocsCount: 0,
+    expiringDocsCount: 0,
+  };
 
-  // Dynamic compliance activity metrics
-  let completedCount = 0;
-  let pendingCount = 0;
-  let expiredCount = 0;
+  const totalTasks = progress.totalActions ?? 0;
+  const completedTasks = progress.completedActions ?? 0;
+  const remainingTasks = Math.max(0, totalTasks - completedTasks);
+  const dgmsRemaining = Math.max(0, (dgmsProgress.totalActions ?? 0) - (dgmsProgress.completedActions ?? 0));
+  const attentionCount = (counts.overdueFilingsCount || 0) + (counts.expiredDocsCount || 0) + dgmsRemaining;
 
-  records.forEach((r) => {
-    const isExpired = r.status === 'EXPIRED' || (r.expiry && r.expiry < now && r.status !== 'SUBMITTED');
-    const isCompleted = !isExpired && (r.status === 'SUBMITTED' || (r.status === 'VALID' && (!r.expiry || r.expiry >= now)));
-    if (isExpired) {
-      expiredCount++;
-    } else if (isCompleted) {
-      completedCount++;
-    } else {
-      pendingCount++;
-    }
-  });
-  const totalActivities = records.length || 26;
-  const displayCompleted = records.length ? completedCount : 18;
-  const displayPending = records.length ? pendingCount : 6;
-  const displayExpired = records.length ? expiredCount : 2;
-
-  const chartData = dashboardData?.chart || [
-    { month: 'Jun', produced: 82000, dispatched: 79000 },
-    { month: 'Jul', produced: 89000, dispatched: 85000 },
-    { month: 'Aug', produced: 95000, dispatched: 91000 },
-    { month: 'Sep', produced: 104000, dispatched: 98000 },
-    { month: 'Oct', produced: 112000, dispatched: 108000 },
-    { month: 'Nov', produced: 98000, dispatched: 95000 },
-  ];
-
+  const chartData = dashboardData?.chart || [];
   const monthProduced = dashboardData?.monthProduced ?? 0;
   const todayProduced = dashboardData?.todayProduced ?? 0;
-  const pendingFilingsCount = dashboardData?.pendingFilingsCount ?? displayPending;
+  const pendingFilingsCount = counts.pendingFilingsCount || 0;
   const grossRoyalty = dashboardData?.grossRoyalty ?? '₹0';
-
-  // Deadlines feed
-  const upcomingDeadlines = records
-    .filter((r) => r.expiry && r.status !== 'SUBMITTED')
-    .sort((a, b) => a.expiry - b.expiry)
-    .slice(0, 4);
+  const royaltyBreakdown = dashboardData?.royaltyBreakdown || { base: 0, dmf: 0, nmet: 0 };
+  const upcomingDeadlines = dashboardData?.upcomingDeadlines || [];
 
   return (
     <section className="page active" id="page-dashboard">
@@ -65,76 +42,70 @@ const DashboardView = memo(function DashboardView({
         <div className="page-title-block">
           <h1 id="dash-greeting">Good morning</h1>
           <p className="page-sub" id="dash-sub">
-            {activeMine ? `${activeMine.name} · ${activeMineMinerals || 'Iron Ore'} · ${activeMine.state || 'Odisha'}` : 'Loading your mine data…'}
+            {activeMine
+              ? [activeMine.name, activeMineMinerals, activeMine.state].filter(Boolean).join(' · ')
+              : 'Loading your mine data…'}
           </p>
         </div>
         <div className="page-actions">
           <button className="btn-ghost" onClick={onOpenLogProd}>+ Log Production</button>
-          <button
-            className="btn-primary"
-            style={{ backgroundColor: '#e8a020', color: '#050810', fontWeight: 700, border: 'none' }}
-            onClick={() => setShowDossierModal(true)}
-            title="Generate comprehensive regulatory packet for visiting IBM/DGMS inspectors"
-          >
-            📋 Inspection Dossier
-          </button>
           <button className="btn-primary" onClick={onOpenFormB}>Generate IBM Return</button>
         </div>
       </div>
 
-      {/* COMPLIANCE ACTIVITIES HERO */}
+      {/* COMPLIANCE TASKS HERO (Completion counts only, no scoring) */}
       <div className="health-hero">
         <div className="compliance-hero-left">
           <div className="ch-top-row">
             <div className="ch-headline-block">
-              <div className="ch-eyebrow">COMPLIANCE ACTIVITIES STATUS</div>
+              <div className="ch-eyebrow">COMPLIANCE TASK COMPLETION</div>
               <div className="ch-main-ratio">
-                <span className="ch-num-completed" id="ch-num-completed">{displayCompleted}</span>
+                <span className="ch-num-completed" id="ch-num-completed">{completedTasks}</span>
                 <span className="ch-num-divider">/</span>
-                <span className="ch-num-total" id="ch-num-total">{totalActivities}</span>
-                <span className="ch-num-caption">Activities Completed</span>
+                <span className="ch-num-total" id="ch-num-total">{totalTasks}</span>
+                <span className="ch-num-caption">Tasks Completed</span>
               </div>
             </div>
             <div className="ch-status-pill" id="hb-status">
-              {displayExpired > 0 ? `⚠ ${displayExpired} Attention Required` : '● Checking compliance records…'}
+              {attentionCount > 0 ? `⚠ ${attentionCount} Overdue / Needs Update` : totalTasks > 0 ? '✓ All Tasks On Track' : '● Loading tasks…'}
             </div>
           </div>
 
           <div className="compliance-cards-grid">
-            <div className="ch-stat-card card-completed" onClick={() => onNavigate('calendar')} title="View completed activities">
+            <div className="ch-stat-card card-completed" onClick={() => onNavigate('calendar')} title="Completed filings, valid clearances & up-to-date registers">
               <div className="ch-card-header">
                 <span className="ch-card-label">Completed</span>
                 <div className="ch-card-icon blue">✓</div>
               </div>
-              <div className="ch-card-number blue" id="cm-completed-val">{displayCompleted}</div>
-              <div className="ch-card-sub">Activities completed</div>
+              <div className="ch-card-number blue" id="cm-completed-val">{completedTasks}</div>
+              <div className="ch-card-sub">Tasks finished</div>
             </div>
 
-            <div className="ch-stat-card card-pending" onClick={() => onNavigate('calendar')} title="View pending activities">
+            <div className="ch-stat-card card-pending" onClick={() => onNavigate('calendar')} title="View remaining tasks">
               <div className="ch-card-header">
-                <span className="ch-card-label">Pending</span>
+                <span className="ch-card-label">Remaining</span>
                 <div className="ch-card-icon orange">⏳</div>
               </div>
-              <div className="ch-card-number orange" id="cm-pending-val">{displayPending}</div>
-              <div className="ch-card-sub">Activities remaining</div>
+              <div className="ch-card-number orange" id="cm-pending-val">{remainingTasks}</div>
+              <div className="ch-card-sub">Tasks open</div>
             </div>
 
-            <div className="ch-stat-card card-expired" onClick={() => onNavigate('calendar')} title="View expired / overdue activities">
+            <div className="ch-stat-card card-expired" onClick={() => onNavigate('alerts')} title="View overdue filings, expired docs & stale registers">
               <div className="ch-card-header">
-                <span className="ch-card-label">Expired</span>
+                <span className="ch-card-label">Overdue</span>
                 <div className="ch-card-icon red">⚠</div>
               </div>
-              <div className="ch-card-number red" id="cm-expired-val">{displayExpired}</div>
+              <div className="ch-card-number red" id="cm-expired-val">{attentionCount}</div>
               <div className="ch-card-sub">Expired / Overdue</div>
             </div>
 
-            <div className="ch-stat-card card-total" onClick={() => onNavigate('calendar')} title="View all activities">
+            <div className="ch-stat-card card-total" onClick={() => onNavigate('calendar')} title="View all statutory tasks">
               <div className="ch-card-header">
                 <span className="ch-card-label">Total</span>
                 <div className="ch-card-icon neutral">📋</div>
               </div>
-              <div className="ch-card-number neutral" id="cm-total-val">{totalActivities}</div>
-              <div className="ch-card-sub">Expected activities</div>
+              <div className="ch-card-number neutral" id="cm-total-val">{totalTasks}</div>
+              <div className="ch-card-sub">Total tracked tasks</div>
             </div>
           </div>
         </div>
@@ -142,19 +113,23 @@ const DashboardView = memo(function DashboardView({
         <div className="health-actions">
           <div className="ha-title">Priority Actions</div>
           <div id="priority-actions">
-            <div className="action-card critical" onClick={() => onNavigate('forms')} style={{ cursor: 'pointer' }}>
-              <div className="ac-severity">CRITICAL ACTION</div>
-              <div className="ac-text">Monthly IBM Form B return due in 4 days. Production entries verified.</div>
-              <div className="ac-cta">File Form B →</div>
-            </div>
-            <div className="action-card warning" onClick={() => onNavigate('calendar')} style={{ cursor: 'pointer' }}>
-              <div className="ac-severity">ACTION REQUIRED</div>
-              <div className="ac-text">DGMS shift attendance records update pending for 2 shifts.</div>
-              <div className="ac-cta">Update Records →</div>
-            </div>
+            {attentionCount > 0 && (
+              <div className="action-card critical" onClick={() => onNavigate('alerts')} style={{ cursor: 'pointer' }}>
+                <div className="ac-severity">CRITICAL ACTION</div>
+                <div className="ac-text">{attentionCount} overdue item(s) / stale register(s) require immediate attention.</div>
+                <div className="ac-cta">Review Alerts →</div>
+              </div>
+            )}
+            {pendingFilingsCount > 0 && (
+              <div className="action-card warning" onClick={() => onNavigate('calendar')} style={{ cursor: 'pointer' }}>
+                <div className="ac-severity">ACTION REQUIRED</div>
+                <div className="ac-text">{pendingFilingsCount} pending filing deadline(s) remaining.</div>
+                <div className="ac-cta">View Calendar →</div>
+              </div>
+            )}
             <div className="action-card ok" onClick={() => onNavigate('royalty')} style={{ cursor: 'pointer' }}>
-              <div className="ac-severity">ON TRACK</div>
-              <div className="ac-text">Current month royalty liability calculated. Dispatches reconciled.</div>
+              <div className="ac-severity">ROYALTY LEDGER</div>
+              <div className="ac-text">Current period gross royalty liability: {grossRoyalty}.</div>
               <div className="ac-cta">Review Breakdown →</div>
             </div>
           </div>
@@ -164,19 +139,8 @@ const DashboardView = memo(function DashboardView({
       {/* ── PRIORITY 1: MCDR RULE 11 MINING PLAN CAPPING QUOTA SENTINEL ── */}
       <Rule11CappingCard
         activeMine={activeMine}
-        cumulativeYtdProduced={monthProduced ? monthProduced * 3.4 : 68450}
+        cumulativeYtdProduced={dashboardData?.extractedYtd ?? 0}
         onNavigate={onNavigate}
-      />
-
-      {/* ── PRIORITY 2: MCDR RULE 45 MASS-BALANCE & STOCK INTEGRITY RECONCILER ── */}
-      <Rule45MassBalanceCard
-        openingStock={12500}
-        romProduced={monthProduced || 28400}
-        dispatched={monthProduced ? Math.round(monthProduced * 0.92) : 26200}
-        wasteRejects={1100}
-        selectedMonth="November 2026"
-        onOpenDispatches={() => onNavigate('sales')}
-        onOpenProduction={() => onNavigate('production')}
       />
 
       {/* KPI STRIP */}
@@ -284,20 +248,20 @@ const DashboardView = memo(function DashboardView({
 
         <div className="dash-card">
           <div className="card-head">
-            <h3>Royalty — Current Month</h3>
+            <h3>Royalty — Latest Period</h3>
           </div>
           <div id="royalty-snap">
             <div className="rb-row">
               <span className="rb-label">Base Royalty</span>
-              <span className="rb-val">₹80,000</span>
+              <span className="rb-val">₹{Math.round(royaltyBreakdown.base).toLocaleString('en-IN')}</span>
             </div>
             <div className="rb-row">
-              <span className="rb-label">DMF (30%)</span>
-              <span className="rb-val">₹24,000</span>
+              <span className="rb-label">DMF</span>
+              <span className="rb-val">₹{Math.round(royaltyBreakdown.dmf).toLocaleString('en-IN')}</span>
             </div>
             <div className="rb-row">
-              <span className="rb-label">NMET (2%)</span>
-              <span className="rb-val">₹1,600</span>
+              <span className="rb-label">NMET</span>
+              <span className="rb-val">₹{Math.round(royaltyBreakdown.nmet).toLocaleString('en-IN')}</span>
             </div>
             <div className="rb-row" style={{ borderBottom: 'none' }}>
               <span className="rb-label" style={{ fontWeight: 600, color: 'var(--amber)' }}>Gross Liability</span>
@@ -309,15 +273,6 @@ const DashboardView = memo(function DashboardView({
           </button>
         </div>
       </div>
-
-      {/* ── PRIORITY 5: 15-MINUTE STATUTORY INSPECTION DOSSIER MODAL ── */}
-      <InspectionDossierModal
-        isOpen={showDossierModal}
-        onClose={() => setShowDossierModal(false)}
-        activeMine={activeMine}
-        dashboardData={dashboardData}
-        activeMineMinerals={activeMineMinerals}
-      />
     </section>
   );
 });

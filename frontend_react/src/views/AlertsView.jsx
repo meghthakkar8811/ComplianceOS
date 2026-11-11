@@ -1,42 +1,37 @@
 import React, { useState, memo } from 'react';
 import { toast } from '../context/ToastContext';
 
-const AlertsView = memo(function AlertsView({ dashboardData, onNavigate }) {
-  const [allRead, setAllRead] = useState(false);
-  const records = dashboardData?.records || [];
-  const now = Date.now();
-  const dgmsTotalActions = dashboardData?.dgms?.totalActions ?? 0;
-  const dgmsCompletedActions = dashboardData?.dgms?.completedActions ?? 0;
-
-  const docRecords = records.filter((r) => r.recordType === 'CLEARANCE' || r.recordType === 'STATUTORY_PLAN');
-  const expiredDocs = docRecords.filter((r) => r.expiry && r.expiry < now);
-  const expiringDocs = docRecords.filter(
-    (r) => r.status === 'VALID' && r.expiry >= now && r.expiry - now < 90 * 86400000
-  );
-
-  const filings = records.filter((r) => r.recordType !== 'REGISTER');
-  const pendingFilings = filings.filter((r) => r.status === 'PENDING_SUBMISSION');
-  const overdueFilings = pendingFilings.filter((r) => r.expiry < now);
+export function buildAlerts(dashboardData) {
+  if (!dashboardData) return [];
+  const dgmsTotal = dashboardData?.dgms?.totalActions ?? 0;
+  const dgmsCompleted = dashboardData?.dgms?.completedActions ?? 0;
+  const dgmsOverdue = Math.max(0, dgmsTotal - dgmsCompleted);
+  const {
+    overdueFilingsCount = 0,
+    pendingFilingsCount = 0,
+    expiredDocsCount = 0,
+    expiringDocsCount = 0,
+  } = dashboardData?.complianceCounts || {};
 
   const alerts = [];
 
-  if (dgmsTotalActions > 0 && dgmsCompletedActions / dgmsTotalActions < 0.6) {
+  if (dgmsOverdue > 0) {
     alerts.push({
       type: 'critical',
       icon: '⚠',
-      title: 'DGMS Readiness is Critical',
-      desc: `${dgmsCompletedActions} of ${dgmsTotalActions} compliance actions are up to date. Multiple registers are overdue. A DGMS inspection today would result in violations.`,
+      title: `${dgmsOverdue} DGMS Register(s) Need Update`,
+      desc: `${dgmsCompleted} of ${dgmsTotal} statutory registers are within their update window. Update overdue registers immediately.`,
       time: 'Now',
-      action: 'Fix Now',
+      action: 'Update Registers',
       nav: 'dgms',
     });
   }
 
-  if (overdueFilings.length > 0) {
+  if (overdueFilingsCount > 0) {
     alerts.push({
       type: 'critical',
       icon: '📋',
-      title: `${overdueFilings.length} Filing(s) Overdue`,
+      title: `${overdueFilingsCount} Filing(s) Overdue`,
       desc: 'Statutory returns are past their due date. File immediately to avoid penalties and show-cause notices.',
       time: 'Now',
       action: 'View Calendar',
@@ -44,11 +39,11 @@ const AlertsView = memo(function AlertsView({ dashboardData, onNavigate }) {
     });
   }
 
-  if (expiredDocs.length > 0) {
+  if (expiredDocsCount > 0) {
     alerts.push({
       type: 'critical',
       icon: '📄',
-      title: `${expiredDocs.length} Document(s) Expired`,
+      title: `${expiredDocsCount} Document(s) Expired`,
       desc: 'An expired CTO, EC or DGMS certificate can halt operations. Renew immediately.',
       time: 'Now',
       action: 'View Documents',
@@ -56,11 +51,11 @@ const AlertsView = memo(function AlertsView({ dashboardData, onNavigate }) {
     });
   }
 
-  if (pendingFilings.length > 0) {
+  if (pendingFilingsCount > 0) {
     alerts.push({
       type: 'warning',
       icon: '⏰',
-      title: `${pendingFilings.length} Deadline(s) Upcoming`,
+      title: `${pendingFilingsCount} Deadline(s) Upcoming`,
       desc: 'Review your compliance calendar and take action before due dates.',
       time: 'Current',
       action: 'View Calendar',
@@ -68,11 +63,11 @@ const AlertsView = memo(function AlertsView({ dashboardData, onNavigate }) {
     });
   }
 
-  if (expiringDocs.length > 0) {
+  if (expiringDocsCount > 0) {
     alerts.push({
       type: 'warning',
       icon: '📄',
-      title: `${expiringDocs.length} Document(s) Expiring Soon`,
+      title: `${expiringDocsCount} Document(s) Expiring Soon`,
       desc: 'Check your document repository. Expiring CTO, EC or DGMS certificates need renewal.',
       time: 'Within 90 days',
       action: 'View Documents',
@@ -80,8 +75,14 @@ const AlertsView = memo(function AlertsView({ dashboardData, onNavigate }) {
     });
   }
 
-  if (!alerts.length) {
-    alerts.push({
+  return alerts;
+}
+
+const AlertsView = memo(function AlertsView({ dashboardData, onNavigate }) {
+  const [allRead, setAllRead] = useState(false);
+  const alerts = buildAlerts(dashboardData);
+  const displayAlerts = alerts.length > 0 ? alerts : [
+    {
       type: 'success',
       icon: '✓',
       title: 'All compliance checks passing!',
@@ -89,8 +90,8 @@ const AlertsView = memo(function AlertsView({ dashboardData, onNavigate }) {
       time: 'Now',
       action: null,
       nav: null,
-    });
-  }
+    },
+  ];
 
   const handleMarkAllRead = () => {
     setAllRead(true);
@@ -112,7 +113,7 @@ const AlertsView = memo(function AlertsView({ dashboardData, onNavigate }) {
       </div>
 
       <div id="alerts-list">
-        {alerts.map((a, idx) => (
+        {displayAlerts.map((a, idx) => (
           <div
             key={idx}
             className={`alert-row ${a.type}`}

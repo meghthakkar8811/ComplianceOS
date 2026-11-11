@@ -13,6 +13,7 @@ import com.agentengine.util.common.query.Query;
 import com.agentengine.util.common.query.Sort;
 import com.agentengine.util.common.beans.FileDetails;
 import com.agentengine.util.common.repository.DocumentBackend;
+import com.agentengine.util.common.utils.CollectionUtils;
 import com.agentengine.util.common.utils.StringUtils;
 import com.agentengine.util.common.validation.ValidationService;
 import com.agentengine.util.context.Context;
@@ -45,6 +46,8 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Singleton
 public class InvoiceServiceImpl implements InvoiceService {
@@ -85,7 +88,16 @@ public class InvoiceServiceImpl implements InvoiceService {
 
   @Override
   public Map<String, Invoice> getInvoices(final List<String> ids) {
-    return invoiceRepository.findByIds(ids);
+    if (CollectionUtils.isEmpty(ids)) {
+      return Map.of();
+    }
+    final Map<String, Invoice> found = invoiceRepository.findByIds(ids);
+    final Set<String> mineIds =
+        found.values().stream().map(Invoice::getMineId).collect(Collectors.toSet());
+    final Map<String, Mine> accessibleMines = mineRepository.findByIds(mineIds);
+    return found.entrySet().stream()
+        .filter(entry -> accessibleMines.containsKey(entry.getValue().getMineId()))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   @Override
@@ -131,6 +143,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     if (SaleType.valueOfOrDefault(sale.getType()) == SaleType.CONSUMPTION) {
       // requiresInvoice() already established the mine and buyer GSTINs differ for a CONSUMPTION
       // sale to reach here — open-market valuation under Rule 28, which this plan doesn't design.
+      // TODO: Implement CGST Rule 28 open-market valuation for deemed-supply CONSUMPTION sales.
       throw new UnsupportedOperationException(
           "Rule 28 open-market valuation for deemed-supply CONSUMPTION sales is not yet implemented");
     }

@@ -1,26 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../../services/api';
 import { toast } from '../../context/ToastContext';
+import { fetchMinePeriodStats, getCurrentFyRange } from '../../utils/formStats';
 
 function formatState(s) {
   if (!s) return '';
   return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export default function FormAModal({ isOpen, onClose, activeMine, onSubmitted, user }) {
+export default function FormAModal({ isOpen, onClose, activeMine, activeMineMinerals, onSubmitted, user }) {
   const [referenceNumber, setReferenceNumber] = useState('');
   const [submitting, setSubmitting] = useState(false);
-
-  if (!isOpen) return null;
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const now = new Date();
-  const fyYear =
-    now.getMonth() >= 3
-      ? `${now.getFullYear()}–${now.getFullYear() + 1}`
-      : `${now.getFullYear() - 1}–${now.getFullYear()}`;
+  const { start, end, label: fyYear } = getCurrentFyRange(now);
 
-  const annualProd = 45200;
-  const overburden = Math.round(annualProd * 1.85);
+  useEffect(() => {
+    if (!isOpen || !activeMine?.id) return;
+    setLoading(true);
+    fetchMinePeriodStats(activeMine.id, start, end)
+      .then(setStats)
+      .finally(() => setLoading(false));
+  }, [isOpen, activeMine?.id, start, end]);
+
+  if (!isOpen) return null;
 
   const handleSubmit = async () => {
     if (!referenceNumber.trim()) {
@@ -59,115 +64,80 @@ export default function FormAModal({ isOpen, onClose, activeMine, onSubmitted, u
         <div className="modal-header">
           <div>
             <h2>IBM Form A — Annual Mineral Production & Statistics</h2>
-            <p className="modal-sub" id="forma-period">Fiscal Year {fyYear} · Geological & Mining Data</p>
+            <p className="modal-sub" id="forma-period">Fiscal Year {fyYear} · Mine Profile & Annual Ledgers</p>
           </div>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body" id="forma-body">
-          <div className="autofill-banner">
-            <span className="afb-icon">✓</span>
-            <span>92% auto-filled from geological & mining logs</span>
-            <span className="afb-pct">92% complete</span>
-          </div>
-
           <div id="forma-content">
             <div className="form-section">
               <div className="fs-title">PART A — Mine & Mining Lease Specifics</div>
               <div className="fs-grid">
-                <div className="fg">
-                  <label>Mine Name</label>
-                  <input readOnly value={activeMine?.name || ''} />
-                </div>
+                <div className="fg"><label>Mine Name</label><input readOnly value={activeMine?.name || ''} /></div>
+                <div className="fg"><label>IBM Registration Number</label><input readOnly value={activeMine?.ibmRegistration?.registrationNumber || '—'} /></div>
                 <div className="fg">
                   <label>Lease Grant Date</label>
-                  <input
-                    readOnly
-                    value={
-                      activeMine?.leaseStartOn
-                        ? new Date(activeMine.leaseStartOn).toLocaleDateString('en-IN')
-                        : '2019-04-01'
-                    }
-                  />
+                  <input readOnly value={activeMine?.leaseStartOn ? new Date(activeMine.leaseStartOn).toLocaleDateString('en-IN') : '—'} />
                 </div>
-                <div className="fg">
-                  <label>Mine Type & Category</label>
-                  <input readOnly value={`${activeMine?.mineType || 'METALLIFEROUS'} — Category 'A' Opencast`} />
-                </div>
+                <div className="fg"><label>Mine Type & State</label><input readOnly value={[activeMine?.mineType || '—', formatState(activeMine?.state || '')].join(' · ')} /></div>
                 <div className="fg">
                   <label>Total Lease Area (Ha)</label>
-                  <input readOnly value="48.50 Ha" />
+                  <input readOnly value={activeMine?.ibmRegistration?.leaseArea ? `${activeMine.ibmRegistration.leaseArea} Ha` : '—'} />
+                </div>
+                <div className="fg">
+                  <label>Sanctioned Annual Capacity (MT)</label>
+                  <input readOnly value={activeMine?.ibmRegistration?.capacity ? `${Number(activeMine.ibmRegistration.capacity).toLocaleString('en-IN')} MT` : '—'} />
                 </div>
               </div>
             </div>
 
             <div className="form-section">
-              <div className="fs-title">PART B — Mining & Geological Statistics</div>
-              <table className="modal-table">
-                <thead>
-                  <tr>
-                    <th>Parameter</th>
-                    <th>Metric (Units)</th>
-                    <th>Remarks</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>Total ROM Ore Extracted</td>
-                    <td>{annualProd.toLocaleString('en-IN')} MT</td>
-                    <td>From Pit A & Pit B</td>
-                  </tr>
-                  <tr>
-                    <td>Overburden / Waste Handled</td>
-                    <td>{overburden.toLocaleString('en-IN')} MT</td>
-                    <td>Stripping Ratio: 1:1.85</td>
-                  </tr>
-                  <tr>
-                    <td>Estimated Remaining Reserves</td>
-                    <td>1,420,000 MT</td>
-                    <td>Proved (111) & Probable (122)</td>
-                  </tr>
-                  <tr>
-                    <td>Average Mineral Grade (ROM)</td>
-                    <td>53.8% purity</td>
-                    <td>Chemical assay verified</td>
-                  </tr>
-                </tbody>
-              </table>
+              <div className="fs-title">PART B — Recorded Annual Production & Dispatches (FY {fyYear})</div>
+              {loading ? (
+                <p style={{ fontSize: '12px', color: 'var(--text2)' }}>Loading FY ledgers…</p>
+              ) : (
+                <table className="modal-table">
+                  <thead>
+                    <tr>
+                      <th>Metric</th>
+                      <th>Value</th>
+                      <th>Source</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Minerals Configured</td>
+                      <td>{activeMineMinerals || '—'}</td>
+                      <td>Mine Minerals</td>
+                    </tr>
+                    <tr>
+                      <td>Total ROM Ore Extracted</td>
+                      <td>{(stats?.producedQty || 0).toLocaleString('en-IN')} MT ({stats?.prodCount || 0} entries)</td>
+                      <td>ProductionEntry</td>
+                    </tr>
+                    <tr>
+                      <td>Total Ore Dispatched</td>
+                      <td>{(stats?.dispatchedQty || 0).toLocaleString('en-IN')} MT ({stats?.saleCount || 0} sales)</td>
+                      <td>Sale Ledger</td>
+                    </tr>
+                    <tr>
+                      <td>Total Dispatch Value</td>
+                      <td>₹{Math.round(stats?.dispatchedValue || 0).toLocaleString('en-IN')}</td>
+                      <td>Sale Ledger</td>
+                    </tr>
+                  </tbody>
+                </table>
+              )}
+              <p style={{ marginTop: '10px', fontSize: '11.5px', color: 'var(--text2)' }}>
+                Note: Geological reserves, overburden/waste volume, ore purity %, machinery fleet counts, and explosives consumption are not tracked in ComplianceOS and must be entered directly on the IBM portal.
+              </p>
             </div>
 
             <div className="form-section">
-              <div className="fs-title">PART C — Machinery Deployed & Explosives</div>
+              <div className="fs-title">PART C — Declaration & Submission</div>
               <div className="fs-grid">
-                <div className="fg">
-                  <label>Excavators (1.2–2.5 cu.m)</label>
-                  <input readOnly value="4 units operational" />
-                </div>
-                <div className="fg">
-                  <label>Dumpers / Tippers (25–35T)</label>
-                  <input readOnly value="12 units operational" />
-                </div>
-                <div className="fg">
-                  <label>Blast Hole Drill Rigs</label>
-                  <input readOnly value="2 units (115mm dia)" />
-                </div>
-                <div className="fg">
-                  <label>Explosives Consumed (SME/ANFO)</label>
-                  <input readOnly value="18,450 kg" />
-                </div>
-              </div>
-            </div>
-
-            <div className="form-section">
-              <div className="fs-title">PART D — Declaration & Submission</div>
-              <div className="fs-grid">
-                <div className="fg">
-                  <label>Mines Geologist / Manager</label>
-                  <input readOnly value={user?.username || 'Mines Manager'} />
-                </div>
-                <div className="fg">
-                  <label>Filing Date</label>
-                  <input type="date" readOnly value={now.toISOString().slice(0, 10)} />
-                </div>
+                <div className="fg"><label>Mines Geologist / Manager</label><input readOnly value={user?.username || 'Mines Manager'} /></div>
+                <div className="fg"><label>Filing Date</label><input type="date" readOnly value={now.toISOString().slice(0, 10)} /></div>
                 <div className="fg">
                   <label>IBM Acknowledgement Number *</label>
                   <input
@@ -192,4 +162,3 @@ export default function FormAModal({ isOpen, onClose, activeMine, onSubmitted, u
     </div>
   );
 }
-

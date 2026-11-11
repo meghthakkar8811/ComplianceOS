@@ -5,6 +5,7 @@ import { toast } from '../../context/ToastContext';
 export default function AddMineModal({ isOpen, onClose, onMineAdded }) {
   const [name, setName] = useState('');
   const [leaseNumber, setLeaseNumber] = useState('');
+  const [gstin, setGstin] = useState('');
   const [state, setState] = useState('RAJASTHAN');
   const [district, setDistrict] = useState('');
   const [mineType, setMineType] = useState('METALLIFEROUS');
@@ -23,6 +24,7 @@ export default function AddMineModal({ isOpen, onClose, onMineAdded }) {
       const payload = {
         name: name.trim(),
         leaseNumber: leaseNumber.trim(),
+        ...(gstin.trim() ? { gstin: gstin.trim().toUpperCase() } : {}),
         state,
         district: district.trim(),
         mineType,
@@ -35,6 +37,7 @@ export default function AddMineModal({ isOpen, onClose, onMineAdded }) {
       toast(`Mine lease "${name}" added successfully!`, 'success');
       setName('');
       setLeaseNumber('');
+      setGstin('');
       setDistrict('');
       if (onMineAdded) onMineAdded(mine);
       onClose();
@@ -124,6 +127,15 @@ export default function AddMineModal({ isOpen, onClose, onMineAdded }) {
                 id="am-lease-start"
                 value={leaseStart}
                 onChange={(e) => setLeaseStart(e.target.value)}
+              />
+            </div>
+            <div className="fg">
+              <label>GSTIN (Optional)</label>
+              <input
+                id="am-gstin"
+                value={gstin}
+                onChange={(e) => setGstin(e.target.value.toUpperCase())}
+                placeholder="08ABCDE1234F1Z5"
               />
             </div>
           </div>

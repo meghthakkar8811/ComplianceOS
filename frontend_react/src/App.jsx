@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { apiFetch, catalogSearch } from './services/api';
+import { apiFetch, catalogSearch, catalogSearchAll, catalogAggregate } from './services/api';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider, toast } from './context/ToastContext';
 import Sidebar from './components/layout/Sidebar';
@@ -15,8 +15,8 @@ import SalesView from './views/SalesView';
 import BuyersView from './views/BuyersView';
 import DocumentsView from './views/DocumentsView';
 import DgmsView from './views/DgmsView';
-import AlertsView from './views/AlertsView';
-import StarRatingView from './views/StarRatingView';
+import AlertsView, { buildAlerts } from './views/AlertsView';
+import MineManagementView from './views/MineManagementView';
 import LoginView from './pages/LoginView';
 import SignupView from './pages/SignupView';
 import ForgotView from './pages/ForgotView';
@@ -34,32 +34,7 @@ import ComplianceLoader from './components/layout/ComplianceLoader';
 
 import './styles/dashboard.css';
 
-const NAV_PAGES = ['dashboard', 'calendar', 'royalty', 'sales', 'buyers', 'forms', 'production', 'documents', 'dgms', 'alerts', 'star-rating'];
-
-/** Mirrors AlertsView's own alert conditions, so the sidebar/topbar badge count matches what opening Alerts shows. */
-function countActiveAlerts(dashboardData) {
-  if (!dashboardData) return 0;
-  const records = dashboardData.records || [];
-  const now = Date.now();
-  const totalActions = dashboardData?.dgms?.totalActions ?? 0;
-  const completedActions = dashboardData?.dgms?.completedActions ?? 0;
-
-  const docRecords = records.filter((r) => r.recordType === 'CLEARANCE' || r.recordType === 'STATUTORY_PLAN');
-  const expiredDocs = docRecords.filter((r) => r.expiry && r.expiry < now);
-  const expiringDocs = docRecords.filter((r) => r.status === 'VALID' && r.expiry >= now && r.expiry - now < 90 * 86400000);
-
-  const filings = records.filter((r) => r.recordType !== 'REGISTER');
-  const pendingFilings = filings.filter((r) => r.status === 'PENDING_SUBMISSION');
-  const overdueFilings = pendingFilings.filter((r) => r.expiry < now);
-
-  let count = 0;
-  if (totalActions > 0 && completedActions / totalActions < 0.6) count += 1;
-  if (overdueFilings.length > 0) count += 1;
-  if (expiredDocs.length > 0) count += 1;
-  if (pendingFilings.length > 0) count += 1;
-  if (expiringDocs.length > 0) count += 1;
-  return count;
-}
+const NAV_PAGES = ['dashboard', 'calendar', 'royalty', 'sales', 'buyers', 'forms', 'production', 'mine', 'documents', 'dgms', 'alerts'];
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -98,12 +73,9 @@ export default function App() {
   const [showFormJModal, setShowFormJModal] = useState(false);
   const [showFormAModal, setShowFormAModal] = useState(false);
   const [showAddDocModal, setShowAddDocModal] = useState(false);
+  const [documentsRefreshKey, setDocumentsRefreshKey] = useState(0);
   const [showStatutoryRatesModal, setShowStatutoryRatesModal] = useState(false);
 
-  // A mine no longer has a single mineral field — it can produce several, each tracked as its
-  // own Mineral record — so every mine's display label is the comma-joined list of those. The
-  // Mineral lookup is scoped per mine via the mineId option, not a query filter, so one mine at a
-  // time (small lists, so a handful of parallel requests is fine).
   const loadMineralsByMineId = useCallback(async (mineList) => {
     if (mineList.length === 0) {
       setMineralsByMineId({});
@@ -111,7 +83,7 @@ export default function App() {
     }
     try {
       const results = await Promise.all(
-        mineList.map((mine) => catalogSearch('Mineral', {}, { mineId: mine.id }).catch(() => ({ items: [] })))
+        mineList.map((mine) => catalogSearchAll('Mineral', {}, { mineId: mine.id }).catch(() => ({ items: [] })))
       );
       const joined = {};
       mineList.forEach((mine, index) => {
@@ -119,21 +91,21 @@ export default function App() {
       });
       setMineralsByMineId(joined);
     } catch (err) {
-      // A display nicety; leave labels blank for unresolved mines rather than failing the page.
+      // Leave labels blank for unresolved mines rather than failing the page.
     }
   }, []);
 
   // Load Mines
   const loadMines = useCallback(async () => {
     try {
-      const res = await catalogSearch('Mine', { filter: { field: 'active', op: 'EQ', values: [true] } });
+      const res = await catalogSearchAll('Mine', { filter: { field: 'active', op: 'EQ', values: [true] } });
       const mineList = res.items || [];
       setMines(mineList);
       loadMineralsByMineId(mineList);
       if (mineList.length > 0) {
         const savedMineId = localStorage.getItem('cos_active_mine') || localStorage.getItem('cos_mine_id');
         const defaultMine = mineList.find((m) => m.id === savedMineId) || mineList[0];
-        setActiveMineId(defaultMine.id);
+        setActiveMineId((prev) => prev && mineList.some((m) => m.id === prev) ? prev : defaultMine.id);
       }
     } catch (err) {
       console.error('Failed to load mines:', err);
@@ -190,85 +162,207 @@ export default function App() {
     }
   };
 
-  // Load Dashboard Data
+  // Load Dashboard Data via server-side Aggregations & compliance progress
   const loadDashboardData = useCallback(async (mineId) => {
     if (!mineId) return;
     setLoading(true);
     try {
-      const sixMonthsAgoStart = new Date(new Date().getFullYear(), new Date().getMonth() - 5, 1).getTime();
-      const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+      const now = new Date();
+      const nowMs = now.getTime();
+      const ninetyDaysMs = nowMs + 90 * 86400000;
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth();
+      const sixMonthsAgoStart = new Date(currentYear, currentMonth - 5, 1).getTime();
       const todayStart = new Date().setHours(0, 0, 0, 0);
+      const fyStartYear = currentMonth >= 3 ? currentYear : currentYear - 1;
+      const fyStart = new Date(fyStartYear, 3, 1).getTime();
 
-      const [recordsRes, entriesRes, salesRes, dgmsRes] = await Promise.all([
-        catalogSearch('ComplianceRecord', { filter: { field: 'mineId', op: 'EQ', values: [mineId] } }).catch(() => ({ items: [] })),
-        catalogSearch('ProductionEntry', {
-          filter: {
-            op: 'AND',
-            values: [
-              { field: 'mineId', op: 'EQ', values: [mineId] },
-              { field: 'entryTime', op: 'GTE', values: [sixMonthsAgoStart] },
-            ],
-          },
-        }).catch(() => ({ items: [] })),
-        catalogSearch('Sale', {
-          filter: {
-            op: 'AND',
-            values: [
-              { field: 'mineId', op: 'EQ', values: [mineId] },
-              { field: 'dispatchedOn', op: 'GTE', values: [sixMonthsAgoStart] },
-            ],
-          },
-        }).catch(() => ({ items: [] })),
+      const countMetric = [{ field: 'id', function: 'COUNT', alias: 'count' }];
+      const aggCount = (filter) =>
+        catalogAggregate('ComplianceRecord', { filter, metrics: countMetric }, { mineId })
+          .then((r) => r?.buckets?.[0]?.count || 0)
+          .catch(() => 0);
+
+      const [
+        totalProgressRes,
+        dgmsRes,
+        overdueFilingsCount,
+        pendingFilingsCount,
+        expiredDocsCount,
+        expiringDocsCount,
+        deadlinesRes,
+        prodAggRes,
+        salesAggRes,
+        ytdAggRes,
+        todayAggRes,
+      ] = await Promise.all([
         apiFetch(`/mines/${mineId}/compliance/progress`, { method: 'POST', body: JSON.stringify(null) }).catch(() => null),
+        apiFetch(`/mines/${mineId}/compliance/progress`, {
+          method: 'POST',
+          body: JSON.stringify({ filter: { field: 'recordType', op: 'EQ', values: ['REGISTER'] } }),
+        }).catch(() => null),
+        aggCount({
+          op: 'AND',
+          values: [
+            { field: 'mineId', op: 'EQ', values: [mineId] },
+            { field: 'recordType', op: 'NE', values: ['REGISTER'] },
+            { field: 'status', op: 'EQ', values: ['PENDING_SUBMISSION'] },
+            { field: 'expiry', op: 'GT', values: [0] },
+            { field: 'expiry', op: 'LT', values: [nowMs] },
+          ],
+        }),
+        aggCount({
+          op: 'AND',
+          values: [
+            { field: 'mineId', op: 'EQ', values: [mineId] },
+            { field: 'recordType', op: 'NE', values: ['REGISTER'] },
+            { field: 'status', op: 'EQ', values: ['PENDING_SUBMISSION'] },
+          ],
+        }),
+        aggCount({
+          op: 'AND',
+          values: [
+            { field: 'mineId', op: 'EQ', values: [mineId] },
+            { field: 'recordType', op: 'IN', values: ['CLEARANCE', 'STATUTORY_PLAN'] },
+            { field: 'expiry', op: 'GT', values: [0] },
+            { field: 'expiry', op: 'LT', values: [nowMs] },
+          ],
+        }),
+        aggCount({
+          op: 'AND',
+          values: [
+            { field: 'mineId', op: 'EQ', values: [mineId] },
+            { field: 'recordType', op: 'IN', values: ['CLEARANCE', 'STATUTORY_PLAN'] },
+            { field: 'status', op: 'EQ', values: ['VALID'] },
+            { field: 'expiry', op: 'GTE', values: [nowMs] },
+            { field: 'expiry', op: 'LT', values: [ninetyDaysMs] },
+          ],
+        }),
+        catalogSearch('ComplianceRecord', {
+          filter: {
+            op: 'AND',
+            values: [
+              { field: 'mineId', op: 'EQ', values: [mineId] },
+              { field: 'status', op: 'NE', values: ['SUBMITTED'] },
+              { field: 'expiry', op: 'GT', values: [0] },
+            ],
+          },
+          sorts: [{ field: 'expiry', order: 'ASC' }],
+          page: { offset: 0, limit: 4 },
+        }).catch(() => ({ items: [] })),
+        catalogAggregate(
+          'ProductionEntry',
+          {
+            filter: { field: 'entryTime', op: 'GTE', values: [sixMonthsAgoStart] },
+            groupByFields: [
+              { field: 'entryTime', alias: 'year', additional: { dateTruncUnit: 'YEARS' } },
+              { field: 'entryTime', alias: 'month', additional: { dateTruncUnit: 'MONTHS' } },
+            ],
+            metrics: [{ field: 'quantity', function: 'SUM', alias: 'produced' }],
+          },
+          { mineId }
+        ).catch(() => ({ buckets: [] })),
+        catalogAggregate(
+          'Sale',
+          {
+            filter: { field: 'dispatchedOn', op: 'GTE', values: [sixMonthsAgoStart] },
+            groupByFields: [
+              { field: 'dispatchedOn', alias: 'year', additional: { dateTruncUnit: 'YEARS' } },
+              { field: 'dispatchedOn', alias: 'month', additional: { dateTruncUnit: 'MONTHS' } },
+            ],
+            metrics: [
+              { field: 'quantity', function: 'SUM', alias: 'dispatched' },
+              { field: 'liability.royaltyAmount', function: 'SUM', alias: 'royaltyAmount' },
+              { field: 'liability.dmfAmount', function: 'SUM', alias: 'dmfAmount' },
+              { field: 'liability.nmetAmount', function: 'SUM', alias: 'nmetAmount' },
+            ],
+          },
+          { mineId }
+        ).catch(() => ({ buckets: [] })),
+        catalogAggregate(
+          'ProductionEntry',
+          {
+            filter: { field: 'entryTime', op: 'GTE', values: [fyStart] },
+            metrics: [{ field: 'quantity', function: 'SUM', alias: 'ytdProduced' }],
+          },
+          { mineId }
+        ).catch(() => ({ buckets: [] })),
+        catalogAggregate(
+          'ProductionEntry',
+          {
+            filter: { field: 'entryTime', op: 'GTE', values: [todayStart] },
+            metrics: [{ field: 'quantity', function: 'SUM', alias: 'todayProduced' }],
+          },
+          { mineId }
+        ).catch(() => ({ buckets: [] })),
       ]);
 
-      const entries = entriesRes.items || [];
-      const sales = salesRes.items || [];
+      // Index buckets by "year-month"
+      const prodByPeriod = new Map();
+      for (const b of prodAggRes?.buckets || []) {
+        prodByPeriod.set(`${b.year}-${b.month}`, b.produced || 0);
+      }
+      const salesByPeriod = new Map();
+      let latestGrossRoyalty = 0;
+      let latestRoyaltyBreakdown = { base: 0, dmf: 0, nmet: 0 };
+      let latestSalePeriodKey = null;
+      for (const b of salesAggRes?.buckets || []) {
+        const key = `${b.year}-${b.month}`;
+        salesByPeriod.set(key, b.dispatched || 0);
+        const base = b.royaltyAmount || 0;
+        const dmf = b.dmfAmount || 0;
+        const nmet = b.nmetAmount || 0;
+        const gross = base + dmf + nmet;
+        const periodNum = (b.year || 0) * 12 + (b.month || 0);
+        if (latestSalePeriodKey == null || periodNum >= latestSalePeriodKey) {
+          latestSalePeriodKey = periodNum;
+          latestGrossRoyalty = gross;
+          latestRoyaltyBreakdown = { base, dmf, nmet };
+        }
+      }
 
-      // Calculate 6-month chart
+      // Build 6-month chart directly from backend aggregated buckets
       const chart = [];
+      let currentMonthProduced = 0;
+      let currentMonthDispatched = 0;
       for (let i = 5; i >= 0; i--) {
-        const monthDate = new Date(new Date().getFullYear(), new Date().getMonth() - i, 1);
-        const start = monthDate.getTime();
-        const end = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1).getTime();
-        const inMonth = entries.filter((e) => e.entryTime >= start && e.entryTime < end);
-        const dispatchedInMonth = sales.filter((s) => s.dispatchedOn >= start && s.dispatchedOn < end);
+        const monthDate = new Date(currentYear, currentMonth - i, 1);
+        const y = monthDate.getFullYear();
+        const m = monthDate.getMonth() + 1; // 1-indexed to match backend MONTHS (1-12)
+        const key = `${y}-${m}`;
+        const produced = prodByPeriod.get(key) || 0;
+        const dispatched = salesByPeriod.get(key) || 0;
+        if (i === 0) {
+          currentMonthProduced = produced;
+          currentMonthDispatched = dispatched;
+        }
         chart.push({
           month: monthDate.toLocaleString('default', { month: 'short' }),
-          produced: inMonth.reduce((s, e) => s + (e.quantity || 0), 0),
-          dispatched: dispatchedInMonth.reduce((s, sale) => s + (sale.quantity || 0), 0),
+          produced,
+          dispatched,
         });
       }
 
-      const monthProduced = entries.filter((e) => e.entryTime >= monthStart).reduce((s, e) => s + (e.quantity || 0), 0);
-      const todayProduced = entries.filter((e) => e.entryTime >= todayStart).reduce((s, e) => s + (e.quantity || 0), 0);
-      const extractedYtd = entries.reduce((s, e) => s + (e.quantity || 0), 0);
-
-      // Royalty/DMF/NMET are computed and stored directly on each Sale's own liability at save
-      // time — the current period's gross liability is just the sum of those fields across its
-      // sales, already fetched above for the chart. Sale has no stored period fields of its own,
-      // so the period key is derived from dispatchedOn here.
-      const royaltyByPeriod = new Map();
-      for (const sale of sales) {
-        if (sale.dispatchedOn == null) continue;
-        const dispatchedDate = new Date(sale.dispatchedOn);
-        const key = dispatchedDate.getFullYear() * 12 + dispatchedDate.getMonth();
-        const liability = sale.liability || {};
-        const grossAmount =
-          (royaltyByPeriod.get(key) || 0) + (liability.royaltyAmount || 0) + (liability.dmfAmount || 0) + (liability.nmetAmount || 0);
-        royaltyByPeriod.set(key, grossAmount);
-      }
-      const latestPeriodKey = royaltyByPeriod.size > 0 ? Math.max(...royaltyByPeriod.keys()) : null;
-      const currentGrossRoyalty = latestPeriodKey != null ? royaltyByPeriod.get(latestPeriodKey) : 0;
+      const extractedYtd = ytdAggRes?.buckets?.[0]?.ytdProduced || 0;
+      const todayProduced = todayAggRes?.buckets?.[0]?.todayProduced || 0;
 
       setDashboardData({
-        records: recordsRes.items || [],
+        progress: totalProgressRes,
         dgms: dgmsRes,
-        chart: chart.length > 0 && chart.some((c) => c.produced > 0) ? chart : undefined,
-        monthProduced,
+        complianceCounts: {
+          overdueFilingsCount,
+          pendingFilingsCount,
+          expiredDocsCount,
+          expiringDocsCount,
+        },
+        upcomingDeadlines: deadlinesRes?.items || [],
+        chart,
+        monthProduced: currentMonthProduced,
+        monthDispatched: currentMonthDispatched,
         todayProduced,
         extractedYtd,
-        grossRoyalty: latestPeriodKey != null ? `₹${currentGrossRoyalty.toLocaleString()}` : '₹0',
+        royaltyBreakdown: latestRoyaltyBreakdown,
+        grossRoyalty: latestSalePeriodKey != null ? `₹${Math.round(latestGrossRoyalty).toLocaleString('en-IN')}` : '₹0',
       });
     } catch (err) {
       console.warn('Dashboard data fetch fallback used:', err);
@@ -334,10 +428,7 @@ export default function App() {
 
   const activeMine = mines.find((m) => m.id === activeMineId) || mines[0];
   const activeMineMinerals = mineralsByMineId[activeMine?.id] || '';
-  const dgmsTotalActions = dashboardData?.dgms?.totalActions ?? 0;
-  const dgmsCompletedActions = dashboardData?.dgms?.completedActions ?? 0;
-  const healthScore = dgmsTotalActions > 0 ? Math.round((dgmsCompletedActions / dgmsTotalActions) * 100) : 100;
-  const alertCount = countActiveAlerts(dashboardData);
+  const alertCount = buildAlerts(dashboardData).length;
 
   if (!authChecked) {
     return <ComplianceLoader />;
@@ -393,7 +484,7 @@ export default function App() {
           onDeleteMine={handleDeleteMine}
           onOpenAddMine={() => setShowAddMineModal(true)}
           user={user}
-          dgmsScore={healthScore}
+          dgmsProgress={dashboardData?.dgms}
           alertCount={alertCount}
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
@@ -407,7 +498,7 @@ export default function App() {
             onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
             onNavigate={setActivePage}
             alertCount={alertCount}
-            healthScore={healthScore}
+            complianceProgress={dashboardData?.progress}
             user={user}
           />
 
@@ -426,7 +517,7 @@ export default function App() {
           )}
 
           {activePage === 'calendar' && (
-            <CalendarView activeMineId={activeMineId} />
+            <CalendarView activeMineId={activeMineId} onDataChanged={() => loadDashboardData(activeMineId)} />
           )}
 
           {activePage === 'forms' && (
@@ -448,11 +539,21 @@ export default function App() {
           )}
 
           {activePage === 'production' && (
-            <ProductionView activeMineId={activeMineId} />
+            <ProductionView activeMineId={activeMineId} onDataChanged={() => loadDashboardData(activeMineId)} />
+          )}
+
+          {activePage === 'mine' && (
+            <MineManagementView
+              activeMine={activeMine}
+              onMineUpdated={() => {
+                loadMines();
+                loadDashboardData(activeMineId);
+              }}
+            />
           )}
 
           {activePage === 'sales' && (
-            <SalesView activeMineId={activeMineId} activeMine={activeMine} />
+            <SalesView activeMineId={activeMineId} activeMine={activeMine} onDataChanged={() => loadDashboardData(activeMineId)} />
           )}
 
           {activePage === 'buyers' && (
@@ -462,20 +563,21 @@ export default function App() {
           {activePage === 'documents' && (
             <DocumentsView
               activeMineId={activeMineId}
+              refreshKey={documentsRefreshKey}
               onOpenUploadDoc={() => setShowAddDocModal(true)}
+              onDataChanged={() => loadDashboardData(activeMineId)}
             />
           )}
 
           {activePage === 'dgms' && (
-            <DgmsView activeMineId={activeMineId} activeMine={activeMine} activeMineMinerals={activeMineMinerals} />
+            <DgmsView
+              activeMineId={activeMineId}
+              onDataChanged={() => loadDashboardData(activeMineId)}
+            />
           )}
 
           {activePage === 'alerts' && (
             <AlertsView dashboardData={dashboardData} onNavigate={setActivePage} />
-          )}
-
-          {activePage === 'star-rating' && (
-            <StarRatingView activeMine={activeMine} />
           )}
         </main>
 
@@ -517,6 +619,7 @@ export default function App() {
           isOpen={showFormAModal}
           onClose={() => setShowFormAModal(false)}
           activeMine={activeMine}
+          activeMineMinerals={activeMineMinerals}
           user={user}
           onSubmitted={() => loadDashboardData(activeMineId)}
         />
@@ -525,7 +628,10 @@ export default function App() {
           isOpen={showAddDocModal}
           onClose={() => setShowAddDocModal(false)}
           activeMineId={activeMineId}
-          onDocAdded={() => loadDashboardData(activeMineId)}
+          onDocAdded={() => {
+            setDocumentsRefreshKey((k) => k + 1);
+            loadDashboardData(activeMineId);
+          }}
         />
 
         <StatutoryRatesModal

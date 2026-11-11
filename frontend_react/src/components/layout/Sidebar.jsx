@@ -17,7 +17,7 @@ const Sidebar = memo(function Sidebar({
   onDeleteMine,
   onOpenAddMine,
   user,
-  dgmsScore,
+  dgmsProgress,
   alertCount = 0,
   isOpen,
   onClose,
@@ -152,7 +152,9 @@ const Sidebar = memo(function Sidebar({
           <span className="nav-icon">◉</span>
           <span>DGMS Readiness</span>
           <span className="nav-score-pill" id="dgms-nav-pill">
-            {dgmsScore != null ? dgmsScore : '–'}
+            {dgmsProgress && dgmsProgress.totalActions > 0
+              ? `${dgmsProgress.completedActions}/${dgmsProgress.totalActions}`
+              : '–'}
           </span>
         </a>
         <a
@@ -161,13 +163,6 @@ const Sidebar = memo(function Sidebar({
         >
           <span className="nav-icon">▣</span>
           <span>Documents</span>
-        </a>
-        <a
-          className={`nav-item ${activePage === 'star-rating' ? 'active' : ''}`}
-          onClick={() => onNavigate('star-rating')}
-        >
-          <span className="nav-icon" style={{ color: '#e8a020' }}>★</span>
-          <span>Rule 35 Star Rating</span>
         </a>
 
         <div className="nav-section-label">Finance</div>
@@ -200,6 +195,13 @@ const Sidebar = memo(function Sidebar({
         >
           <span className="nav-icon">⬡</span>
           <span>Production Log</span>
+        </a>
+        <a
+          className={`nav-item ${activePage === 'mine' ? 'active' : ''}`}
+          onClick={() => onNavigate('mine')}
+        >
+          <span className="nav-icon">⚙</span>
+          <span>Mine Management</span>
         </a>
       </nav>
 

@@ -12,6 +12,22 @@ function fromDateInputValue(dateString) {
   return dateString ? new Date(dateString).getTime() : null;
 }
 
+function resolveLookupOptions(lookup, formData) {
+  if (!lookup?.options) return undefined;
+  const resolved = {};
+  for (const [key, expr] of Object.entries(lookup.options)) {
+    const pointer =
+      typeof expr === 'string' && expr.startsWith('$.')
+        ? '/' + expr.slice(2).replace(/\./g, '/')
+        : expr;
+    const val = getValueByPointer(formData, pointer);
+    if (val !== undefined && val !== null && val !== '') {
+      resolved[key] = String(val);
+    }
+  }
+  return Object.keys(resolved).length ? resolved : undefined;
+}
+
 /** Renders one layout field as its widget, wired to the hook's form state. */
 function Field({ pointer, field, access, formData, setFieldValue, error }) {
   if (!access.visible) return null;
@@ -82,6 +98,7 @@ function Field({ pointer, field, access, formData, setFieldValue, error }) {
           value={value}
           onChange={onChange}
           assetType={field.lookup?.assetType}
+          lookupOptions={resolveLookupOptions(field.lookup, formData)}
           disabled={disabled}
           placeholder={`Search ${field.label}…`}
         />

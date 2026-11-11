@@ -1,19 +1,23 @@
-import React, { useState, useEffect, memo } from 'react';
+import React, { useState, useEffect, useCallback, memo } from 'react';
 import { catalogSearch, apiFetch } from '../services/api';
 import { toast } from '../context/ToastContext';
+import PaginationBar from '../components/common/PaginationBar';
 
-const CalendarView = memo(function CalendarView({ activeMineId }) {
+const PAGE_SIZE = 20;
+
+const CalendarView = memo(function CalendarView({ activeMineId, onDataChanged }) {
   const [authorityFilter, setAuthorityFilter] = useState('');
   const [records, setRecords] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (activeMineId) {
-      loadCalendarData();
-    }
+    setPage(0);
   }, [activeMineId, authorityFilter]);
 
-  const loadCalendarData = async () => {
+  const loadCalendarData = useCallback(async () => {
+    if (!activeMineId) return;
     setLoading(true);
     try {
       const filters = [
@@ -23,22 +27,31 @@ const CalendarView = memo(function CalendarView({ activeMineId }) {
       if (authorityFilter) {
         filters.push({ field: 'authority', op: 'EQ', values: [authorityFilter] });
       }
-      const res = await catalogSearch('ComplianceRecord', { filter: { op: 'AND', values: filters } });
+      const res = await catalogSearch('ComplianceRecord', {
+        filter: { op: 'AND', values: filters },
+        sorts: [{ field: 'expiry', order: 'ASC' }],
+        page: { offset: page * PAGE_SIZE, limit: PAGE_SIZE },
+        includeCount: true,
+      });
       const now = Date.now();
-      const items = (res.items || [])
-        .map((r) => ({
-          ...r,
-          days_until: Math.floor((r.expiry - now) / 86400000),
-          dt: new Date(r.expiry),
-        }))
-        .sort((a, b) => a.expiry - b.expiry);
+      const raw = res?.items || [];
+      const items = raw.map((r) => ({
+        ...r,
+        days_until: Math.floor((r.expiry - now) / 86400000),
+        dt: new Date(r.expiry),
+      }));
       setRecords(items);
+      setTotalCount(res?.totalCount ?? raw.length);
     } catch (err) {
       toast('Failed to load compliance calendar', 'error');
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeMineId, authorityFilter, page]);
+
+  useEffect(() => {
+    loadCalendarData();
+  }, [loadCalendarData]);
 
   const handleMarkSubmitted = async (ev) => {
     if (ev.status === 'SUBMITTED') {
@@ -55,6 +68,7 @@ const CalendarView = memo(function CalendarView({ activeMineId }) {
       });
       toast(`Marked "${ev.title}" as submitted!`, 'success');
       loadCalendarData();
+      onDataChanged?.();
     } catch (err) {
       toast(err.message || 'Failed to mark as submitted', 'error');
     }
@@ -160,6 +174,14 @@ const CalendarView = memo(function CalendarView({ activeMineId }) {
           ))
         )}
       </div>
+
+      <PaginationBar
+        page={page}
+        pageSize={PAGE_SIZE}
+        totalCount={totalCount}
+        itemCount={records.length}
+        onPageChange={setPage}
+      />
     </section>
   );
 });

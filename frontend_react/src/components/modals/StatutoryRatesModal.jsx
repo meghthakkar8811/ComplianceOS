@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { catalogSearch } from '../../services/api';
+import { catalogSearchAll } from '../../services/api';
 import { toast } from '../../context/ToastContext';
 
 const MONTH_INDEX = {
@@ -48,11 +48,11 @@ export default function StatutoryRatesModal({ isOpen, onClose, activeMineral = '
     setLoading(true);
     try {
       const [royaltyRes, gstRes] = await Promise.all([
-        catalogSearch('RoyaltyRate', {}).catch(() => ({ items: [] })),
-        catalogSearch('GstRate', {}).catch(() => ({ items: [] })),
+        catalogSearchAll('RoyaltyRate', {}).catch(() => ({ items: [] })),
+        catalogSearchAll('GstRate', {}).catch(() => ({ items: [] })),
       ]);
-      setRoyaltyRates(latestRoyaltyRatesByStateAndMineral(royaltyRes.items || []));
-      setGstRates(latestGstRatesByMineral(gstRes.items || []));
+      setRoyaltyRates(latestRoyaltyRatesByStateAndMineral(royaltyRes?.items || []));
+      setGstRates(latestGstRatesByMineral(gstRes?.items || []));
     } finally {
       setLoading(false);
     }

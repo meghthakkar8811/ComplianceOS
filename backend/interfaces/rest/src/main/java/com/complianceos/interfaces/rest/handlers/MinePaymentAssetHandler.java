@@ -1,7 +1,9 @@
 package com.complianceos.interfaces.rest.handlers;
 
+import com.agentengine.interfaces.rest.dto.AggregationRequest;
 import com.agentengine.interfaces.rest.dto.AssetRequest;
 import com.agentengine.interfaces.rest.handlers.catalog.AssetHandler;
+import com.agentengine.util.common.query.AggregationResult;
 import com.agentengine.util.common.query.PaginatedResult;
 import com.agentengine.util.common.utils.CollectionUtils;
 import com.agentengine.util.ms.client.MicroServiceClientProvider;
@@ -43,5 +45,15 @@ public class MinePaymentAssetHandler implements AssetHandler<MinePayment> {
       return Map.of();
     }
     return service.getPayments(request.getKeys());
+  }
+
+  /** {@code mineId} (an option, not a query filter) is required: payments are always aggregated one mine at a time. */
+  @Override
+  public AggregationResult aggregate(final AggregationRequest request) {
+    final String mineId = CollectionUtils.getStringValueFromMap(request.getOptions(), "mineId");
+    if (mineId == null) {
+      throw new IllegalArgumentException("mineId option is required to aggregate payments");
+    }
+    return service.aggregatePayments(mineId, request.getQuery());
   }
 }

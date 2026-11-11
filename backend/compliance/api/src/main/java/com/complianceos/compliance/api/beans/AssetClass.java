@@ -5,6 +5,8 @@ public interface AssetClass {
   String BUYER = "Buyer";
   String PRODUCTION_ENTRY = "ProductionEntry";
   String ROYALTY_RATE = "RoyaltyRate";
+  String DMF_RATE = "DmfRate";
+  String NMET_RATE = "NmetRate";
   String GST_RATE = "GstRate";
   String COMPLIANCE_RECORD = "ComplianceRecord";
   String MINE_RENT = "MineRent";

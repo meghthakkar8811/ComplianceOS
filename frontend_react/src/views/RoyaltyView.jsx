@@ -1,10 +1,24 @@
 import React, { useState, useEffect, memo } from 'react';
-import { catalogAggregate, catalogSearch } from '../services/api';
+import { catalogAggregate, catalogSearchAll } from '../services/api';
 
 const MONTH_NAMES = [
   'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
   'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER',
 ];
+
+const DMF_RATE_CHANGE_CUTOFF = Date.parse('2015-01-12T00:00:00Z');
+const LEASE_TIER_PRE_2015 = 'RegisteredBefore12Jan2015';
+const LEASE_TIER_POST_2015 = 'RegisteredAfter12Jan2015';
+
+function pickLatestRate(rates, asOf) {
+  let chosen = null;
+  for (const r of rates) {
+    if ((r.effectiveFrom || 0) <= asOf && (!chosen || r.effectiveFrom > chosen.effectiveFrom)) {
+      chosen = r;
+    }
+  }
+  return chosen;
+}
 
 const RoyaltyView = memo(function RoyaltyView({ activeMine, onOpenStatutoryRates }) {
   const [tonnage, setTonnage] = useState(1000);
@@ -13,6 +27,8 @@ const RoyaltyView = memo(function RoyaltyView({ activeMine, onOpenStatutoryRates
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [royaltyRatesById, setRoyaltyRatesById] = useState({});
+  const [dmfRates, setDmfRates] = useState([]);
+  const [nmetRates, setNmetRates] = useState([]);
 
   useEffect(() => {
     if (activeMine) {
@@ -20,20 +36,21 @@ const RoyaltyView = memo(function RoyaltyView({ activeMine, onOpenStatutoryRates
     }
   }, [activeMine]);
 
-  // The statutory RoyaltyRate catalog is global reference data, not scoped to any one mine — load
-  // it once so the current period's royaltyRateIds can be resolved to a mineral + source citation.
+  // Global statutory reference catalogs (RoyaltyRate, DmfRate, NmetRate), not scoped to any one mine.
   useEffect(() => {
-    catalogSearch('RoyaltyRate', {})
-      .then((res) => {
-        const byId = {};
-        for (const rate of res.items || []) {
-          byId[rate.id] = rate;
-        }
-        setRoyaltyRatesById(byId);
-      })
-      .catch(() => {
-        // A display nicety for the schedule/citation row; the computed amounts don't depend on it.
-      });
+    Promise.all([
+      catalogSearchAll('RoyaltyRate', {}).catch(() => ({ items: [] })),
+      catalogSearchAll('DmfRate', {}).catch(() => ({ items: [] })),
+      catalogSearchAll('NmetRate', {}).catch(() => ({ items: [] })),
+    ]).then(([royaltyRes, dmfRes, nmetRes]) => {
+      const byId = {};
+      for (const rate of royaltyRes?.items || []) {
+        byId[rate.id] = rate;
+      }
+      setRoyaltyRatesById(byId);
+      setDmfRates(dmfRes?.items || []);
+      setNmetRates(nmetRes?.items || []);
+    });
   }, []);
 
   const loadRoyaltyData = async () => {
@@ -94,8 +111,15 @@ const RoyaltyView = memo(function RoyaltyView({ activeMine, onOpenStatutoryRates
     }
   };
 
-  const dmfPct = 0.30;
-  const nmetPct = 0.02;
+  const leaseTier =
+    activeMine?.leaseStartOn != null && activeMine.leaseStartOn >= DMF_RATE_CHANGE_CUTOFF
+      ? LEASE_TIER_POST_2015
+      : LEASE_TIER_PRE_2015;
+  const now = Date.now();
+  const activeDmfRate = pickLatestRate(dmfRates.filter((r) => r.tier === leaseTier), now);
+  const activeNmetRate = pickLatestRate(nmetRates, now);
+  const dmfPct = activeDmfRate?.rate ?? 0;
+  const nmetPct = activeNmetRate?.rate ?? 0;
 
   // Current period liability — summed from each Sale's own stored royalty/DMF/NMET amounts, never estimated.
   const dispatchedQty = current?.quantity || 0;
@@ -134,29 +158,9 @@ const RoyaltyView = memo(function RoyaltyView({ activeMine, onOpenStatutoryRates
           <p className="page-sub">Statutory royalty rates per metric tonne (MT), DMF, and NMET under MMDR Act Schedule II</p>
         </div>
         <div className="page-actions" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          <span className="live-sync-indicator" id="rate-sync-indicator">
-            <span className="live-pulse-dot" />
-            <span id="rate-sync-text">Live Gov Sync: Active</span>
-          </span>
-          <button className="btn-ghost" onClick={onOpenStatutoryRates} title="View full government statutory rates table for all minerals">
+          <button className="btn-ghost" onClick={onOpenStatutoryRates} title="View statutory rates table for all minerals">
             <span style={{ marginRight: '4px' }}>📊</span>All Mineral Rates
           </button>
-          <button className="btn-primary" id="btn-sync-rates" onClick={loadRoyaltyData} title="Fetch and update latest statutory royalty rates online">
-            <span id="sync-icon" style={{ marginRight: '4px' }}>🔄</span>Fetch Latest Rates
-          </button>
-        </div>
-      </div>
-
-      {/* Official Live Government Source Banner */}
-      <div className="rate-source-banner" id="rate-source-banner">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
-          <span className="gov-badge">Official Govt Gazette</span>
-          <span id="rate-source-text">
-            Source: Indian Bureau of Mines (ibm.gov.in) & Ministry of Mines Gazette (MMDR Act Schedule II)
-          </span>
-        </div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text2)' }} id="rate-last-synced-time">
-          Auto-synced via Google & Ministry of Mines Feed
         </div>
       </div>
 
@@ -164,13 +168,15 @@ const RoyaltyView = memo(function RoyaltyView({ activeMine, onOpenStatutoryRates
       <div className="royalty-kpi-row">
         <div className="rk-card highlight">
           <span className="rk-label">Base Royalty Rate (per MT)</span>
-          <span className="rk-val amber" id="rk-base-rate">₹{baseRate}.00 / MT</span>
+          <span className="rk-val amber" id="rk-base-rate">₹{Number(baseRate).toFixed(2)} / MT</span>
           <span className="rk-sub" id="rk-mineral-sub">{curMineralSchedule}</span>
         </div>
         <div className="rk-card">
           <span className="rk-label">Effective Total per MT</span>
           <span className="rk-val" id="rk-gross-rate">₹{perMtTotal} / MT</span>
-          <span className="rk-sub" id="rk-eff-sub">Base + DMF (10-30%) + NMET (2%)</span>
+          <span className="rk-sub" id="rk-eff-sub">
+            Base + DMF ({Number((dmfPct * 100).toFixed(2))}%) + NMET ({Number((nmetPct * 100).toFixed(2))}%)
+          </span>
         </div>
         <div className="rk-card">
           <span className="rk-label">Current Period Dispatched</span>

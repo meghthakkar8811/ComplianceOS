@@ -9,7 +9,10 @@ const PAGE_TITLES = {
   dgms: 'DGMS Readiness',
   documents: 'Documents',
   royalty: 'Royalty Calculator',
+  sales: 'Sales / Dispatches',
+  buyers: 'Buyers',
   production: 'Production Log',
+  mine: 'Mine Management',
 };
 
 const Topbar = memo(function Topbar({
@@ -17,9 +20,13 @@ const Topbar = memo(function Topbar({
   onToggleSidebar,
   onNavigate,
   alertCount = 0,
-  healthScore = 84,
+  complianceProgress,
   user,
 }) {
+  const totalTasks = complianceProgress?.totalActions ?? 0;
+  const completedTasks = complianceProgress?.completedActions ?? 0;
+  const completionPct = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const progressColor = totalTasks === 0 ? 'var(--text2)' : completedTasks === totalTasks ? 'var(--green)' : 'var(--amber)';
   const { theme, toggleTheme } = useTheme();
   const userName = user?.username || 'User';
   const initials =
@@ -73,27 +80,25 @@ const Topbar = memo(function Topbar({
           )}
         </button>
 
-        {/* HEALTH PILL */}
-        <div className="health-pill" id="health-pill" onClick={() => onNavigate('dashboard')}>
-          <span className="hp-label">Health</span>
+        {/* TASK COMPLETION PILL */}
+        <div className="health-pill" id="health-pill" onClick={() => onNavigate('dashboard')} title="Completed vs total statutory tasks">
+          <span className="hp-label">Tasks</span>
           <div className="hp-bar-wrap">
             <div
               className="hp-bar"
               id="hp-bar"
               style={{
-                width: `${Math.max(0, Math.min(100, healthScore))}%`,
-                background: healthScore >= 80 ? 'var(--green)' : healthScore >= 50 ? 'var(--amber)' : 'var(--red)',
+                width: `${completionPct}%`,
+                background: progressColor,
               }}
             />
           </div>
           <span
             className="hp-score"
             id="hp-score"
-            style={{
-              color: healthScore >= 80 ? 'var(--green)' : healthScore >= 50 ? 'var(--amber)' : 'var(--red)',
-            }}
+            style={{ color: progressColor }}
           >
-            {healthScore != null ? healthScore : '–'}
+            {complianceProgress ? `${completedTasks}/${totalTasks}` : '–'}
           </span>
         </div>
 

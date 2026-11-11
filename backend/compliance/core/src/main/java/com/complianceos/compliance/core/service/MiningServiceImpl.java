@@ -1,5 +1,6 @@
 package com.complianceos.compliance.core.service;
 
+import com.agentengine.util.common.beans.BaseEntity;
 import com.agentengine.util.common.beans.FileDetails;
 import com.agentengine.util.common.codec.JsonUtils;
 import com.agentengine.util.common.exception.UnauthorizedException;
@@ -10,6 +11,7 @@ import com.agentengine.util.common.query.Filters;
 import com.agentengine.util.common.query.Page;
 import com.agentengine.util.common.query.PaginatedResult;
 import com.agentengine.util.common.query.Query;
+import com.agentengine.util.common.repository.AbstractRepository;
 import com.agentengine.util.common.utils.CollectionUtils;
 import com.agentengine.util.common.utils.ResourceUtils;
 import com.agentengine.util.common.utils.StringUtils;
@@ -241,13 +243,12 @@ public class MiningServiceImpl implements MiningService {
   }
 
   @Override
-  public void deleteProductionEntry(final String id) {
-    final ProductionEntry entry = productionEntryRepository.findById(id);
-    if (entry == null) {
-      return;
-    }
-    requireMineEdit(entry.getMineId());
-    productionEntryRepository.deleteByIdIgnoringVersion(id);
+  public void deleteProductionEntry(final String mineId, final String id) {
+    requireMineEdit(mineId);
+    productionEntryRepository.deleteByFilterIgnoringVersion(
+        Filters.and(
+            Filters.eq(BaseEntity.FIELD_ID, id),
+            Filters.eq(ProductionEntry.FIELD_MINE_ID, mineId)));
   }
 
   @Override
@@ -267,15 +268,51 @@ public class MiningServiceImpl implements MiningService {
   }
 
   @Override
+  public Map<String, RoyaltyRate> getRoyaltyRates(final List<String> ids) {
+    if (CollectionUtils.isEmpty(ids)) {
+      return Map.of();
+    }
+    return Context.asSystemCustomer().get(() -> royaltyRateRepository.findByIds(ids));
+  }
+
+  @Override
   public DmfRate saveDmfRate(final DmfRate rate) {
     rate.setId(DmfRate.id(rate.getTier(), rate.getEffectiveFrom()));
     return Context.asSystemCustomer().get(() -> dmfRateRepository.saveIgnoringVersion(rate));
   }
 
   @Override
+  public PaginatedResult<DmfRate> findDmfRates(final Query query) {
+    return Context.asSystemCustomer()
+        .get(() -> dmfRateRepository.findByQuery(query == null ? new Query() : query));
+  }
+
+  @Override
+  public Map<String, DmfRate> getDmfRates(final List<String> ids) {
+    if (CollectionUtils.isEmpty(ids)) {
+      return Map.of();
+    }
+    return Context.asSystemCustomer().get(() -> dmfRateRepository.findByIds(ids));
+  }
+
+  @Override
   public NmetRate saveNmetRate(final NmetRate rate) {
     rate.setId(NmetRate.id(rate.getEffectiveFrom()));
     return Context.asSystemCustomer().get(() -> nmetRateRepository.saveIgnoringVersion(rate));
+  }
+
+  @Override
+  public PaginatedResult<NmetRate> findNmetRates(final Query query) {
+    return Context.asSystemCustomer()
+        .get(() -> nmetRateRepository.findByQuery(query == null ? new Query() : query));
+  }
+
+  @Override
+  public Map<String, NmetRate> getNmetRates(final List<String> ids) {
+    if (CollectionUtils.isEmpty(ids)) {
+      return Map.of();
+    }
+    return Context.asSystemCustomer().get(() -> nmetRateRepository.findByIds(ids));
   }
 
   @Override
@@ -287,6 +324,14 @@ public class MiningServiceImpl implements MiningService {
   @Override
   public PaginatedResult<GstRate> findGstRates(final Query query) {
     return Context.asSystemCustomer().get(() -> gstRateRepository.findByQuery(query == null ? new Query() : query));
+  }
+
+  @Override
+  public Map<String, GstRate> getGstRates(final List<String> ids) {
+    if (CollectionUtils.isEmpty(ids)) {
+      return Map.of();
+    }
+    return Context.asSystemCustomer().get(() -> gstRateRepository.findByIds(ids));
   }
 
   @Override
@@ -394,13 +439,12 @@ public class MiningServiceImpl implements MiningService {
   }
 
   @Override
-  public void deleteComplianceRecord(final String id) {
-    final ComplianceRecord record = complianceRecordRepository.findById(id);
-    if (record == null) {
-      return;
-    }
-    requireMineEdit(record.getMineId());
-    complianceRecordRepository.deleteByIdIgnoringVersion(id);
+  public void deleteComplianceRecord(final String mineId, final String id) {
+    requireMineEdit(mineId);
+    complianceRecordRepository.deleteByFilterIgnoringVersion(
+        Filters.and(
+            Filters.eq(BaseEntity.FIELD_ID, id),
+            Filters.eq(ComplianceRecord.FIELD_MINE_ID, mineId)));
   }
 
   @Override
@@ -734,15 +778,53 @@ public class MiningServiceImpl implements MiningService {
   }
 
   @Override
+  public AggregationResult aggregateProductionEntries(final String mineId, final AggregationQuery query) {
+    return aggregateForMine(mineId, query, ProductionEntry.FIELD_MINE_ID, productionEntryRepository);
+  }
+
+  @Override
   public AggregationResult aggregateSales(final String mineId, final AggregationQuery query) {
+    return aggregateForMine(mineId, query, Sale.FIELD_MINE_ID, saleRepository);
+  }
+
+  @Override
+  public AggregationResult aggregateComplianceRecords(final String mineId, final AggregationQuery query) {
+    return aggregateForMine(mineId, query, ComplianceRecord.FIELD_MINE_ID, complianceRecordRepository);
+  }
+
+  @Override
+  public AggregationResult aggregateLaborDays(final String mineId, final AggregationQuery query) {
+    return aggregateForMine(mineId, query, LaborDay.FIELD_MINE_ID, laborDayRepository);
+  }
+
+  @Override
+  public AggregationResult aggregateLaborPayrolls(final String mineId, final AggregationQuery query) {
+    return aggregateForMine(mineId, query, LaborPayroll.FIELD_MINE_ID, laborPayrollRepository);
+  }
+
+  @Override
+  public AggregationResult aggregatePayments(final String mineId, final AggregationQuery query) {
+    return aggregateForMine(mineId, query, MinePayment.FIELD_MINE_ID, minePaymentRepository);
+  }
+
+  @Override
+  public AggregationResult aggregateMineStoppages(final String mineId, final AggregationQuery query) {
+    return aggregateForMine(mineId, query, MineStoppage.FIELD_MINE_ID, mineStoppageRepository);
+  }
+
+  private AggregationResult aggregateForMine(
+      final String mineId,
+      final AggregationQuery query,
+      final String mineIdField,
+      final AbstractRepository<?> repository) {
     if (!mineRepository.hasPermission(mineId, Permission.READ)) {
       return AggregationResult.create(List.of());
     }
     final AggregationQuery source = query == null ? new AggregationQuery() : query;
     final AggregationQuery scoped = new AggregationQuery(source);
-    final Filter mineFilter = Filters.eq(Sale.FIELD_MINE_ID, mineId);
+    final Filter mineFilter = Filters.eq(mineIdField, mineId);
     scoped.setFilter(source.getFilter() == null ? mineFilter : Filters.and(source.getFilter(), mineFilter));
-    return saleRepository.aggregate(scoped);
+    return repository.aggregate(scoped);
   }
 
   @Override

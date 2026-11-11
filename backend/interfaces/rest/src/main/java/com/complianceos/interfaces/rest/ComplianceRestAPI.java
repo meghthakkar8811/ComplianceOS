@@ -108,7 +108,7 @@ public class ComplianceRestAPI {
   @Operation(summary = "Delete a compliance record")
   public void deleteComplianceRecord(
       @PathParam("mineId") final String mineId, @PathParam("recordId") final String recordId) {
-    service.deleteComplianceRecord(recordId);
+    service.deleteComplianceRecord(mineId, recordId);
   }
 
   @POST

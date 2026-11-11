@@ -64,19 +64,31 @@ public interface MiningService {
    */
   PaginatedResult<ProductionEntry> findProductionEntries(Query query);
 
-  void deleteProductionEntry(String id);
+  void deleteProductionEntry(String mineId, String id);
 
   RoyaltyRate saveRoyaltyRate(RoyaltyRate rate);
 
   PaginatedResult<RoyaltyRate> findRoyaltyRates(Query query);
 
+  Map<String, RoyaltyRate> getRoyaltyRates(List<String> ids);
+
   DmfRate saveDmfRate(DmfRate rate);
 
+  PaginatedResult<DmfRate> findDmfRates(Query query);
+
+  Map<String, DmfRate> getDmfRates(List<String> ids);
+
   NmetRate saveNmetRate(NmetRate rate);
+
+  PaginatedResult<NmetRate> findNmetRates(Query query);
+
+  Map<String, NmetRate> getNmetRates(List<String> ids);
 
   GstRate saveGstRate(GstRate rate);
 
   PaginatedResult<GstRate> findGstRates(Query query);
+
+  Map<String, GstRate> getGstRates(List<String> ids);
 
   /** Records a statutory return as filed — a RETURN record for {@code title}, submitted now under {@code referenceNumber}. */
   ComplianceRecord fileReturn(String mineId, String title, String referenceNumber);
@@ -108,7 +120,7 @@ public interface MiningService {
       Long issuedOn,
       Long expiry);
 
-  void deleteComplianceRecord(String id);
+  void deleteComplianceRecord(String mineId, String id);
 
   Map<String, ComplianceRecord> getComplianceRecords(List<String> ids);
 
@@ -223,7 +235,23 @@ public interface MiningService {
    * filtering it post-aggregation can't undo an unscoped read the way filtering a list of rows
    * can.
    */
+  /**
+   * Aggregates {@code mineId}'s production entries against whichever fields/metrics {@code query} asks for
+   * — empty if the caller may not read that mine. Always scoped to one mine explicitly.
+   */
+  AggregationResult aggregateProductionEntries(String mineId, AggregationQuery query);
+
   AggregationResult aggregateSales(String mineId, AggregationQuery query);
+
+  AggregationResult aggregateComplianceRecords(String mineId, AggregationQuery query);
+
+  AggregationResult aggregateLaborDays(String mineId, AggregationQuery query);
+
+  AggregationResult aggregateLaborPayrolls(String mineId, AggregationQuery query);
+
+  AggregationResult aggregatePayments(String mineId, AggregationQuery query);
+
+  AggregationResult aggregateMineStoppages(String mineId, AggregationQuery query);
 
   /**
    * Creates whatever of the mine's fixed DGMS registers and rolling-12-month recurring filing

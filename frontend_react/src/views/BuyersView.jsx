@@ -1,29 +1,40 @@
-import React, { useState, useEffect, memo } from 'react';
+import React, { useState, useEffect, useCallback, memo } from 'react';
 import { catalogSearch, apiFetch } from '../services/api';
 import { toast } from '../context/ToastContext';
 import { SchemaForm } from '../components/forms/SchemaForm';
+import PaginationBar from '../components/common/PaginationBar';
+
+const PAGE_SIZE = 20;
 
 const BuyersView = memo(function BuyersView() {
   const [buyers, setBuyers] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingBuyer, setEditingBuyer] = useState(null);
 
-  useEffect(() => {
-    loadBuyers();
-  }, []);
-
-  const loadBuyers = async () => {
+  const loadBuyers = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await catalogSearch('Buyer', {});
-      setBuyers(res.items || []);
+      const res = await catalogSearch('Buyer', {
+        sorts: [{ field: 'name', order: 'ASC' }],
+        page: { offset: page * PAGE_SIZE, limit: PAGE_SIZE },
+        includeCount: true,
+      });
+      const items = res?.items || [];
+      setBuyers(items);
+      setTotalCount(res?.totalCount ?? items.length);
     } catch (e) {
       toast('Failed to load buyers', 'error');
     } finally {
       setLoading(false);
     }
-  };
+  }, [page]);
+
+  useEffect(() => {
+    loadBuyers();
+  }, [loadBuyers]);
 
   const openCreate = () => {
     setEditingBuyer(null);
@@ -138,6 +149,13 @@ const BuyersView = memo(function BuyersView() {
             </tbody>
           </table>
         </div>
+        <PaginationBar
+          page={page}
+          pageSize={PAGE_SIZE}
+          totalCount={totalCount}
+          itemCount={buyers.length}
+          onPageChange={setPage}
+        />
       </div>
 
       {showForm && (

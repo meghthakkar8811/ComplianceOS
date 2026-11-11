@@ -1,16 +1,21 @@
-import React, { useState, useEffect, memo } from 'react';
-import { catalogSearch, apiFetch } from '../services/api';
+import React, { useState, useEffect, useCallback, memo } from 'react';
+import { catalogSearch, catalogSearchAll, catalogAggregate, apiFetch } from '../services/api';
 import { toast } from '../context/ToastContext';
+import PaginationBar from '../components/common/PaginationBar';
 
-const ProductionView = memo(function ProductionView({ activeMineId }) {
+const PAGE_SIZE = 20;
+
+const ProductionView = memo(function ProductionView({ activeMineId, onDataChanged }) {
   const [showProdForm, setShowProdForm] = useState(false);
   const [entries, setEntries] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [summary, setSummary] = useState({ totalProduced: 0, entryCount: 0 });
+  const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
   });
-  // The mine's own registered Minerals, for the Mineral/Grade pickers below.
   const [mineMinerals, setMineMinerals] = useState([]);
 
   // Prod Form State
@@ -25,48 +30,80 @@ const ProductionView = memo(function ProductionView({ activeMineId }) {
   const [prodRem, setProdRem] = useState('');
 
   useEffect(() => {
-    if (activeMineId) {
-      loadProductionData();
-      loadMineMinerals();
-    }
-  }, [activeMineId, selectedMonth]);
+    setPage(0);
+  }, [activeMineId, selectedMonth, search]);
 
-  const loadMineMinerals = async () => {
-    try {
-      const res = await catalogSearch('Mineral', {}, { mineId: activeMineId });
-      setMineMinerals(res.items || []);
-    } catch (e) {
-      setMineMinerals([]);
-    }
-  };
+  useEffect(() => {
+    if (!activeMineId) return;
+    catalogSearchAll('Mineral', {}, { mineId: activeMineId })
+      .then((res) => setMineMinerals(res.items || []))
+      .catch(() => setMineMinerals([]));
+  }, [activeMineId]);
 
   const mineralNameOf = (mineMineralId) => mineMinerals.find((m) => m.id === mineMineralId)?.mineral || '—';
   const gradesOf = (mineMineralId) => mineMinerals.find((m) => m.id === mineMineralId)?.grades || [];
 
-  const loadProductionData = async () => {
+  const loadProductionData = useCallback(async () => {
+    if (!activeMineId) return;
     try {
       const [year, month] = selectedMonth.split('-').map(Number);
-      const start = new Date(year, month - 1, 1).getTime();
-      const end = new Date(year, month, 1).getTime();
+      const start = Date.UTC(year, month - 1, 1);
+      const end = Date.UTC(year, month, 1);
 
-      const entriesRes = await catalogSearch('ProductionEntry', {
-        filter: {
-          op: 'AND',
+      const filterValues = [
+        { field: 'mineId', op: 'EQ', values: [activeMineId] },
+        { field: 'entryTime', op: 'GTE', values: [start] },
+        { field: 'entryTime', op: 'LT', values: [end] },
+      ];
+      const q = search.trim();
+      if (q) {
+        filterValues.push({
+          op: 'OR',
           values: [
-            { field: 'mineId', op: 'EQ', values: [activeMineId] },
-            { field: 'entryTime', op: 'GTE', values: [start - 86400000] },
-            { field: 'entryTime', op: 'LT', values: [end + 86400000] },
+            { field: 'pitSection', op: 'CONTAINS', values: [q] },
+            { field: 'grade', op: 'CONTAINS', values: [q] },
+            { field: 'supervisorName', op: 'CONTAINS', values: [q] },
           ],
-        },
-      }).catch(() => ({ items: [] }));
+        });
+      }
+      const filter = { op: 'AND', values: filterValues };
 
-      const sortedEntries = (entriesRes.items || []).sort((a, b) => (b.entryTime || 0) - (a.entryTime || 0));
+      const [entriesRes, aggRes] = await Promise.all([
+        catalogSearch('ProductionEntry', {
+          filter,
+          sorts: [{ field: 'entryTime', order: 'DESC' }],
+          page: { offset: page * PAGE_SIZE, limit: PAGE_SIZE },
+          includeCount: true,
+        }),
+        catalogAggregate(
+          'ProductionEntry',
+          {
+            filter,
+            metrics: [
+              { field: 'quantity', function: 'SUM', alias: 'totalProduced' },
+              { field: 'id', function: 'COUNT', alias: 'entryCount' },
+            ],
+          },
+          { mineId: activeMineId }
+        ).catch(() => ({ buckets: [] })),
+      ]);
 
-      setEntries(sortedEntries);
+      const items = entriesRes?.items || [];
+      setEntries(items);
+      setTotalCount(entriesRes?.totalCount ?? items.length);
+      const bucket = aggRes?.buckets?.[0];
+      setSummary({
+        totalProduced: bucket?.totalProduced || 0,
+        entryCount: bucket?.entryCount || 0,
+      });
     } catch (e) {
       toast('Failed to load production data', 'error');
     }
-  };
+  }, [activeMineId, selectedMonth, search, page]);
+
+  useEffect(() => {
+    loadProductionData();
+  }, [loadProductionData]);
 
   const handleSaveProd = async () => {
     if (!prodDate || !prodQty) {
@@ -100,6 +137,7 @@ const ProductionView = memo(function ProductionView({ activeMineId }) {
       setProdGrade('');
       setProdQty('');
       loadProductionData();
+      if (onDataChanged) onDataChanged();
     } catch (e) {
       toast(e.message || 'Failed to save production entry', 'error');
     }
@@ -124,6 +162,7 @@ const ProductionView = memo(function ProductionView({ activeMineId }) {
       await apiFetch(`/mines/${activeMineId}/production/${id}`, { method: 'DELETE' });
       toast('Entry deleted', 'success');
       loadProductionData();
+      if (onDataChanged) onDataChanged();
     } catch (e) {
       toast(e.message || 'Failed to delete entry', 'error');
     }
@@ -137,49 +176,11 @@ const ProductionView = memo(function ProductionView({ activeMineId }) {
       });
       toast('Entry verified', 'success');
       loadProductionData();
+      if (onDataChanged) onDataChanged();
     } catch (e) {
       toast(e.message || 'Failed to verify entry', 'error');
     }
   };
-
-  const exportProdCSV = () => {
-    const rows = [
-      ['Date', 'Shift', 'Pit', 'Mineral', 'Grade', 'Produced (MT)', 'Supervisor', 'Status'],
-      ...entries.map((r) => [
-        new Date(r.entryTime).toLocaleDateString('en-IN'),
-        r.shift,
-        r.pitSection,
-        mineralNameOf(r.mineral),
-        r.grade,
-        r.quantity,
-        r.supervisorName || '',
-        r.status,
-      ]),
-    ];
-    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `production_${activeMineId}_${selectedMonth}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    toast('CSV exported', 'success');
-  };
-
-  const totalP = entries.reduce((s, r) => s + (r.quantity || 0), 0);
-
-  const filteredEntries = entries.filter((e) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      (e.pitSection || '').toLowerCase().includes(q) ||
-      (e.grade || '').toLowerCase().includes(q) ||
-      (e.supervisorName || '').toLowerCase().includes(q)
-    );
-  });
 
   return (
     <section className="page active" id="page-production">
@@ -189,9 +190,6 @@ const ProductionView = memo(function ProductionView({ activeMineId }) {
           <p className="page-sub">Daily shift-wise production entry</p>
         </div>
         <div className="page-actions">
-          <button className="btn-ghost" onClick={exportProdCSV}>
-            Export CSV
-          </button>
           <button
             className="btn-primary"
             onClick={() => {
@@ -281,15 +279,15 @@ const ProductionView = memo(function ProductionView({ activeMineId }) {
         </div>
       )}
 
-      {/* SUMMARY ROW */}
+      {/* SUMMARY ROW (Server-Side Aggregated) */}
       <div className="prod-summary-row" id="prod-summary">
         <div className="psr-card">
           <span className="psr-label">Total Produced</span>
-          <span className="psr-val">{totalP.toLocaleString('en-IN', { maximumFractionDigits: 1 })} MT</span>
+          <span className="psr-val">{summary.totalProduced.toLocaleString('en-IN', { maximumFractionDigits: 1 })} MT</span>
         </div>
         <div className="psr-card">
           <span className="psr-label">Entries</span>
-          <span className="psr-val">{entries.length}</span>
+          <span className="psr-val">{summary.entryCount}</span>
         </div>
       </div>
 
@@ -299,7 +297,7 @@ const ProductionView = memo(function ProductionView({ activeMineId }) {
           <input
             className="table-search"
             id="prod-search"
-            placeholder="Search entries…"
+            placeholder="Search pit, grade, supervisor…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -336,8 +334,8 @@ const ProductionView = memo(function ProductionView({ activeMineId }) {
               </tr>
             </thead>
             <tbody id="prod-tbody">
-              {filteredEntries.length > 0 ? (
-                filteredEntries.map((r) => (
+              {entries.length > 0 ? (
+                entries.map((r) => (
                   <tr key={r.id}>
                     <td>{new Date(r.entryTime).toLocaleDateString('en-IN')}</td>
                     <td>{r.shift}</td>
@@ -383,13 +381,20 @@ const ProductionView = memo(function ProductionView({ activeMineId }) {
               ) : (
                 <tr>
                   <td colSpan="9" style={{ textAlign: 'center', color: 'var(--text2)', padding: '24px' }}>
-                    No production entries recorded for this month.
+                    No production entries recorded for this period.
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
+        <PaginationBar
+          page={page}
+          pageSize={PAGE_SIZE}
+          totalCount={totalCount}
+          itemCount={entries.length}
+          onPageChange={setPage}
+        />
       </div>
     </section>
   );

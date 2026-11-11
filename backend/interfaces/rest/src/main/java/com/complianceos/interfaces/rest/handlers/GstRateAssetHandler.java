@@ -10,11 +10,8 @@ import com.complianceos.compliance.api.beans.GstRate;
 import com.complianceos.compliance.api.services.MiningService;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
-import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.Map;
-import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /** GST rates are global reference data with no mine scoping, so this needs no access check. */
 @Singleton
@@ -42,9 +39,6 @@ public class GstRateAssetHandler implements AssetHandler<GstRate> {
     if (CollectionUtils.isEmpty(request.getKeys())) {
       return Map.of();
     }
-    final Set<String> keys = new HashSet<>(request.getKeys());
-    return service.findGstRates(null).getItems().stream()
-        .filter(rate -> keys.contains(rate.getId()))
-        .collect(Collectors.toMap(GstRate::getId, Function.identity()));
+    return service.getGstRates(CollectionUtils.nullSafeList(request.getKeys()));
   }
 }

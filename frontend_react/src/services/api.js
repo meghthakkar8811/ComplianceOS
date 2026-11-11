@@ -66,6 +66,29 @@ export async function catalogSearch(assetType, query, options) {
   });
 }
 
+/**
+ * Pages through a reference catalog (e.g. RoyaltyRate, GstRate, DmfRate, NmetRate, Mineral)
+ * so callers never silently truncate at the backend's default page size.
+ */
+export async function catalogSearchAll(assetType, query = {}, options, pageSize = 100) {
+  const allItems = [];
+  let offset = 0;
+  let totalCount = null;
+  while (totalCount === null || offset < totalCount) {
+    const res = await catalogSearch(
+      assetType,
+      { ...query, includeCount: true, page: { offset, limit: pageSize } },
+      options
+    );
+    const items = res?.items || [];
+    allItems.push(...items);
+    totalCount = res?.totalCount ?? items.length;
+    if (items.length < pageSize || items.length === 0) break;
+    offset += items.length;
+  }
+  return { items: allItems, totalCount: allItems.length };
+}
+
 export async function catalogAggregate(assetType, query, options) {
   return apiFetch('/catalog/aggregate', {
     method: 'POST',

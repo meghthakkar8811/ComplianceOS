@@ -1,6 +1,9 @@
-import React, { useState, useEffect, memo } from 'react';
+import React, { useState, useEffect, useCallback, memo } from 'react';
 import { catalogSearch, apiFetch, apiUpload, apiDownload } from '../services/api';
 import { toast } from '../context/ToastContext';
+import PaginationBar from '../components/common/PaginationBar';
+
+const PAGE_SIZE = 20;
 
 const AUTHORITY_ICONS = {
   IBM: '📄',
@@ -29,10 +32,12 @@ function getExpiryLabel(expiryMillis) {
     : '✓ Valid';
 }
 
-const DocumentsView = memo(function DocumentsView({ activeMineId, onOpenUploadDoc }) {
+const DocumentsView = memo(function DocumentsView({ activeMineId, refreshKey = 0, onOpenUploadDoc, onDataChanged }) {
   const [filterAuth, setFilterAuth] = useState('');
   const [search, setSearch] = useState('');
   const [docs, setDocs] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
 
   // Edit Doc Modal State
@@ -46,12 +51,11 @@ const DocumentsView = memo(function DocumentsView({ activeMineId, onOpenUploadDo
   const [editSaving, setEditSaving] = useState(false);
 
   useEffect(() => {
-    if (activeMineId) {
-      loadDocuments();
-    }
-  }, [activeMineId, filterAuth]);
+    setPage(0);
+  }, [activeMineId, filterAuth, search]);
 
-  const loadDocuments = async () => {
+  const loadDocuments = useCallback(async () => {
+    if (!activeMineId) return;
     setLoading(true);
     try {
       const filters = [
@@ -61,17 +65,28 @@ const DocumentsView = memo(function DocumentsView({ activeMineId, onOpenUploadDo
       if (filterAuth) {
         filters.push({ field: 'authority', op: 'EQ', values: [filterAuth] });
       }
-      const res = await catalogSearch('ComplianceRecord', { filter: { op: 'AND', values: filters } });
-      const rawDocs = (res.items || [])
-        .filter((d) => d.recordType !== 'DELETED' && d.status !== 'DELETED')
-        .sort((a, b) => (b.issuedOn || 0) - (a.issuedOn || 0));
+      if (search.trim()) {
+        filters.push({ field: 'title', op: 'CONTAINS', values: [search.trim()] });
+      }
+      const res = await catalogSearch('ComplianceRecord', {
+        filter: { op: 'AND', values: filters },
+        sorts: [{ field: 'issuedOn', order: 'DESC' }],
+        page: { offset: page * PAGE_SIZE, limit: PAGE_SIZE },
+        includeCount: true,
+      });
+      const rawDocs = res?.items || [];
       setDocs(rawDocs);
+      setTotalCount(res?.totalCount ?? rawDocs.length);
     } catch (e) {
       toast('Failed to load documents', 'error');
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeMineId, filterAuth, search, page, refreshKey]);
+
+  useEffect(() => {
+    loadDocuments();
+  }, [loadDocuments]);
 
   const handleOpenDoc = async (doc) => {
     if (!doc.attachment) {
@@ -91,6 +106,7 @@ const DocumentsView = memo(function DocumentsView({ activeMineId, onOpenUploadDo
       await apiFetch(`/mines/${activeMineId}/compliance/records/${id}`, { method: 'DELETE' });
       toast('Document deleted', 'success');
       loadDocuments();
+      onDataChanged?.();
     } catch (e) {
       toast(e.message || 'Failed to delete document', 'error');
     }
@@ -134,22 +150,13 @@ const DocumentsView = memo(function DocumentsView({ activeMineId, onOpenUploadDo
       toast('Document updated successfully', 'success');
       setEditingDoc(null);
       loadDocuments();
+      onDataChanged?.();
     } catch (e) {
       toast(e.message || 'Failed to update document', 'error');
     } finally {
       setEditSaving(false);
     }
   };
-
-  const filteredDocs = docs.filter((d) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      (d.title || '').toLowerCase().includes(q) ||
-      (d.authority || '').toLowerCase().includes(q) ||
-      (d.recordType || '').toLowerCase().includes(q)
-    );
-  });
 
   return (
     <section className="page active" id="page-documents">
@@ -224,8 +231,8 @@ const DocumentsView = memo(function DocumentsView({ activeMineId, onOpenUploadDo
           <p style={{ color: 'var(--text2)', fontFamily: 'var(--mono)', gridColumn: '1/-1', padding: '24px 0' }}>
             Loading documents…
           </p>
-        ) : filteredDocs.length > 0 ? (
-          filteredDocs.map((d) => (
+        ) : docs.length > 0 ? (
+          docs.map((d) => (
             <div
               key={d.id}
               className="doc-card"
@@ -278,6 +285,14 @@ const DocumentsView = memo(function DocumentsView({ activeMineId, onOpenUploadDo
           </p>
         )}
       </div>
+
+      <PaginationBar
+        page={page}
+        pageSize={PAGE_SIZE}
+        totalCount={totalCount}
+        itemCount={docs.length}
+        onPageChange={setPage}
+      />
 
       {/* EDIT DOCUMENT MODAL */}
       {editingDoc && (

@@ -10,11 +10,8 @@ import com.complianceos.compliance.api.beans.RoyaltyRate;
 import com.complianceos.compliance.api.services.MiningService;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
-import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.Map;
-import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /** Royalty rates are global reference data with no mine scoping, so this needs no access check. */
 @Singleton
@@ -42,9 +39,6 @@ public class RoyaltyRateAssetHandler implements AssetHandler<RoyaltyRate> {
     if (CollectionUtils.isEmpty(request.getKeys())) {
       return Map.of();
     }
-    final Set<String> keys = new HashSet<>(request.getKeys());
-    return service.findRoyaltyRates(null).getItems().stream()
-        .filter(rate -> keys.contains(rate.getId()))
-        .collect(Collectors.toMap(RoyaltyRate::getId, Function.identity()));
+    return service.getRoyaltyRates(CollectionUtils.nullSafeList(request.getKeys()));
   }
 }
