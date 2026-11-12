@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, memo } from 'react';
 import { catalogSearch, apiFetch } from '../services/api';
 import { toast } from '../context/ToastContext';
-import { SchemaForm } from '../components/forms/SchemaForm';
+import BuyerModal from '../components/modals/BuyerModal';
 import PaginationBar from '../components/common/PaginationBar';
 
 const PAGE_SIZE = 20;
@@ -49,21 +49,6 @@ const BuyersView = memo(function BuyersView() {
   const closeForm = () => {
     setShowForm(false);
     setEditingBuyer(null);
-  };
-
-  const handleSave = async (formData) => {
-    try {
-      const payload = editingBuyer ? { ...editingBuyer, ...formData } : formData;
-      await apiFetch(`/buyers/?skipVersion=true`, {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
-      toast(editingBuyer ? 'Buyer updated' : 'Buyer added', 'success');
-      closeForm();
-      loadBuyers();
-    } catch (e) {
-      toast(e.message || 'Failed to save buyer', 'error');
-    }
   };
 
   const handleDelete = async (buyer) => {
@@ -158,34 +143,12 @@ const BuyersView = memo(function BuyersView() {
         />
       </div>
 
-      {showForm && (
-        <div
-          className="modal-overlay"
-          id="modal-buyer-form"
-          style={{ display: 'flex' }}
-          onClick={(e) => e.target === e.currentTarget && closeForm()}
-        >
-          <div className="modal-box medium">
-            <div className="modal-header">
-              <div>
-                <h2>{editingBuyer ? 'Edit Buyer' : 'New Buyer'}</h2>
-              </div>
-              <button className="modal-close" onClick={closeForm}>✕</button>
-            </div>
-            <div className="modal-body">
-              <SchemaForm
-                key={editingBuyer ? editingBuyer.id : 'new'}
-                assetType="Buyer"
-                mode={editingBuyer ? 'edit' : 'create'}
-                initialData={editingBuyer}
-                onSubmit={handleSave}
-                onCancel={closeForm}
-                submitLabel={editingBuyer ? 'Save Changes' : 'Add Buyer'}
-              />
-            </div>
-          </div>
-        </div>
-      )}
+      <BuyerModal
+        isOpen={showForm}
+        onClose={closeForm}
+        initialBuyer={editingBuyer}
+        onSaved={loadBuyers}
+      />
     </section>
   );
 });
