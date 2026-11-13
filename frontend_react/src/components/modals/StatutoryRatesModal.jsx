@@ -11,10 +11,12 @@ const MONTH_INDEX = {
 function latestRoyaltyRatesByStateAndMineral(rates) {
   const latest = new Map();
   for (const rate of rates) {
-    const key = `${rate.state}:${rate.mineral}:${rate.grade || ''}`;
+    const key = `${rate.state || ''}:${rate.mineral || ''}:${rate.grade || ''}`;
     const existing = latest.get(key);
-    const rank = rate.year * 12 + (MONTH_INDEX[rate.month] || 0);
-    const existingRank = existing ? existing.year * 12 + (MONTH_INDEX[existing.month] || 0) : -1;
+    const yr = Number(rate.year) || 0;
+    const rank = yr * 12 + (MONTH_INDEX[rate.month] ?? 0);
+    const existingYr = existing ? (Number(existing.year) || 0) : 0;
+    const existingRank = existing ? existingYr * 12 + (MONTH_INDEX[existing.month] ?? 0) : -1;
     if (!existing || rank > existingRank) {
       latest.set(key, rate);
     }
