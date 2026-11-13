@@ -245,3 +245,4 @@ export default function FormF2Modal({ isOpen, onClose, activeMine, activeMineMin
     </div>
   );
 }
+
