@@ -330,3 +330,4 @@ export default function DispatchModal({ isOpen, onClose, activeMineId, onSaved }
     </div>
   );
 }
+
