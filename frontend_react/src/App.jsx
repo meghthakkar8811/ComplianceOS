@@ -25,6 +25,7 @@ import VerifyView from './pages/VerifyView';
 // Modals
 import AddMineModal from './components/modals/AddMineModal';
 import FormBModal from './components/modals/FormBModal';
+import FormF2Modal from './components/modals/FormF2Modal';
 import FormCModal from './components/modals/FormCModal';
 import FormJModal from './components/modals/FormJModal';
 import FormAModal from './components/modals/FormAModal';
@@ -69,6 +70,7 @@ export default function App() {
   // Modal states
   const [showAddMineModal, setShowAddMineModal] = useState(false);
   const [showFormBModal, setShowFormBModal] = useState(false);
+  const [showFormF2Modal, setShowFormF2Modal] = useState(false);
   const [showFormCModal, setShowFormCModal] = useState(false);
   const [showFormJModal, setShowFormJModal] = useState(false);
   const [showFormAModal, setShowFormAModal] = useState(false);
@@ -385,6 +387,7 @@ export default function App() {
       if (e.key === 'Escape') {
         setShowAddMineModal(false);
         setShowFormBModal(false);
+        setShowFormF2Modal(false);
         setShowFormCModal(false);
         setShowFormJModal(false);
         setShowFormAModal(false);
@@ -523,7 +526,8 @@ export default function App() {
           {activePage === 'forms' && (
             <FormsView
               onOpenForm={(type) => {
-                if (type === 'formb') setShowFormBModal(true);
+                if (type === 'formb' || type === 'formf1') setShowFormBModal(true);
+                else if (type === 'formf2') setShowFormF2Modal(true);
                 else if (type === 'formc') setShowFormCModal(true);
                 else if (type === 'formj') setShowFormJModal(true);
                 else if (type === 'forma') setShowFormAModal(true);
@@ -591,6 +595,15 @@ export default function App() {
         <FormBModal
           isOpen={showFormBModal}
           onClose={() => setShowFormBModal(false)}
+          activeMine={activeMine}
+          activeMineMinerals={activeMineMinerals}
+          user={user}
+          onSubmitted={() => loadDashboardData(activeMineId)}
+        />
+
+        <FormF2Modal
+          isOpen={showFormF2Modal}
+          onClose={() => setShowFormF2Modal(false)}
           activeMine={activeMine}
           activeMineMinerals={activeMineMinerals}
           user={user}

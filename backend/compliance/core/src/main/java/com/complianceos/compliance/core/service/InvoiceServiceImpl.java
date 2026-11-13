@@ -140,18 +140,26 @@ public class InvoiceServiceImpl implements InvoiceService {
    * winner's own request crashed between inserting the record and uploading the file).
    */
   private Invoice createInvoice(final Sale sale, final Mine mine, final Buyer buyer) {
+    final double taxableValue;
     if (SaleType.valueOfOrDefault(sale.getType()) == SaleType.CONSUMPTION) {
-      // requiresInvoice() already established the mine and buyer GSTINs differ for a CONSUMPTION
-      // sale to reach here — open-market valuation under Rule 28, which this plan doesn't design.
-      // TODO: Implement CGST Rule 28 open-market valuation for deemed-supply CONSUMPTION sales.
-      throw new UnsupportedOperationException(
-          "Rule 28 open-market valuation for deemed-supply CONSUMPTION sales is not yet implemented");
+      // CGST Rule 28 deemed supply between distinct persons with different GSTINs:
+      // Proviso 2: Where recipient is eligible for full ITC, the declared value in the invoice is
+      // deemed to be the open market value. If positive, use saleValue; otherwise fallback to
+      // grade baseline price per unit * quantity.
+      if (sale.getSaleValue() > 0) {
+        taxableValue = sale.getSaleValue();
+      } else {
+        final double unitPrice = resolveGradePrice(sale);
+        taxableValue = unitPrice > 0 ? unitPrice * sale.getQuantity() : 0;
+      }
+    } else {
+      taxableValue = sale.getSaleValue();
     }
 
     final boolean interState = !mine.getState().equals(buyer.getState());
     final GstRate gstRate = Objects.requireNonNull(getGstRate(mineralNameFor(sale), sale.getDispatchedOn()));
     final double rate = gstRate.getRate();
-    final double totalGst = sale.getSaleValue() * rate;
+    final double totalGst = taxableValue * rate;
     final double cgstAmount = interState ? 0 : totalGst / 2;
     final double sgstAmount = interState ? 0 : totalGst - cgstAmount;
     final double igstAmount = interState ? totalGst : 0;
@@ -222,10 +230,34 @@ public class InvoiceServiceImpl implements InvoiceService {
 
     final Map<String, Object> saleMap = JsonUtils.toMap(sale);
     saleMap.put("mineral", mineralNameFor(sale));
+    if (SaleType.valueOfOrDefault(sale.getType()) == SaleType.CONSUMPTION && (sale.getSaleValue() <= 0)) {
+      final double unitPrice = resolveGradePrice(sale);
+      saleMap.put("saleValue", unitPrice > 0 ? unitPrice * sale.getQuantity() : 0);
+    }
 
     final Map<String, Object> invoiceMap = JsonUtils.toMap(invoice);
 
     return Map.of("mine", mineMap, "buyer", buyerMap, "sale", saleMap, "invoice", invoiceMap);
+  }
+
+  /** Resolves baseline unit price from mineral grade when a captive CONSUMPTION dispatch has no declared sale value. */
+  private double resolveGradePrice(final Sale sale) {
+    if (StringUtils.isBlank(sale.getMineral()) || StringUtils.isBlank(sale.getGrade())) {
+      return 0;
+    }
+    final Mineral mineral =
+        mineralService
+            .getMinerals(sale.getMineId(), List.of(sale.getMineral()))
+            .get(sale.getMineral());
+    if (mineral == null || CollectionUtils.isEmpty(mineral.getGrades())) {
+      return 0;
+    }
+    for (final Mineral.MineralGrade grade : mineral.getGrades()) {
+      if (Objects.equals(grade.getName(), sale.getGrade()) && grade.getOpeningPricePerUnit() != null) {
+        return grade.getOpeningPricePerUnit();
+      }
+    }
+    return 0;
   }
 
   /** The display name of the mineral {@code sale.getMineral()} (a {@link Mineral} id) names. */

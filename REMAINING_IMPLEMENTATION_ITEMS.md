@@ -6,32 +6,33 @@
 
 ## Summary Matrix
 
-| # | Item | Category | Target Area | Priority |
+| # | Item | Category | Target Area | Status |
 | :-: | :--- | :--- | :--- | :---: |
-| 1 | **CGST Rule 28 Open-Market Valuation (`CONSUMPTION`)** | Backend / Invoicing | `InvoiceServiceImpl.java` | High |
-| 2 | **Form F-2 Monthly Return (Non-Metallic Minerals)** | Statutory Forms | `FormsView.jsx` / New `FormF2Modal.jsx` | Medium |
-| 3 | **Geological, Explosives & Fleet Tracking** | Domain Data | Backend Beans + `FormAModal.jsx` / `FormBModal.jsx` | Medium |
-| 4 | **Live Government Portal Bridges (`ibmts.gov.in` / DMG)** | External Integration | Backend REST / Adapters | Low (Requires MoU/Credentials) |
-| 5 | **Weighbridge Load-Cell & DGPS Hardware Ingestion** | Hardware / IoT | Ingestion API / Edge Adapter | Low (Site Hardware) |
+| 1 | **CGST Rule 28 Open-Market Valuation (`CONSUMPTION`)** | Backend / Invoicing | `InvoiceServiceImpl.java` | **Completed** |
+| 2 | **Form F-2 Monthly Return (Non-Metallic Minerals)** | Statutory Forms | `FormsView.jsx` / `FormF2Modal.jsx` | **Completed** |
+| 3 | **Geological, Explosives & Fleet Tracking** | Domain Data | Backend Beans + `FormAModal.jsx` / `FormBModal.jsx` | Pending |
+| 4 | **Live Government Portal Bridges (`ibmts.gov.in` / DMG)** | External Integration | Backend REST / Adapters | Post-MoU (Requires Govt. API) |
+| 5 | **Weighbridge Load-Cell & DGPS Hardware Ingestion** | Hardware / IoT | Ingestion API / Edge Adapter | Post-Pilot (Site Hardware) |
 
 ---
 
 ## Detailed Breakdown
 
-### 1. CGST Rule 28 Open-Market Valuation for Inter-GSTIN `CONSUMPTION` Invoices
+### 1. CGST Rule 28 Open-Market Valuation for Inter-GSTIN `CONSUMPTION` Invoices (COMPLETED)
 - **Source:** [`TODO.md`](./TODO.md#L5-L7)
-- **Current State:** [`InvoiceServiceImpl.createInvoice`](./backend/compliance/core/src/main/java/com/complianceos/compliance/core/service/InvoiceServiceImpl.java#L142-L149) currently throws `UnsupportedOperationException` when a `Sale` of type `CONSUMPTION` occurs between a mine and buyer with **different GSTINs**.
-- **Requirement:**
-  - Implement Rule 28 (CGST Rules, 2017) valuation hierarchy (Open Market Value → Value of like kind/quality → Cost + 10% fallback) for deemed-supply captive transfers.
-  - Compute CGST/SGST/IGST against the Rule 28 taxable value and persist the generated invoice + PDF.
+- **Status:** **Implemented** in [`InvoiceServiceImpl.java`](./backend/compliance/core/src/main/java/com/complianceos/compliance/core/service/InvoiceServiceImpl.java).
+- **Solution:** Evaluates deemed supply between distinct registrations (different GSTINs). In accordance with the second proviso to Rule 28, positive declared values are treated as open market value; when zero, it falls back to the baseline grade price per unit multiplied by quantity. Tax invoice and PDF generation now execute without throwing an `UnsupportedOperationException`.
 
 ---
 
-### 2. Form F-2 Monthly Return (Non-Metallic Minerals)
+### 2. Form F-2 Monthly Return for Non-Metallic Minerals (COMPLETED)
 - **Source:** [`IBM_MOU_FINAL_IMPLEMENTATION_PLAN.md`](./IBM_MOU_FINAL_IMPLEMENTATION_PLAN.md#L94) (MCDR 2017 — Rule 45)
-- **Current State:** [`FormBModal.jsx`](./frontend_react/src/components/modals/FormBModal.jsx) covers **Form F-1** (Metallic Minerals) ledger preview and acknowledgement logging.
-- **Requirement:**
-  - Support **Form F-2** layout and fields for non-metallic / industrial minerals (e.g., Limestone, Gypsum, Silica, Dolomite) with grade/use-wise dispatch breakouts (Cement, Chemical, Steel, etc.) alongside Form F-1 in [`FormsView.jsx`](./frontend_react/src/views/FormsView.jsx).
+- **Status:** **Implemented** in [`FormsView.jsx`](./frontend_react/src/views/FormsView.jsx) and [`FormF2Modal.jsx`](./frontend_react/src/components/modals/FormF2Modal.jsx).
+- **Solution:** Dedicated Form F-2 modal with:
+  - Part I Mine & Lessee particulars.
+  - Part II Monthly ROM production & dispatch ledger figures.
+  - Part III Consuming industry end-use allocation (Cement, Iron & Steel, Chemical/Fertilizer, Glass & Ceramics, Captive Plant/Other).
+  - Part IV IBM MTS filing acknowledgement logging.
 
 ---
 
