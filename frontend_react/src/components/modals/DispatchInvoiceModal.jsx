@@ -446,3 +446,4 @@ export default function DispatchInvoiceModal({ isOpen, onClose, dispatch, active
     </div>
   );
 }
+
