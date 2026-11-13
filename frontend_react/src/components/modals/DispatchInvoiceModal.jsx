@@ -143,7 +143,10 @@ export default function DispatchInvoiceModal({ isOpen, onClose, dispatch, active
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       };
 
-      await html2pdf().set(opt).from(element).save();
+      const html2pdfLib = typeof html2pdf === 'function' ? html2pdf : (html2pdf && html2pdf.default ? html2pdf.default : window.html2pdf);
+      if (!html2pdfLib) throw new Error('PDF library not ready');
+
+      await html2pdfLib().set(opt).from(element).save();
       toast('Statutory Tax Invoice PDF generated successfully', 'success');
     } catch (err) {
       toast('Failed to generate PDF: ' + (err.message || 'Error'), 'error');

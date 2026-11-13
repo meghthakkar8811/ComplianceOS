@@ -113,7 +113,7 @@ const ProductionView = memo(function ProductionView({ activeMineId, onDataChange
     try {
       const payload = {
         mineId: activeMineId,
-        entryTime: new Date(prodDate).getTime(),
+        entryTime: Date.parse(prodDate + 'T00:00:00Z'),
         shift: prodShift,
         pitSection: prodPit || 'Pit A (North)',
         mineral: prodMineral,

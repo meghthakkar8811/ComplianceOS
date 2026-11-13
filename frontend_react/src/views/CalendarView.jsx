@@ -35,11 +35,15 @@ const CalendarView = memo(function CalendarView({ activeMineId, onDataChanged })
       });
       const now = Date.now();
       const raw = res?.items || [];
-      const items = raw.map((r) => ({
-        ...r,
-        days_until: Math.floor((r.expiry - now) / 86400000),
-        dt: new Date(r.expiry),
-      }));
+      const items = raw.map((r) => {
+        const hasExpiry = typeof r.expiry === 'number' && !isNaN(r.expiry) && r.expiry > 0;
+        const dt = hasExpiry ? new Date(r.expiry) : null;
+        return {
+          ...r,
+          days_until: hasExpiry ? Math.floor((r.expiry - now) / 86400000) : null,
+          dt,
+        };
+      });
       setRecords(items);
       setTotalCount(res?.totalCount ?? raw.length);
     } catch (err) {
@@ -77,7 +81,7 @@ const CalendarView = memo(function CalendarView({ activeMineId, onDataChanged })
   // Group events by month
   const months = {};
   records.forEach((ev) => {
-    const key = ev.dt.toLocaleString('default', { month: 'long', year: 'numeric' });
+    const key = ev.dt ? ev.dt.toLocaleString('default', { month: 'long', year: 'numeric' }) : 'Standing / No Expiry Date';
     if (!months[key]) months[key] = [];
     months[key].push(ev);
   });
@@ -124,6 +128,8 @@ const CalendarView = memo(function CalendarView({ activeMineId, onDataChanged })
                 const cls =
                   ev.status === 'SUBMITTED'
                     ? 'done'
+                    : days == null
+                    ? 'upcoming'
                     : days < 0
                     ? 'overdue'
                     : days <= 7
@@ -132,6 +138,8 @@ const CalendarView = memo(function CalendarView({ activeMineId, onDataChanged })
                 const chipCls =
                   ev.status === 'SUBMITTED'
                     ? 'green'
+                    : days == null
+                    ? 'neutral'
                     : days <= 0
                     ? 'red'
                     : days <= 7
@@ -142,6 +150,8 @@ const CalendarView = memo(function CalendarView({ activeMineId, onDataChanged })
                 const chip =
                   ev.status === 'SUBMITTED'
                     ? 'Filed ✓'
+                    : days == null
+                    ? 'Ongoing'
                     : days < 0
                     ? 'OVERDUE'
                     : `${days}d away`;
@@ -154,9 +164,9 @@ const CalendarView = memo(function CalendarView({ activeMineId, onDataChanged })
                     title={ev.status === 'SUBMITTED' ? 'Already submitted' : 'Click to mark as submitted'}
                   >
                     <div>
-                      <span className="cal-day-num">{ev.dt.getDate()}</span>
+                      <span className="cal-day-num">{ev.dt ? ev.dt.getDate() : '—'}</span>
                       <span className="cal-day-mon">
-                        {ev.dt.toLocaleString('default', { month: 'short' }).toUpperCase()}
+                        {ev.dt ? ev.dt.toLocaleString('default', { month: 'short' }).toUpperCase() : 'N/A'}
                       </span>
                     </div>
                     <div>
