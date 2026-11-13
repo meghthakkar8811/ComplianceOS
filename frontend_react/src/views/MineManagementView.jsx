@@ -38,12 +38,22 @@ const STOPPAGE_REASONS = [
 
 function fmtDate(ms) {
   if (!ms) return '—';
-  return new Date(ms).toLocaleDateString('en-IN');
+  try {
+    const d = new Date(ms);
+    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-IN');
+  } catch {
+    return '—';
+  }
 }
 
 function toDateInput(ms) {
   if (!ms) return '';
-  return new Date(ms).toISOString().slice(0, 10);
+  try {
+    const d = new Date(ms);
+    return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+  } catch {
+    return '';
+  }
 }
 
 function useMinePagedList(mineId, assetType, sortField, reloadKey) {
@@ -83,7 +93,7 @@ function useMinePagedList(mineId, assetType, sortField, reloadKey) {
   return { items, totalCount, page, setPage, loading, reload: load };
 }
 
-const MineManagementView = memo(function MineManagementView({ activeMine, onMineUpdated }) {
+const MineManagementView = memo(function MineManagementView({ activeMine, onMineUpdated, onOpenAddMine }) {
   const mineId = activeMine?.id;
   const [tab, setTab] = useState('profile');
   const [reloadKey, setReloadKey] = useState(0);
@@ -187,8 +197,8 @@ const MineManagementView = memo(function MineManagementView({ activeMine, onMine
     setSavingMine(true);
     try {
       const payload = {
-        ...activeMine,
-        id: activeMine.id,
+        ...(activeMine || {}),
+        id: activeMine?.id,
         name: mineForm.name.trim(),
         leaseNumber: mineForm.leaseNumber.trim(),
         gstin: mineForm.gstin.trim() ? mineForm.gstin.trim().toUpperCase() : null,
@@ -484,8 +494,20 @@ const MineManagementView = memo(function MineManagementView({ activeMine, onMine
         <div className="page-header">
           <div className="page-title-block">
             <h1>Mine Management</h1>
-            <p className="page-sub">Select a mine lease to manage profile, minerals, rents, payments, labour, and stoppages.</p>
+            <p className="page-sub">Select or add a mine lease to manage profile, minerals, rents, payments, labour, and stoppages.</p>
           </div>
+        </div>
+        <div style={{ textAlign: 'center', padding: '60px 24px', background: 'var(--bg-card, #0f172a)', borderRadius: '12px', border: '1px solid var(--border, #334155)', margin: '20px 0' }}>
+          <div style={{ fontSize: '36px', marginBottom: '12px' }}>⛏️</div>
+          <h3 style={{ margin: '0 0 8px', color: 'var(--text0, #f8fafc)' }}>No Mine Lease Selected</h3>
+          <p style={{ color: 'var(--text2, #94a3b8)', maxWidth: '440px', margin: '0 auto 20px', fontSize: '13px' }}>
+            There are currently no active mine leases configured in this account. Add your mining lease to begin compliance tracking.
+          </p>
+          {onOpenAddMine && (
+            <button className="btn-primary" onClick={onOpenAddMine}>
+              + Add Mine Lease
+            </button>
+          )}
         </div>
       </section>
     );

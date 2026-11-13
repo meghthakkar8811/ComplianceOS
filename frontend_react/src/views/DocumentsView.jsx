@@ -13,6 +13,16 @@ const AUTHORITY_ICONS = {
   STATE_GOVT: '📜',
 };
 
+function safeToIsoDate(val) {
+  if (!val) return '';
+  try {
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+  } catch {
+    return '';
+  }
+}
+
 function getExpiryStatus(expiryMillis) {
   if (!expiryMillis) return 'none';
   const now = Date.now();
@@ -117,8 +127,8 @@ const DocumentsView = memo(function DocumentsView({ activeMineId, refreshKey = 0
     setEditTitle(d.title || '');
     setEditAuthority(d.authority || 'STATE_GOVT');
     setEditRecordType(d.recordType || 'CLEARANCE');
-    setEditIssued(d.issuedOn ? new Date(d.issuedOn).toISOString().slice(0, 10) : '');
-    setEditExpiry(d.expiry ? new Date(d.expiry).toISOString().slice(0, 10) : '');
+    setEditIssued(safeToIsoDate(d.issuedOn));
+    setEditExpiry(safeToIsoDate(d.expiry));
     setEditFile(null);
   };
 

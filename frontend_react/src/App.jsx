@@ -108,6 +108,8 @@ export default function App() {
         const savedMineId = localStorage.getItem('cos_active_mine') || localStorage.getItem('cos_mine_id');
         const defaultMine = mineList.find((m) => m.id === savedMineId) || mineList[0];
         setActiveMineId((prev) => prev && mineList.some((m) => m.id === prev) ? prev : defaultMine.id);
+      } else {
+        setActiveMineId(null);
       }
     } catch (err) {
       console.error('Failed to load mines:', err);
@@ -553,6 +555,7 @@ export default function App() {
                 loadMines();
                 loadDashboardData(activeMineId);
               }}
+              onOpenAddMine={() => setShowAddMineModal(true)}
             />
           )}
 

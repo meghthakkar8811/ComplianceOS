@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback, memo } from 'react';
 import { catalogSearch, catalogAggregate, apiFetch, downloadInvoice } from '../services/api';
 import { toast } from '../context/ToastContext';
-import { SchemaForm } from '../components/forms/SchemaForm';
 import PaginationBar from '../components/common/PaginationBar';
 import DispatchInvoiceModal from '../components/modals/DispatchInvoiceModal';
+import DispatchModal from '../components/modals/DispatchModal';
 
 const PAGE_SIZE = 20;
 
@@ -190,29 +190,21 @@ const SalesView = memo(function SalesView({ activeMineId, activeMine, onDataChan
               outline: 'none',
             }}
           />
-          <button className="btn-primary" onClick={() => setShowSaleForm(!showSaleForm)}>
-            {showSaleForm ? 'Cancel' : '+ New Dispatch'}
+          <button className="btn-primary" onClick={() => setShowSaleForm(true)}>
+            + New Dispatch
           </button>
         </div>
       </div>
 
-      {showSaleForm && (
-        <div className="prod-form-card" id="sale-form-card" style={{ display: 'block' }}>
-          <div className="pfc-header">
-            <h3>New Dispatch</h3>
-            <button className="icon-close" onClick={() => setShowSaleForm(false)}>✕</button>
-          </div>
-          <SchemaForm
-            key={activeMineId}
-            assetType="Sale"
-            mode="create"
-            initialData={{ mineId: activeMineId }}
-            onSubmit={handleSaveSale}
-            onCancel={() => setShowSaleForm(false)}
-            submitLabel="Save Dispatch"
-          />
-        </div>
-      )}
+      <DispatchModal
+        isOpen={showSaleForm}
+        onClose={() => setShowSaleForm(false)}
+        activeMineId={activeMineId}
+        onSaved={() => {
+          loadSales();
+          if (onDataChanged) onDataChanged();
+        }}
+      />
 
       {/* SUMMARY ROW (Server-Side Aggregated) */}
       <div className="prod-summary-row" id="sale-summary">
@@ -320,6 +312,7 @@ const SalesView = memo(function SalesView({ activeMineId, activeMine, onDataChan
 
       {selectedInvoiceDispatch && (
         <DispatchInvoiceModal
+          key={selectedInvoiceDispatch.id}
           isOpen={Boolean(selectedInvoiceDispatch)}
           onClose={() => setSelectedInvoiceDispatch(null)}
           dispatch={selectedInvoiceDispatch}
