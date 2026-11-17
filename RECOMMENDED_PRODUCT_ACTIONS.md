@@ -157,3 +157,4 @@ To make ComplianceOS irresistible to mine owners operating under ILMS, execute t
 - [ ] **Step 2:** Build the Pre-Audit Reconciliation summary card (Pit Production vs. ILMS Passes vs. Stockpile).
 - [ ] **Step 3:** Add PESO Form RE-3 explosive consumption logging for powder-factor theft calculation.
 - [ ] **Step 4:** Launch the 60-day trial with target mine owners.
+
